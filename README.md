@@ -59,7 +59,7 @@ So that's why this app exists! It basically lets you have the watch app installe
 ## Setup
 
 ### Download
-1. Download the phone and watch apps from the [releases page](https://github.com/WitherredAway/NotificationMirror/releases) or build the apks yourself, scroll down for that)
+1. Download the phone and watch apps from the [releases page](https://github.com/WitherredAway/NotificationMirror/releases) (or build the apks yourself, scroll down for that)
 
 ### Install
 1. Install the `mobile` APK on your Android phone
