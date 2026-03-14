@@ -62,10 +62,15 @@ So that's why this app exists! It basically lets you have the watch app installe
 1. Download the phone and watch apps from the [releases page](https://github.com/WitherredAway/NotificationMirror/releases) (or build the apks yourself, scroll down for that)
 
 ### Install
+You'll have to sideload the watch apk, e.g. using [Wear Installer 2](https://play.google.com/store/apps/details?id=org.freepoc.wearinstaller2&hl=en_IN) or [Geminiman WearOS Manager](https://play.google.com/store/apps/details?id=com.geminiman.wearosmanager&hl=en_IN) or adb, etc
+
+If Google Play prevents you from installing the phone apk, please use [Install With Options](https://github.com/zacharee/InstallWithOptions) to install it.
+
 1. Install the `mobile` APK on your Android phone
 2. Install the `wear` APK on your Wear OS watch
-3. Open the phone app and grant **Notification Access** permission
-4. Make sure phone and watch are paired
+3. Open the phone app and grant **Notification Access** permission, disable Battery Optimization.
+4. Open the watch app and grant the Notification permission.
+5. Make sure phone and watch are paired
 
 ### Usage
 1. Once notification access is granted, the phone app runs in the background
