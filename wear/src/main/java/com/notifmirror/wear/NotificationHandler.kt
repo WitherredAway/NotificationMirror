@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -50,6 +51,7 @@ object NotificationHandler {
             val muteDuration = json.optInt("muteDuration", 30)
             val defaultVibration = json.optString("defaultVibration", "0,200,100,200")
             val customVibrationPattern = json.optString("vibrationPattern", "")
+            val customSoundUri = json.optString("soundUri", "")
             val isSilent = json.optBoolean("silent", false)
 
             Log.d(TAG, "Received notification: $title - $text")
@@ -80,7 +82,7 @@ object NotificationHandler {
             showNotification(
                 context, notifId, key, packageName, title, text, subText, actionsArray, iconBitmap,
                 notifPriority, bigTextThreshold, autoCancel, showOpenButton, showMuteButton,
-                muteDuration, defaultVibration, customVibrationPattern, isSilent
+                muteDuration, defaultVibration, customVibrationPattern, customSoundUri, isSilent
             )
 
             NotificationTileService.incrementCount(context, packageName)
@@ -129,6 +131,7 @@ object NotificationHandler {
         muteDuration: Int = 30,
         defaultVibration: String = "0,200,100,200",
         customVibrationPattern: String = "",
+        customSoundUri: String = "",
         isSilent: Boolean = false
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -146,8 +149,11 @@ object NotificationHandler {
             -1 -> NotificationManager.IMPORTANCE_LOW
             else -> NotificationManager.IMPORTANCE_HIGH
         }
+        // Use a unique channel ID when custom sound is set so the sound setting takes effect
+        val soundSuffix = if (customSoundUri.isNotEmpty()) "_sound_${customSoundUri.hashCode()}" else ""
+        val effectiveChannelId = channelId + soundSuffix
         val channel = NotificationChannel(
-            channelId,
+            effectiveChannelId,
             "$appLabel Notifications",
             if (isSilent) NotificationManager.IMPORTANCE_LOW else importance
         ).apply {
@@ -155,6 +161,15 @@ object NotificationHandler {
             enableVibration(true)
             this.vibrationPattern = vibrationPattern
             this.group = groupId
+            if (customSoundUri.isNotEmpty()) {
+                setSound(
+                    Uri.parse(customSoundUri),
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
         }
         nm.createNotificationChannel(channel)
 
@@ -164,7 +179,7 @@ object NotificationHandler {
             else -> NotificationCompat.PRIORITY_HIGH
         }
 
-        val builder = NotificationCompat.Builder(context, channelId)
+        val builder = NotificationCompat.Builder(context, effectiveChannelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)

@@ -105,6 +105,10 @@ class MainActivity : AppCompatActivity() {
             versionText.text = "v${pInfo.versionName}"
         } catch (_: Exception) {}
 
+        findViewById<TextView>(R.id.githubLink).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
+        }
+
         checkAndRequestPermissions()
     }
 
@@ -240,6 +244,10 @@ class MainActivity : AppCompatActivity() {
             val customVib = settingsManager.getVibrationPattern(packageName)
             if (customVib.isNotEmpty()) {
                 put("vibrationPattern", customVib)
+            }
+            val customSound = settingsManager.getSoundUri(packageName)
+            if (customSound.isNotEmpty()) {
+                put("soundUri", customSound)
             }
         }
 

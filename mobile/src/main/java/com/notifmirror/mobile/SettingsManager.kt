@@ -14,6 +14,8 @@ class SettingsManager(context: Context) {
         private const val KEY_SCREEN_OFF_MODE = "screen_off_mode"
         private const val KEY_MUTE_DURATION = "mute_duration_minutes"
         private const val KEY_VIBRATION_PREFIX = "vibration_"
+        private const val KEY_SOUND_PREFIX = "sound_"
+        private const val KEY_SOUND_NAME_PREFIX = "sound_name_"
         private const val KEY_DEFAULT_VIBRATION = "default_vibration_pattern"
         private const val KEY_MIRROR_ONGOING = "mirror_ongoing"
         private const val KEY_NOTIF_PRIORITY = "notification_priority"
@@ -188,6 +190,41 @@ class SettingsManager(context: Context) {
 
     fun removeVibrationPattern(packageName: String) {
         prefs.edit().remove(KEY_VIBRATION_PREFIX + packageName).apply()
+    }
+
+    // --- Per-App Sound ---
+
+    fun getSoundUri(packageName: String): String {
+        return prefs.getString(KEY_SOUND_PREFIX + packageName, "") ?: ""
+    }
+
+    fun getSoundDisplayName(packageName: String): String {
+        return prefs.getString(KEY_SOUND_NAME_PREFIX + packageName, "") ?: ""
+    }
+
+    fun setSoundUri(packageName: String, uri: String, displayName: String) {
+        prefs.edit()
+            .putString(KEY_SOUND_PREFIX + packageName, uri)
+            .putString(KEY_SOUND_NAME_PREFIX + packageName, displayName)
+            .apply()
+    }
+
+    fun removeSoundUri(packageName: String) {
+        prefs.edit()
+            .remove(KEY_SOUND_PREFIX + packageName)
+            .remove(KEY_SOUND_NAME_PREFIX + packageName)
+            .apply()
+    }
+
+    fun getAllCustomSounds(): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        for ((key, value) in prefs.all) {
+            if (key.startsWith(KEY_SOUND_NAME_PREFIX) && value is String && value.isNotEmpty()) {
+                val pkg = key.removePrefix(KEY_SOUND_NAME_PREFIX)
+                result[pkg] = value
+            }
+        }
+        return result
     }
 
     /**

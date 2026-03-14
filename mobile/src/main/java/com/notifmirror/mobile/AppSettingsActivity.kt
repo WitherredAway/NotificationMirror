@@ -2,6 +2,8 @@ package com.notifmirror.mobile
 
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -13,6 +15,7 @@ import android.widget.ImageView
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -24,6 +27,26 @@ import com.google.android.material.switchmaterial.SwitchMaterial
 class AppSettingsActivity : AppCompatActivity() {
 
     private lateinit var settings: SettingsManager
+    private var selectedSoundPackage = ""
+    private var selectedSoundUri: Uri? = null
+    private var selectedSoundName = ""
+
+    private val ringtonePicker = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) {
+                selectedSoundUri = uri
+                val ringtone = RingtoneManager.getRingtone(this, uri)
+                selectedSoundName = ringtone?.getTitle(this) ?: uri.toString()
+                findViewById<TextView>(R.id.soundNameDisplay).apply {
+                    text = "Sound: $selectedSoundName"
+                    visibility = View.VISIBLE
+                }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -126,6 +149,85 @@ class AppSettingsActivity : AppCompatActivity() {
             vibAppDisplay.visibility = View.GONE
             vibPatternInput.text.clear()
             updateCustomVibrationsDisplay(customVibrationsText)
+        }
+
+        // Sound section
+        val selectSoundAppButton = findViewById<MaterialButton>(R.id.selectSoundAppButton)
+        val soundAppDisplay = findViewById<TextView>(R.id.soundAppDisplay)
+        val pickSoundButton = findViewById<MaterialButton>(R.id.pickSoundButton)
+        val setSoundButton = findViewById<MaterialButton>(R.id.setSoundButton)
+        val clearSoundButton = findViewById<MaterialButton>(R.id.clearSoundButton)
+        val customSoundsText = findViewById<TextView>(R.id.customSoundsText)
+
+        updateCustomSoundsDisplay(customSoundsText)
+
+        selectSoundAppButton.setOnClickListener {
+            showAppPickerDialog { pkg, label ->
+                selectedSoundPackage = pkg
+                soundAppDisplay.text = label
+                soundAppDisplay.visibility = View.VISIBLE
+                // Load existing sound if set
+                val existingUri = settings.getSoundUri(pkg)
+                if (existingUri.isNotEmpty()) {
+                    selectedSoundUri = Uri.parse(existingUri)
+                    selectedSoundName = settings.getSoundDisplayName(pkg)
+                    findViewById<TextView>(R.id.soundNameDisplay).apply {
+                        text = "Sound: $selectedSoundName"
+                        visibility = View.VISIBLE
+                    }
+                } else {
+                    selectedSoundUri = null
+                    selectedSoundName = ""
+                    findViewById<TextView>(R.id.soundNameDisplay).visibility = View.GONE
+                }
+            }
+        }
+
+        pickSoundButton.setOnClickListener {
+            val intent = android.content.Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Notification Sound")
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                if (selectedSoundUri != null) {
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedSoundUri)
+                }
+            }
+            ringtonePicker.launch(intent)
+        }
+
+        setSoundButton.setOnClickListener {
+            if (selectedSoundPackage.isEmpty()) {
+                Toast.makeText(this, "Select an app first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (selectedSoundUri == null) {
+                Toast.makeText(this, "Pick a sound first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            settings.setSoundUri(selectedSoundPackage, selectedSoundUri.toString(), selectedSoundName)
+            Toast.makeText(this, "Sound set for ${soundAppDisplay.text}", Toast.LENGTH_SHORT).show()
+            selectedSoundPackage = ""
+            selectedSoundUri = null
+            selectedSoundName = ""
+            soundAppDisplay.visibility = View.GONE
+            findViewById<TextView>(R.id.soundNameDisplay).visibility = View.GONE
+            updateCustomSoundsDisplay(customSoundsText)
+        }
+
+        clearSoundButton.setOnClickListener {
+            if (selectedSoundPackage.isEmpty()) {
+                Toast.makeText(this, "Select an app first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            settings.removeSoundUri(selectedSoundPackage)
+            Toast.makeText(this, "Sound cleared", Toast.LENGTH_SHORT).show()
+            selectedSoundPackage = ""
+            selectedSoundUri = null
+            selectedSoundName = ""
+            soundAppDisplay.visibility = View.GONE
+            findViewById<TextView>(R.id.soundNameDisplay).visibility = View.GONE
+            updateCustomSoundsDisplay(customSoundsText)
         }
 
         saveButton.setOnClickListener {
@@ -258,6 +360,20 @@ class AppSettingsActivity : AppCompatActivity() {
             for ((pkg, pattern) in custom.entries.sortedBy { it.key }) {
                 val label = getAppDisplayName(pkg)
                 sb.appendLine("$label: $pattern")
+            }
+            textView.text = sb.toString().trimEnd()
+        }
+    }
+
+    private fun updateCustomSoundsDisplay(textView: TextView) {
+        val custom = settings.getAllCustomSounds()
+        if (custom.isEmpty()) {
+            textView.text = "No custom notification sounds set."
+        } else {
+            val sb = StringBuilder()
+            for ((pkg, name) in custom.entries.sortedBy { it.key }) {
+                val label = getAppDisplayName(pkg)
+                sb.appendLine("$label: $name")
             }
             textView.text = sb.toString().trimEnd()
         }
