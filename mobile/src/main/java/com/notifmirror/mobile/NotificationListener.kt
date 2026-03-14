@@ -1,0 +1,235 @@
+package com.notifmirror.mobile
+
+import android.app.Notification
+import android.app.NotificationManager
+import android.content.Context
+import android.graphics.Bitmap
+import android.os.PowerManager
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
+import android.util.Base64
+import android.util.Log
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+
+class NotificationListener : NotificationListenerService() {
+
+    companion object {
+        private const val TAG = "NotifMirror"
+        private const val PATH_NOTIFICATION = "/notification"
+        private const val PATH_DISMISS = "/notification_dismiss"
+
+        val pendingActions = mutableMapOf<String, Notification.Action>()
+    }
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private lateinit var settings: SettingsManager
+    private lateinit var notifLog: NotificationLog
+
+    override fun onCreate() {
+        super.onCreate()
+        settings = SettingsManager(this)
+        notifLog = NotificationLog(this)
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (sbn.packageName == packageName) return
+        if (sbn.isOngoing && !settings.isMirrorOngoingEnabled()) return
+
+        // Check DND mode (only if DND sync is enabled)
+        if (settings.isDndSyncEnabled()) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val interruptionFilter = nm.currentInterruptionFilter
+            if (interruptionFilter == NotificationManager.INTERRUPTION_FILTER_NONE ||
+                interruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS) {
+                return
+            }
+        }
+
+        // Check screen-off mode
+        val screenMode = settings.getScreenOffMode()
+        if (screenMode == SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY) {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (pm.isInteractive) {
+                return
+            }
+        }
+
+        val notification = sbn.notification ?: return
+        val extras = notification.extras ?: return
+
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+        val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
+
+        if (title.isEmpty() && text.isEmpty()) return
+
+        val displayText = bigText ?: text
+
+        // Check app whitelist
+        if (!settings.isAppWhitelisted(sbn.packageName)) {
+            return
+        }
+
+        // Check keyword filters
+        if (!settings.passesKeywordFilter(title, displayText)) {
+            Log.d(TAG, "Notification filtered out by keyword rules: $title")
+            return
+        }
+
+        val notifKey = sbn.key
+        val appPackageName = sbn.packageName
+        val postTime = sbn.postTime
+
+        // Get app icon as base64
+        val iconBase64 = getAppIconBase64(appPackageName)
+
+        // Process ALL actions and store them
+        val actionsJson = JSONArray()
+        val actions = notification.actions
+        if (actions != null) {
+            for ((index, action) in actions.withIndex()) {
+                val actionKey = "$notifKey:$index"
+                pendingActions[actionKey] = action
+
+                val hasRemoteInput = action.remoteInputs != null && action.remoteInputs.isNotEmpty()
+                val actionJson = JSONObject().apply {
+                    put("index", index)
+                    put("title", action.title?.toString() ?: "Action $index")
+                    put("hasRemoteInput", hasRemoteInput)
+                }
+                actionsJson.put(actionJson)
+            }
+        }
+
+        val json = JSONObject().apply {
+            put("key", notifKey)
+            put("package", appPackageName)
+            put("title", title)
+            put("text", displayText)
+            put("subText", subText ?: "")
+            put("postTime", postTime)
+            put("actions", actionsJson)
+            if (iconBase64 != null) {
+                put("icon", iconBase64)
+            }
+            put("muteDuration", settings.getMuteDurationMinutes())
+            // Send all configurable values to watch
+            put("notifPriority", settings.getNotificationPriority())
+            put("bigTextThreshold", settings.getBigTextThreshold())
+            put("autoCancel", settings.isAutoCancelEnabled())
+            put("autoDismissSync", settings.isAutoDismissSyncEnabled())
+            put("showOpenButton", settings.isShowOpenButtonEnabled())
+            put("showMuteButton", settings.isShowMuteButtonEnabled())
+            put("defaultVibration", settings.getDefaultVibrationPattern())
+            // Send screen mode so watch knows whether to be silent
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
+                put("silent", true)
+            }
+            // Send custom vibration pattern if set
+            val customVib = settings.getVibrationPattern(sbn.packageName)
+            if (customVib.isNotEmpty()) {
+                put("vibrationPattern", customVib)
+            }
+        }
+
+        Log.d(TAG, "Forwarding notification: $title from $appPackageName (${actionsJson.length()} actions)")
+
+        scope.launch {
+            try {
+                val nodeClient = Wearable.getNodeClient(this@NotificationListener)
+                val nodes = nodeClient.connectedNodes.await()
+
+                if (nodes.isEmpty()) {
+                    Log.w(TAG, "No connected watch nodes found")
+                    return@launch
+                }
+
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@NotificationListener)
+                        .sendMessage(node.id, PATH_NOTIFICATION, json.toString().toByteArray())
+                        .await()
+                    Log.d(TAG, "Sent to node: ${node.displayName}")
+                }
+
+                notifLog.addEntry(
+                    appPackageName, title, displayText, "SENT",
+                    "${actionsJson.length()} actions, sent to ${nodes.size} node(s)"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send notification to watch", e)
+            }
+        }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        val keysToRemove = pendingActions.keys.filter { it.startsWith(sbn.key + ":") }
+        keysToRemove.forEach { pendingActions.remove(it) }
+
+        if (!settings.isAutoDismissSyncEnabled()) return
+
+        val json = JSONObject().apply {
+            put("action", "dismiss")
+            put("key", sbn.key)
+        }
+
+        scope.launch {
+            try {
+                sendToWatch(json.toString().toByteArray(), PATH_DISMISS)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send dismissal to watch", e)
+            }
+        }
+    }
+
+    private fun getAppIconBase64(packageName: String): String? {
+        return try {
+            val iconSize = 48
+            val iconQuality = 80
+            val drawable = packageManager.getApplicationIcon(packageName)
+            val bitmap = if (drawable is BitmapDrawable) {
+                Bitmap.createScaledBitmap(drawable.bitmap, iconSize, iconSize, true)
+            } else {
+                val bmp = Bitmap.createBitmap(iconSize, iconSize, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                drawable.setBounds(0, 0, iconSize, iconSize)
+                drawable.draw(canvas)
+                bmp
+            }
+            val stream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, iconQuality, stream)
+            Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get icon for $packageName", e)
+            null
+        }
+    }
+
+    private suspend fun sendToWatch(data: ByteArray, path: String = PATH_NOTIFICATION) {
+        val nodeClient = Wearable.getNodeClient(this)
+        val nodes = nodeClient.connectedNodes.await()
+        for (node in nodes) {
+            Wearable.getMessageClient(this)
+                .sendMessage(node.id, path, data)
+                .await()
+            Log.d(TAG, "Sent to node: ${node.displayName}")
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
+    }
+}

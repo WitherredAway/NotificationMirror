@@ -1,0 +1,423 @@
+package com.notifmirror.mobile
+
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
+import android.text.Editable
+import android.text.TextUtils
+import android.text.TextWatcher
+import android.util.Base64
+import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.gms.wearable.Wearable
+import com.google.android.material.color.DynamicColors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+
+class MainActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "NotifMirror"
+        private const val PATH_NOTIFICATION = "/notification"
+    }
+
+    private lateinit var statusText: TextView
+    private lateinit var enableButton: Button
+    private lateinit var appWhitelistButton: Button
+    private lateinit var keywordFilterButton: Button
+    private lateinit var viewLogButton: Button
+    private lateinit var settingsManager: SettingsManager
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        checkAndRequestPermissions()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        DynamicColors.applyToActivityIfAvailable(this)
+        setContentView(R.layout.activity_main)
+
+        settingsManager = SettingsManager(this)
+        statusText = findViewById(R.id.statusText)
+        enableButton = findViewById(R.id.enableButton)
+        appWhitelistButton = findViewById(R.id.appWhitelistButton)
+        keywordFilterButton = findViewById(R.id.keywordFilterButton)
+        viewLogButton = findViewById(R.id.viewLogButton)
+
+        enableButton.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+
+        appWhitelistButton.setOnClickListener {
+            startActivity(Intent(this, AppPickerActivity::class.java))
+        }
+
+        keywordFilterButton.setOnClickListener {
+            startActivity(Intent(this, FilterSettingsActivity::class.java))
+        }
+
+        viewLogButton.setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
+
+        findViewById<Button>(R.id.settingsButton).setOnClickListener {
+            startActivity(Intent(this, AppSettingsActivity::class.java))
+        }
+
+        findViewById<Button>(R.id.testNotifButton).setOnClickListener {
+            showTestNotificationDialog()
+        }
+
+        val versionText = findViewById<TextView>(R.id.versionText)
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            versionText.text = "v${pInfo.versionName}"
+        } catch (_: Exception) {}
+
+        checkAndRequestPermissions()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateStatus()
+    }
+
+    private fun showTestNotificationDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_test_notification, null)
+        val appIconView = dialogView.findViewById<ImageView>(R.id.testAppIcon)
+        val appNameView = dialogView.findViewById<TextView>(R.id.testAppName)
+        val titleInput = dialogView.findViewById<EditText>(R.id.testTitleInput)
+        val textInput = dialogView.findViewById<EditText>(R.id.testTextInput)
+        val selectAppButton = dialogView.findViewById<Button>(R.id.selectAppButton)
+
+        var selectedPackage = packageName
+        appNameView.text = "Notification Mirror"
+        try {
+            appIconView.setImageDrawable(packageManager.getApplicationIcon(packageName))
+        } catch (_: Exception) {}
+
+        selectAppButton.setOnClickListener {
+            showAppSelectionDialog { pkg, label, icon ->
+                selectedPackage = pkg
+                appNameView.text = label
+                if (icon != null) appIconView.setImageDrawable(icon)
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Send Test Notification")
+            .setView(dialogView)
+            .setPositiveButton("Send") { _, _ ->
+                val title = titleInput.text.toString().ifEmpty { "Test Notification" }
+                val text = textInput.text.toString().ifEmpty { "This is a test notification from Notification Mirror" }
+                sendTestNotification(selectedPackage, title, text)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showAppSelectionDialog(onSelected: (String, String, android.graphics.drawable.Drawable?) -> Unit) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_select, null)
+        val recyclerView = dialogView.findViewById<RecyclerView>(R.id.appSelectList)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        val searchInput = dialogView.findViewById<EditText>(R.id.dialogSearchInput)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Select App")
+            .setView(dialogView)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        Thread {
+            val pm = packageManager
+            val allApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 || pm.getLaunchIntentForPackage(it.packageName) != null }
+                .map { appInfo ->
+                    AppPickerActivity.AppInfo(
+                        packageName = appInfo.packageName,
+                        label = pm.getApplicationLabel(appInfo).toString(),
+                        icon = try { pm.getApplicationIcon(appInfo.packageName) } catch (_: Exception) { null }
+                    )
+                }
+                .sortedBy { it.label.lowercase() }
+
+            runOnUiThread {
+                val adapter = SimpleAppAdapter(allApps) { app ->
+                    onSelected(app.packageName, app.label, app.icon)
+                    dialog.dismiss()
+                }
+                recyclerView.adapter = adapter
+
+                searchInput.addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        val query = s?.toString()?.trim()?.lowercase() ?: ""
+                        val filtered = if (query.isEmpty()) {
+                            allApps
+                        } else {
+                            allApps.filter {
+                                it.label.lowercase().contains(query) ||
+                                    it.packageName.lowercase().contains(query)
+                            }
+                        }
+                        adapter.updateList(filtered)
+                    }
+                })
+            }
+        }.start()
+
+        dialog.show()
+    }
+
+    private fun sendTestNotification(packageName: String, title: String, text: String) {
+        val iconBase64 = getAppIconBase64(packageName)
+
+        val json = JSONObject().apply {
+            put("key", "test_${System.currentTimeMillis()}")
+            put("package", packageName)
+            put("title", title)
+            put("text", text)
+            put("subText", "")
+            put("postTime", System.currentTimeMillis())
+            put("actions", JSONArray())
+            if (iconBase64 != null) {
+                put("icon", iconBase64)
+            }
+            put("muteDuration", settingsManager.getMuteDurationMinutes())
+            put("notifPriority", settingsManager.getNotificationPriority())
+            put("bigTextThreshold", settingsManager.getBigTextThreshold())
+            put("autoCancel", settingsManager.isAutoCancelEnabled())
+            put("autoDismissSync", settingsManager.isAutoDismissSyncEnabled())
+            put("showOpenButton", settingsManager.isShowOpenButtonEnabled())
+            put("showMuteButton", settingsManager.isShowMuteButtonEnabled())
+            put("defaultVibration", settingsManager.getDefaultVibrationPattern())
+            val customVib = settingsManager.getVibrationPattern(packageName)
+            if (customVib.isNotEmpty()) {
+                put("vibrationPattern", customVib)
+            }
+        }
+
+        scope.launch {
+            try {
+                val nodeClient = Wearable.getNodeClient(this@MainActivity)
+                val nodes = nodeClient.connectedNodes.await()
+
+                if (nodes.isEmpty()) {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "No connected watch found", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@MainActivity)
+                        .sendMessage(node.id, PATH_NOTIFICATION, json.toString().toByteArray())
+                        .await()
+                }
+
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Test notification sent to ${nodes.size} watch(es)", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send test notification", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun getAppIconBase64(pkg: String): String? {
+        return try {
+            val iconSize = 48
+            val iconQuality = 80
+            val drawable = packageManager.getApplicationIcon(pkg)
+            val bitmap = if (drawable is BitmapDrawable) {
+                Bitmap.createScaledBitmap(drawable.bitmap, iconSize, iconSize, true)
+            } else {
+                val bmp = Bitmap.createBitmap(iconSize, iconSize, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                drawable.setBounds(0, 0, iconSize, iconSize)
+                drawable.draw(canvas)
+                bmp
+            }
+            val stream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, iconQuality, stream)
+            Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notifPerm = android.Manifest.permission.POST_NOTIFICATIONS
+            if (checkSelfPermission(notifPerm) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(notifPerm)
+                return
+            }
+        }
+
+        if (!isNotificationListenerEnabled()) {
+            AlertDialog.Builder(this)
+                .setTitle("Notification Access Required")
+                .setMessage("This app needs notification access to mirror notifications to your watch. Please enable it in the next screen.")
+                .setPositiveButton("Open Settings") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                }
+                .setNegativeButton("Later", null)
+                .show()
+            return
+        }
+
+        if (!isBatteryOptimizationExempt()) {
+            AlertDialog.Builder(this)
+                .setTitle("Unrestricted Battery")
+                .setMessage("To keep notification mirroring running reliably in the background, please allow unrestricted battery usage for this app.")
+                .setPositiveButton("Allow") { _, _ ->
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                }
+                .setNegativeButton("Later", null)
+                .show()
+        }
+    }
+
+    private fun isBatteryOptimizationExempt(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun updateStatus() {
+        val enabled = isNotificationListenerEnabled()
+        val batteryExempt = isBatteryOptimizationExempt()
+        val settings = SettingsManager(this)
+        val whitelistedApps = settings.getWhitelistedApps()
+        val whitelistKeywords = settings.getKeywordWhitelist()
+        val blacklistKeywords = settings.getKeywordBlacklist()
+
+        val statusParts = mutableListOf<String>()
+
+        if (enabled) {
+            statusParts.add("Notification mirroring is ACTIVE.")
+            enableButton.text = "Manage Notification Access"
+        } else {
+            statusParts.add("Notification mirroring is INACTIVE.\nPlease grant notification access.")
+            enableButton.text = "Enable Notification Access"
+        }
+
+        if (!batteryExempt) {
+            statusParts.add("Battery: Restricted (may stop in background)")
+        } else {
+            statusParts.add("Battery: Unrestricted")
+        }
+
+        statusParts.add("")
+
+        if (whitelistedApps.isEmpty()) {
+            statusParts.add("Apps: All apps (no filter)")
+        } else {
+            statusParts.add("Apps: ${whitelistedApps.size} whitelisted")
+        }
+
+        if (whitelistKeywords.isNotEmpty()) {
+            statusParts.add("Keyword whitelist: ${whitelistKeywords.size} pattern(s)")
+        }
+
+        if (blacklistKeywords.isNotEmpty()) {
+            statusParts.add("Keyword blacklist: ${blacklistKeywords.size} pattern(s)")
+        }
+
+        val logCount = NotificationLog(this).getEntries().size
+        if (logCount > 0) {
+            statusParts.add("")
+            statusParts.add("Log: $logCount entries")
+        }
+
+        statusText.text = statusParts.joinToString("\n")
+    }
+
+    private fun isNotificationListenerEnabled(): Boolean {
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        if (!TextUtils.isEmpty(flat)) {
+            val names = flat.split(":")
+            for (name in names) {
+                val cn = ComponentName.unflattenFromString(name)
+                if (cn != null && cn.packageName == packageName) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    // Simple adapter for app selection dialogs (used by test notification and vibration picker)
+    inner class SimpleAppAdapter(
+        private var apps: List<AppPickerActivity.AppInfo>,
+        private val onClick: (AppPickerActivity.AppInfo) -> Unit
+    ) : RecyclerView.Adapter<SimpleAppAdapter.ViewHolder>() {
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val icon: ImageView = view.findViewById(R.id.appIcon)
+            val name: TextView = view.findViewById(R.id.appName)
+            val pkg: TextView = view.findViewById(R.id.appPackage)
+        }
+
+        fun updateList(newApps: List<AppPickerActivity.AppInfo>) {
+            apps = newApps
+            notifyDataSetChanged()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_app_simple, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val app = apps[position]
+            holder.name.text = app.label
+            holder.pkg.text = app.packageName
+            if (app.icon != null) {
+                holder.icon.setImageDrawable(app.icon)
+            }
+            holder.itemView.setOnClickListener { onClick(app) }
+        }
+
+        override fun getItemCount() = apps.size
+    }
+}

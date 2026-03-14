@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:colorBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Log"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="?colorOnSurface" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/clearLogButton"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:text="Clear"
+            android:textSize="10sp"
+            android:textAllCaps="false"
+            android:minWidth="0dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            style="@style/Widget.NotifMirror.Button.Passive" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/searchInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:hint="Search (regex)"
+        android:inputType="text"
+        android:textSize="12sp"
+        android:textColor="?colorOnSurface"
+        android:textColorHint="?colorOutline"
+        android:padding="8dp"
+        android:backgroundTint="?colorSurfaceContainerHigh" />
+
+    <Spinner
+        android:id="@+id/appFilter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="6dp" />
+
+    <TextView
+        android:id="@+id/countText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp"
+        android:textSize="10sp"
+        android:textColor="?colorOutline" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@+id/logText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:textSize="10sp"
+            android:textColor="?colorOnSurfaceVariant"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="2dp" />
+    </ScrollView>
+
+</LinearLayout>

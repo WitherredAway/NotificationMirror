@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:colorBackground">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Keyword Filters"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="?colorOnSurface" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Use regex patterns to control which notifications get mirrored. One pattern per line."
+                android:textSize="13sp"
+                android:textColor="?colorOutline" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Whitelist (include)"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?colorOnSurface" />
+
+            <TextView
+                android:id="@+id/whitelistHelp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="12sp"
+                android:textColor="?colorOutline" />
+
+            <EditText
+                android:id="@+id/whitelistInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minLines="3"
+                android:gravity="top"
+                android:inputType="textMultiLine"
+                android:hint="e.g. urgent|important"
+                android:textSize="14sp"
+                android:textColor="?colorOnSurface"
+                android:textColorHint="?colorOutline"
+                android:padding="12dp"
+                android:background="@drawable/edit_text_bg" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Blacklist (exclude)"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?colorOnSurface" />
+
+            <TextView
+                android:id="@+id/blacklistHelp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="12sp"
+                android:textColor="?colorOutline" />
+
+            <EditText
+                android:id="@+id/blacklistInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minLines="3"
+                android:gravity="top"
+                android:inputType="textMultiLine"
+                android:hint="e.g. spam|promo"
+                android:textSize="14sp"
+                android:textColor="?colorOnSurface"
+                android:textColorHint="?colorOutline"
+                android:padding="12dp"
+                android:background="@drawable/edit_text_bg" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/saveButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="Save Filters"
+                android:textAllCaps="false"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Live Preview"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?colorOnSurface" />
+
+            <TextView
+                android:id="@+id/previewHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="12sp"
+                android:textColor="?colorOutline" />
+
+            <LinearLayout
+                android:id="@+id/previewContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="24dp" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
