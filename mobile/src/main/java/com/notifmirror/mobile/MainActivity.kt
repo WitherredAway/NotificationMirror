@@ -111,6 +111,20 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatus()
+        // Re-check battery optimization every time the app is opened
+        if (isNotificationListenerEnabled() && !isBatteryOptimizationExempt()) {
+            AlertDialog.Builder(this)
+                .setTitle("Unrestricted Battery")
+                .setMessage("To keep notification mirroring running reliably in the background, please allow unrestricted battery usage for this app.")
+                .setPositiveButton("Allow") { _, _ ->
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                }
+                .setNegativeButton("Later", null)
+                .show()
+        }
     }
 
     private fun showTestNotificationDialog() {
