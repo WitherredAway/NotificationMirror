@@ -2,15 +2,24 @@ package com.notifmirror.wear
 
 import android.content.ComponentName
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.color.DynamicColors
 import com.google.android.gms.wearable.Wearable
 
 class MainActivity : AppCompatActivity() {
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        // Permission result received, continue
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,5 +63,27 @@ class MainActivity : AppCompatActivity() {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             versionText.text = "v${pInfo.versionName}"
         } catch (_: Exception) {}
+
+        checkAndRequestPermissions()
+    }
+
+    private fun checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notifPerm = android.Manifest.permission.POST_NOTIFICATIONS
+            if (checkSelfPermission(notifPerm) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                if (shouldShowRequestPermissionRationale(notifPerm)) {
+                    AlertDialog.Builder(this)
+                        .setTitle("Notification Permission Required")
+                        .setMessage("This app needs notification permission to display mirrored notifications from your phone.")
+                        .setPositiveButton("Grant") { _, _ ->
+                            notificationPermissionLauncher.launch(notifPerm)
+                        }
+                        .setNegativeButton("Later", null)
+                        .show()
+                } else {
+                    notificationPermissionLauncher.launch(notifPerm)
+                }
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 # Notification Mirror - WearOS App
 
-Fully customizable lightweight WearOS app  for mirroring app notifications from phone to watch with replying and buttons.
+Fully customizable lightweight WearOS app for mirroring app notifications from phone to watch with replying and buttons.
 
 Made with help from Devin AI.
 
