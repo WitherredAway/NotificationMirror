@@ -143,6 +143,11 @@ class NotificationListener : NotificationListenerService() {
             if (customVib.isNotEmpty()) {
                 put("vibrationPattern", customVib)
             }
+            // Send custom sound URI if set
+            val customSound = settings.getSoundUri(sbn.packageName)
+            if (customSound.isNotEmpty()) {
+                put("soundUri", customSound)
+            }
         }
 
         Log.d(TAG, "Forwarding notification: $title from $appPackageName (${actionsJson.length()} actions)")

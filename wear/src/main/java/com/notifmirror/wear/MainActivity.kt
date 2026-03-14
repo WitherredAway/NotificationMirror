@@ -64,6 +64,10 @@ class MainActivity : AppCompatActivity() {
             versionText.text = "v${pInfo.versionName}"
         } catch (_: Exception) {}
 
+        findViewById<TextView>(R.id.githubLink).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
+        }
+
         checkAndRequestPermissions()
     }
 
