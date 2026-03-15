@@ -100,18 +100,25 @@ class NotificationTileService : TileService() {
         val colorPrimary = resolveThemeColor(com.google.android.material.R.attr.colorPrimary, 0xFFD0BCFF.toInt())
         val colorOnSurface = resolveThemeColor(com.google.android.material.R.attr.colorOnSurface, 0xFFE6E1E5.toInt())
         val colorOnSurfaceVariant = resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFFCAC4D0.toInt())
+        val colorSurfaceVariant = 0xFF49454F.toInt()
+
+        val prefs = getSharedPreferences("notif_mirror_settings", MODE_PRIVATE)
+        val mirroringEnabled = prefs.getBoolean("mirroring_enabled", true)
+        val muteManager = MuteManager(this)
+        val allMuted = muteManager.isAllMuted()
+
         val columnBuilder = LayoutElementBuilders.Column.Builder()
             .setWidth(DimensionBuilders.expand())
-            .setHeight(DimensionBuilders.expand())
+            .setHeight(DimensionBuilders.wrap())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
 
         // Title
         columnBuilder.addContent(
             LayoutElementBuilders.Text.Builder()
-                .setText("Notifications")
+                .setText("Notification Mirror")
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
-                        .setSize(DimensionBuilders.sp(14f))
+                        .setSize(DimensionBuilders.sp(13f))
                         .setColor(ColorBuilders.argb(colorPrimary))
                         .setWeight(LayoutElementBuilders.FONT_WEIGHT_BOLD)
                         .build()
@@ -122,17 +129,23 @@ class NotificationTileService : TileService() {
         // Spacer
         columnBuilder.addContent(
             LayoutElementBuilders.Spacer.Builder()
-                .setHeight(DimensionBuilders.dp(4f))
+                .setHeight(DimensionBuilders.dp(3f))
                 .build()
         )
 
-        // Total count
+        // Status line
+        val statusText = when {
+            !mirroringEnabled -> "Paused"
+            allMuted -> "Muted"
+            total > 0 -> "$total notifications"
+            else -> "No notifications"
+        }
         columnBuilder.addContent(
             LayoutElementBuilders.Text.Builder()
-                .setText("$total total")
+                .setText(statusText)
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
-                        .setSize(DimensionBuilders.sp(12f))
+                        .setSize(DimensionBuilders.sp(11f))
                         .setColor(ColorBuilders.argb(colorOnSurface))
                         .build()
                 )
@@ -142,12 +155,12 @@ class NotificationTileService : TileService() {
         // Spacer
         columnBuilder.addContent(
             LayoutElementBuilders.Spacer.Builder()
-                .setHeight(DimensionBuilders.dp(6f))
+                .setHeight(DimensionBuilders.dp(3f))
                 .build()
         )
 
-        // Top apps by count (max 4)
-        val sorted = counts.entries.sortedByDescending { it.value }.take(4)
+        // Top apps by count (max 3)
+        val sorted = counts.entries.sortedByDescending { it.value }.take(3)
         for (entry in sorted) {
             val appLabel = getShortAppLabel(entry.key)
             columnBuilder.addContent(
@@ -155,7 +168,7 @@ class NotificationTileService : TileService() {
                     .setText("$appLabel: ${entry.value}")
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
-                            .setSize(DimensionBuilders.sp(11f))
+                            .setSize(DimensionBuilders.sp(10f))
                             .setColor(ColorBuilders.argb(colorOnSurfaceVariant))
                             .build()
                     )
@@ -163,19 +176,45 @@ class NotificationTileService : TileService() {
             )
         }
 
-        if (counts.isEmpty()) {
-            columnBuilder.addContent(
-                LayoutElementBuilders.Text.Builder()
-                    .setText("No notifications")
-                    .setFontStyle(
-                        LayoutElementBuilders.FontStyle.Builder()
-                            .setSize(DimensionBuilders.sp(11f))
-                            .setColor(ColorBuilders.argb(colorOnSurfaceVariant))
-                            .build()
-                    )
-                    .build()
-            )
-        }
+        // Spacer before buttons
+        columnBuilder.addContent(
+            LayoutElementBuilders.Spacer.Builder()
+                .setHeight(DimensionBuilders.dp(6f))
+                .build()
+        )
+
+        // Action buttons row
+        val buttonRow = LayoutElementBuilders.Row.Builder()
+            .setWidth(DimensionBuilders.wrap())
+            .setHeight(DimensionBuilders.wrap())
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+
+        // Toggle Mirroring button
+        val mirrorLabel = if (mirroringEnabled) "Pause" else "Resume"
+        buttonRow.addContent(buildActionButton(mirrorLabel, TileActionActivity.ACTION_TOGGLE_MIRRORING, colorPrimary, colorSurfaceVariant))
+
+        // Spacer between buttons
+        buttonRow.addContent(
+            LayoutElementBuilders.Spacer.Builder()
+                .setWidth(DimensionBuilders.dp(4f))
+                .build()
+        )
+
+        // Mute All button
+        val muteLabel = if (allMuted) "Unmute" else "Mute"
+        buttonRow.addContent(buildActionButton(muteLabel, TileActionActivity.ACTION_MUTE_ALL, colorPrimary, colorSurfaceVariant))
+
+        // Spacer between buttons
+        buttonRow.addContent(
+            LayoutElementBuilders.Spacer.Builder()
+                .setWidth(DimensionBuilders.dp(4f))
+                .build()
+        )
+
+        // Connection Details button
+        buttonRow.addContent(buildActionButton("Info", TileActionActivity.ACTION_CONNECTION_DETAILS, colorPrimary, colorSurfaceVariant))
+
+        columnBuilder.addContent(buttonRow.build())
 
         return LayoutElementBuilders.Box.Builder()
             .setWidth(DimensionBuilders.expand())
@@ -183,6 +222,32 @@ class NotificationTileService : TileService() {
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .addContent(columnBuilder.build())
+            .build()
+    }
+
+    private fun buildActionButton(
+        label: String,
+        action: String,
+        textColor: Int,
+        bgColor: Int
+    ): LayoutElementBuilders.LayoutElement {
+        return LayoutElementBuilders.Box.Builder()
+            .setWidth(DimensionBuilders.wrap())
+            .setHeight(DimensionBuilders.wrap())
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(
+                LayoutElementBuilders.Text.Builder()
+                    .setText(label)
+                    .setFontStyle(
+                        LayoutElementBuilders.FontStyle.Builder()
+                            .setSize(DimensionBuilders.sp(10f))
+                            .setColor(ColorBuilders.argb(textColor))
+                            .setWeight(LayoutElementBuilders.FONT_WEIGHT_BOLD)
+                            .build()
+                    )
+                    .build()
+            )
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setClickable(
@@ -192,12 +257,36 @@ class NotificationTileService : TileService() {
                                     .setAndroidActivity(
                                         ActionBuilders.AndroidActivity.Builder()
                                             .setPackageName("com.notifmirror.mobile")
-                                            .setClassName("com.notifmirror.wear.MainActivity")
+                                            .setClassName("com.notifmirror.wear.TileActionActivity")
+                                            .addKeyToExtraMapping(
+                                                TileActionActivity.EXTRA_ACTION,
+                                                ActionBuilders.AndroidStringExtra.Builder()
+                                                    .setValue(action)
+                                                    .build()
+                                            )
                                             .build()
                                     )
                                     .build()
                             )
-                            .setId("open_app")
+                            .setId("action_$action")
+                            .build()
+                    )
+                    .setPadding(
+                        ModifiersBuilders.Padding.Builder()
+                            .setStart(DimensionBuilders.dp(8f))
+                            .setEnd(DimensionBuilders.dp(8f))
+                            .setTop(DimensionBuilders.dp(4f))
+                            .setBottom(DimensionBuilders.dp(4f))
+                            .build()
+                    )
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(ColorBuilders.argb(bgColor))
+                            .setCorner(
+                                ModifiersBuilders.Corner.Builder()
+                                    .setRadius(DimensionBuilders.dp(12f))
+                                    .build()
+                            )
                             .build()
                     )
                     .build()

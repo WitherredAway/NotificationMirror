@@ -83,6 +83,25 @@
         </service>
 
         <service
+            android:name=".NotificationTileService"
+            android:exported="true"
+            android:label="Notification Mirror"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@mipmap/ic_launcher" />
+        </service>
+
+        <activity
+            android:name=".TileActionActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog"
+            android:taskAffinity="" />
+
+        <service
             android:name=".NotificationComplicationService"
             android:exported="true"
             android:label="Latest Notification"

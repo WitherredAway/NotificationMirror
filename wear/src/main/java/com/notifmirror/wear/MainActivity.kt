@@ -97,16 +97,6 @@ class MainActivity : AppCompatActivity() {
             statusText.text = "Connection check failed"
         }
 
-        // Quick action: Mute All
-        findViewById<LinearLayout>(R.id.muteAllButton).setOnClickListener {
-            showMuteAllDialog()
-        }
-
-        // Quick action: Connection Details
-        findViewById<LinearLayout>(R.id.connectionDetailsButton).setOnClickListener {
-            showConnectionDetails()
-        }
-
         findViewById<LinearLayout>(R.id.notifSettingsButton).setOnClickListener {
             try {
                 val intent = Intent().apply {
@@ -218,52 +208,6 @@ class MainActivity : AppCompatActivity() {
                 Log.d("NotifMirrorWear", "Mirroring toggle synced to phone: enabled=$enabled")
             } catch (e: Exception) {
                 Log.e("NotifMirrorWear", "Failed to sync mirroring toggle to phone", e)
-            }
-        }
-    }
-
-    private fun showMuteAllDialog() {
-        val options = arrayOf("15 minutes", "30 minutes", "1 hour", "2 hours")
-        val durations = intArrayOf(15, 30, 60, 120)
-        AlertDialog.Builder(this)
-            .setTitle("Mute all notifications")
-            .setItems(options) { _, which ->
-                val muteManager = MuteManager(this)
-                muteManager.muteAll(durations[which])
-                Toast.makeText(this, "All notifications muted for ${options[which]}", Toast.LENGTH_SHORT).show()
-                // Update button label
-                findViewById<TextView>(R.id.muteAllLabel).text = "Muted ${options[which]}"
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun showConnectionDetails() {
-        scope.launch {
-            try {
-                val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
-                val details = if (nodes.isNotEmpty()) {
-                    nodes.joinToString("\n") { node ->
-                        "Name: ${node.displayName}\nID: ${node.id}\nNearby: ${node.isNearby}"
-                    }
-                } else {
-                    "No phone connected"
-                }
-                runOnUiThread {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("Connection Details")
-                        .setMessage(details)
-                        .setPositiveButton("OK", null)
-                        .show()
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("Connection Details")
-                        .setMessage("Failed to check connection: ${e.message}")
-                        .setPositiveButton("OK", null)
-                        .show()
-                }
             }
         }
     }
