@@ -67,7 +67,13 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
                 if (decryptedData != null) {
                     NotificationHandler.handleNotification(this, NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedData))
                 } else {
-                    NotificationHandler.handleNotification(this, messageEvent)
+                    // Decryption failed — check if the raw data is valid JSON (plaintext)
+                    try {
+                        org.json.JSONObject(String(messageEvent.data))
+                        NotificationHandler.handleNotification(this, messageEvent)
+                    } catch (_: Exception) {
+                        Log.w(TAG, "Cannot decrypt notification and data is not valid JSON — key may not be synced yet")
+                    }
                 }
             }
             "/notification_dismiss" -> NotificationHandler.handleDismissal(this, messageEvent)

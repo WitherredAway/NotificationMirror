@@ -325,7 +325,8 @@ class NotificationListener : NotificationListenerService() {
                         notifLog.addEntry(pkg, title, "", "DELIVERED", "From offline queue")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to send queued notification", e)
+                    Log.w(TAG, "Failed to send queued notification, re-queuing", e)
+                    offlineQueue.enqueue(queuedJson)
                 }
             }
         } catch (e: Exception) {
