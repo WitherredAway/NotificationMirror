@@ -62,8 +62,25 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Log.d(TAG, "PersistentListener received message on path: ${messageEvent.path}")
         when (messageEvent.path) {
-            "/notification" -> NotificationHandler.handleNotification(this, messageEvent)
+            "/notification" -> {
+                val decryptedData = decryptMessageData(messageEvent.data)
+                if (decryptedData != null) {
+                    NotificationHandler.handleNotification(this, NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedData))
+                } else {
+                    NotificationHandler.handleNotification(this, messageEvent)
+                }
+            }
             "/notification_dismiss" -> NotificationHandler.handleDismissal(this, messageEvent)
+        }
+    }
+
+    private fun decryptMessageData(data: ByteArray): ByteArray? {
+        return try {
+            val key = CryptoHelper.getKey(this) ?: return null
+            CryptoHelper.decrypt(data, key)
+        } catch (e: Exception) {
+            Log.w(TAG, "Decryption failed, trying as plaintext", e)
+            null
         }
     }
 

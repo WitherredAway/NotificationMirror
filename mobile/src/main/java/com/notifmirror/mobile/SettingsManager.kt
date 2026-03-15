@@ -29,6 +29,12 @@ class SettingsManager(context: Context) {
         private const val KEY_KEEP_NOTIFICATION_HISTORY = "keep_notification_history"
         private const val KEY_HIDE_WHEN_LOCKED = "hide_content_when_locked"
         private const val KEY_MUTE_CONTINUATION = "mute_continuation_alerts"
+        private const val KEY_SHOW_SNOOZE_BUTTON = "show_snooze_button"
+        private const val KEY_SNOOZE_DURATION = "snooze_duration_minutes"
+        private const val KEY_BATTERY_SAVER_ENABLED = "battery_saver_enabled"
+        private const val KEY_BATTERY_SAVER_THRESHOLD = "battery_saver_threshold"
+        private const val KEY_COMPLICATION_SOURCE = "complication_source"
+        private const val KEY_COMPLICATION_APP = "complication_app"
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
@@ -200,6 +206,50 @@ class SettingsManager(context: Context) {
 
     fun setMuteContinuationEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_MUTE_CONTINUATION, enabled).apply()
+    }
+
+    // --- Snooze Button ---
+
+    fun isShowSnoozeButtonEnabled(): Boolean = prefs.getBoolean(KEY_SHOW_SNOOZE_BUTTON, true)
+
+    fun setShowSnoozeButtonEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_SNOOZE_BUTTON, enabled).apply()
+    }
+
+    // --- Snooze Duration ---
+
+    fun getSnoozeDurationMinutes(): Int = prefs.getInt(KEY_SNOOZE_DURATION, 5)
+
+    fun setSnoozeDurationMinutes(minutes: Int) {
+        prefs.edit().putInt(KEY_SNOOZE_DURATION, minutes).apply()
+    }
+
+    // --- Battery Saver ---
+
+    fun isBatterySaverEnabled(): Boolean = prefs.getBoolean(KEY_BATTERY_SAVER_ENABLED, false)
+
+    fun setBatterySaverEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BATTERY_SAVER_ENABLED, enabled).apply()
+    }
+
+    fun getBatterySaverThreshold(): Int = prefs.getInt(KEY_BATTERY_SAVER_THRESHOLD, 15)
+
+    fun setBatterySaverThreshold(threshold: Int) {
+        prefs.edit().putInt(KEY_BATTERY_SAVER_THRESHOLD, threshold).apply()
+    }
+
+    // --- Complication Settings ---
+
+    fun getComplicationSource(): String = prefs.getString(KEY_COMPLICATION_SOURCE, "most_recent") ?: "most_recent"
+
+    fun setComplicationSource(source: String) {
+        prefs.edit().putString(KEY_COMPLICATION_SOURCE, source).apply()
+    }
+
+    fun getComplicationApp(): String = prefs.getString(KEY_COMPLICATION_APP, "") ?: ""
+
+    fun setComplicationApp(packageName: String) {
+        prefs.edit().putString(KEY_COMPLICATION_APP, packageName).apply()
     }
 
     // --- Default Vibration Pattern ---
@@ -379,6 +429,14 @@ class SettingsManager(context: Context) {
 
     fun getEffectiveMuteContinuation(packageName: String): Boolean {
         return getPerAppBoolean("mute_continuation", packageName, isMuteContinuationEnabled())
+    }
+
+    fun getEffectiveShowSnoozeButton(packageName: String): Boolean {
+        return getPerAppBoolean("show_snooze", packageName, isShowSnoozeButtonEnabled())
+    }
+
+    fun getEffectiveSnoozeDuration(packageName: String): Int {
+        return getPerAppInt("snooze_duration", packageName, getSnoozeDurationMinutes())
     }
 
     fun getEffectiveBigTextThreshold(packageName: String): Int {

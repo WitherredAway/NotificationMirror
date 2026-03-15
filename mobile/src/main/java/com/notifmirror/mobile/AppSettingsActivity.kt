@@ -50,6 +50,18 @@ class AppSettingsActivity : AppCompatActivity() {
         val showMuteButtonSwitch = findViewById<SwitchMaterial>(R.id.showMuteButtonSwitch)
         val bigTextThresholdInput = findViewById<EditText>(R.id.bigTextThresholdInput)
 
+        // Snooze section
+        val showSnoozeButtonSwitch = findViewById<SwitchMaterial>(R.id.showSnoozeButtonSwitch)
+        val snoozeDurationInput = findViewById<EditText>(R.id.snoozeDurationInput)
+
+        // Battery saver section
+        val batterySaverSwitch = findViewById<SwitchMaterial>(R.id.batterySaverSwitch)
+        val batterySaverThresholdInput = findViewById<EditText>(R.id.batterySaverThresholdInput)
+
+        // Complication section
+        val complicationSourceGroup = findViewById<RadioGroup>(R.id.complicationSourceGroup)
+        val complicationAppInput = findViewById<EditText>(R.id.complicationAppInput)
+
         // Mute section
         val muteDurationInput = findViewById<EditText>(R.id.muteDurationInput)
 
@@ -83,6 +95,26 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Load current values - Mute
         muteDurationInput.setText(settings.getMuteDurationMinutes().toString())
+
+        // Load current values - Snooze
+        showSnoozeButtonSwitch.isChecked = settings.isShowSnoozeButtonEnabled()
+        snoozeDurationInput.setText(settings.getSnoozeDurationMinutes().toString())
+
+        // Load current values - Battery saver
+        batterySaverSwitch.isChecked = settings.isBatterySaverEnabled()
+        batterySaverThresholdInput.setText(settings.getBatterySaverThreshold().toString())
+
+        // Load current values - Complication
+        when (settings.getComplicationSource()) {
+            "most_recent" -> complicationSourceGroup.check(R.id.radioComplicationMostRecent)
+            "specific_app" -> {
+                complicationSourceGroup.check(R.id.radioComplicationSpecificApp)
+                complicationAppInput.visibility = View.VISIBLE
+            }
+        }
+        complicationAppInput.setText(settings.getComplicationApp())
+
+        // Note: complicationSourceGroup listener is set below with showSave integration
 
         // Load current values - Vibration
         defaultVibrationInput.setText(settings.getDefaultVibrationPattern())
@@ -144,13 +176,18 @@ class AppSettingsActivity : AppCompatActivity() {
 
         val switches = listOf(dndSwitch, mirrorOngoingSwitch, mirrorPersistentSwitch,
             autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch,
-            hideWhenLockedSwitch, muteContinuationSwitch, keepHistorySwitch)
+            hideWhenLockedSwitch, muteContinuationSwitch, keepHistorySwitch,
+            showSnoozeButtonSwitch, batterySaverSwitch)
         for (sw in switches) {
             sw.setOnCheckedChangeListener { _, _ -> showSave() }
         }
 
         screenModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         priorityGroup.setOnCheckedChangeListener { _, _ -> showSave() }
+        complicationSourceGroup.setOnCheckedChangeListener { _, checkedId ->
+            complicationAppInput.visibility = if (checkedId == R.id.radioComplicationSpecificApp) View.VISIBLE else View.GONE
+            showSave()
+        }
 
         val textWatcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -160,6 +197,9 @@ class AppSettingsActivity : AppCompatActivity() {
         bigTextThresholdInput.addTextChangedListener(textWatcher)
         muteDurationInput.addTextChangedListener(textWatcher)
         defaultVibrationInput.addTextChangedListener(textWatcher)
+        snoozeDurationInput.addTextChangedListener(textWatcher)
+        batterySaverThresholdInput.addTextChangedListener(textWatcher)
+        complicationAppInput.addTextChangedListener(textWatcher)
 
         saveButton.setOnClickListener {
             val durationStr = muteDurationInput.text.toString().trim()
@@ -207,6 +247,26 @@ class AppSettingsActivity : AppCompatActivity() {
             settings.setKeepNotificationHistoryEnabled(keepHistorySwitch.isChecked)
             settings.setHideWhenLockedEnabled(hideWhenLockedSwitch.isChecked)
             settings.setMuteContinuationEnabled(muteContinuationSwitch.isChecked)
+            settings.setShowSnoozeButtonEnabled(showSnoozeButtonSwitch.isChecked)
+            settings.setBatterySaverEnabled(batterySaverSwitch.isChecked)
+
+            val snoozeDur = snoozeDurationInput.text.toString().trim().toIntOrNull()
+            if (snoozeDur != null && snoozeDur >= 1) {
+                settings.setSnoozeDurationMinutes(snoozeDur)
+            }
+
+            val batteryThreshold = batterySaverThresholdInput.text.toString().trim().toIntOrNull()
+            if (batteryThreshold != null && batteryThreshold in 1..100) {
+                settings.setBatterySaverThreshold(batteryThreshold)
+            }
+
+            val complicationSource = when (complicationSourceGroup.checkedRadioButtonId) {
+                R.id.radioComplicationSpecificApp -> "specific_app"
+                else -> "most_recent"
+            }
+            settings.setComplicationSource(complicationSource)
+            settings.setComplicationApp(complicationAppInput.text.toString().trim())
+
             settings.setBigTextThreshold(bigTextThreshold)
             settings.setMuteDurationMinutes(duration)
 

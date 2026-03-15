@@ -6,9 +6,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.BatteryManager
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -53,6 +55,8 @@ object NotificationHandler {
             val autoCancel = json.optBoolean("autoCancel", true)
             val showOpenButton = json.optBoolean("showOpenButton", true)
             val showMuteButton = json.optBoolean("showMuteButton", true)
+            val showSnoozeButton = json.optBoolean("showSnoozeButton", true)
+            val snoozeDuration = json.optInt("snoozeDuration", 5)
             val muteDuration = json.optInt("muteDuration", 30)
             val defaultVibration = json.optString("defaultVibration", "0,200,100,200")
             val customVibrationPattern = json.optString("vibrationPattern", "")
@@ -66,6 +70,25 @@ object NotificationHandler {
                 .getBoolean("keep_notification_history", true)
             val keepHistory = phoneKeepHistory && watchKeepHistory
 
+            // Battery saver: check both phone-side and watch-side settings
+            val watchSettings = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+            val phoneBatterySaverEnabled = json.optBoolean("batterySaverEnabled", false)
+            val watchBatterySaverEnabled = watchSettings.getBoolean("battery_saver_enabled", false)
+            val batterySaverEnabled = phoneBatterySaverEnabled || watchBatterySaverEnabled
+            val phoneBatterySaverThreshold = json.optInt("batterySaverThreshold", 15)
+            val watchBatterySaverThreshold = watchSettings.getInt("battery_saver_threshold", 15)
+            val batterySaverThreshold = if (watchBatterySaverEnabled) watchBatterySaverThreshold else phoneBatterySaverThreshold
+            if (batterySaverEnabled) {
+                val batteryLevel = getWatchBatteryLevel(context)
+                if (batteryLevel in 0 until batterySaverThreshold) {
+                    if (keepHistory) {
+                        notifLog.addEntry(packageName, title, text, "SKIPPED", "Battery saver: ${batteryLevel}% < ${batterySaverThreshold}%")
+                    }
+                    Log.d(TAG, "Skipping notification due to battery saver: ${batteryLevel}%")
+                    return
+                }
+            }
+
             Log.d(TAG, "Received notification: $title - $text")
 
             val muteManager = MuteManager(context)
@@ -78,12 +101,19 @@ object NotificationHandler {
                 return
             }
 
+            // Smart grouping: derive a conversation key from the notification
+            // For messaging apps, group by title (sender/chat name) within the same app
+            // This groups "John" messages together even if they have different notification keys
+            val conversationKey = deriveConversationKey(packageName, key, title)
+            // Track reverse mapping for dismissals
+            notifKeyToConversationKey[key] = conversationKey
+
             // Reuse notification ID for same conversation key to stack messages
-            val isUpdate = notifIdMap.containsKey(key)
-            val notifId = notifIdMap.getOrPut(key) { nextId++ }
+            val isUpdate = notifIdMap.containsKey(conversationKey)
+            val notifId = notifIdMap.getOrPut(conversationKey) { nextId++ }
 
             // Track conversation messages for stacking
-            conversationMessages.getOrPut(key) { mutableListOf() }.add(Pair(title, text))
+            conversationMessages.getOrPut(conversationKey) { mutableListOf() }.add(Pair(title, text))
 
             val actionCount = actionsArray?.length() ?: 0
             if (keepHistory) {
@@ -107,16 +137,21 @@ object NotificationHandler {
             // Use phone-provided app label, fallback to local resolution
             val resolvedAppLabel = if (appLabel.isNotEmpty()) appLabel else getAppLabel(packageName)
 
-            val messages = conversationMessages[key] ?: mutableListOf(Pair(title, text))
+            val messages = conversationMessages[conversationKey] ?: mutableListOf(Pair(title, text))
 
             showNotification(
                 context, notifId, key, packageName, resolvedAppLabel, title, text, subText, actionsArray, iconBitmap,
                 notifPriority, bigTextThreshold, autoCancel, showOpenButton, showMuteButton,
-                muteDuration, defaultVibration, customVibrationPattern, customSoundUri, isSilent,
-                hideContent, isUpdate && muteContinuation, messages
+                muteDuration = muteDuration, showSnoozeButton = showSnoozeButton, snoozeDuration = snoozeDuration,
+                defaultVibration = defaultVibration, customVibrationPattern = customVibrationPattern,
+                customSoundUri = customSoundUri, isSilent = isSilent,
+                hideContent = hideContent, silentUpdate = isUpdate && muteContinuation,
+                conversationHistory = messages
             )
 
             NotificationTileService.incrementCount(context, packageName)
+            // Update the notification content complication
+            NotificationComplicationService.updateComplication(context, resolvedAppLabel, packageName, title, text)
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle notification", e)
@@ -129,8 +164,10 @@ object NotificationHandler {
             val json = JSONObject(String(messageEvent.data))
             val key = json.getString("key")
 
-            val notifId = notifIdMap.remove(key) ?: return
-            conversationMessages.remove(key)
+            // Use conversation key mapping if available, otherwise fall back to raw key
+            val conversationKey = notifKeyToConversationKey.remove(key) ?: key
+            val notifId = notifIdMap.remove(conversationKey) ?: return
+            conversationMessages.remove(conversationKey)
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(notifId)
 
@@ -171,6 +208,8 @@ object NotificationHandler {
         showOpenButton: Boolean = true,
         showMuteButton: Boolean = true,
         muteDuration: Int = 30,
+        showSnoozeButton: Boolean = true,
+        snoozeDuration: Int = 5,
         defaultVibration: String = "0,200,100,200",
         customVibrationPattern: String = "",
         customSoundUri: String = "",
@@ -371,6 +410,24 @@ object NotificationHandler {
             }
         }
 
+        if (showSnoozeButton) {
+            val snoozeIntent = Intent(context, SnoozeBroadcastReceiver::class.java).apply {
+                action = "com.notifmirror.wear.SNOOZE"
+                putExtra(SnoozeBroadcastReceiver.EXTRA_NOTIF_KEY, notifKey)
+                putExtra(SnoozeBroadcastReceiver.EXTRA_NOTIFICATION_ID, notifId)
+                putExtra(SnoozeBroadcastReceiver.EXTRA_SNOOZE_DURATION_MS, snoozeDuration.toLong() * 60000L)
+                putExtra(SnoozeBroadcastReceiver.EXTRA_PACKAGE_NAME, packageName)
+            }
+            val snoozePendingIntent = PendingIntent.getBroadcast(
+                context,
+                notifId * 100 + 98,
+                snoozeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val snoozeLabel = "Snooze ${snoozeDuration}min"
+            builder.addAction(R.drawable.ic_action, snoozeLabel, snoozePendingIntent)
+        }
+
         if (showMuteButton) {
             val muteIntent = Intent(context, MuteBroadcastReceiver::class.java).apply {
                 action = "com.notifmirror.wear.MUTE"
@@ -460,6 +517,44 @@ object NotificationHandler {
             }
         }
     }
+
+    private fun getWatchBatteryLevel(context: Context): Int {
+        val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+        return if (scale > 0) (level * 100 / scale) else -1
+    }
+
+    /**
+     * Derive a conversation-level grouping key from notification metadata.
+     * For messaging apps, groups by sender/chat name (title) within the same app.
+     * For other apps, falls back to the notification key.
+     */
+    private fun deriveConversationKey(packageName: String, notifKey: String, title: String): String {
+        // Known messaging apps where title = sender/conversation name
+        val isMessagingApp = packageName.contains("whatsapp") ||
+            packageName.contains("telegram") ||
+            packageName.contains("messenger") ||
+            packageName.contains("signal") ||
+            packageName.contains("discord") ||
+            packageName.contains("slack") ||
+            packageName.contains("instagram") ||
+            packageName.contains("sms") ||
+            packageName.contains("mms") ||
+            packageName.contains("messaging") ||
+            packageName.contains("gmail")
+
+        return if (isMessagingApp && title.isNotEmpty()) {
+            // Group by app + sender/conversation title
+            "$packageName:$title"
+        } else {
+            // Non-messaging apps: use the original notification key
+            notifKey
+        }
+    }
+
+    // Reverse lookup: find conversation key from notification key
+    private val notifKeyToConversationKey = mutableMapOf<String, String>()
 
     private val KNOWN_WATCH_PACKAGES = mapOf(
         "com.google.android.apps.messaging" to "com.google.android.apps.messaging",

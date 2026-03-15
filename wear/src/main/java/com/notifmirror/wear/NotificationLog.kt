@@ -5,11 +5,12 @@ import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 
-class NotificationLog(context: Context) {
+class NotificationLog(private val context: Context) {
 
     companion object {
         private const val PREFS_NAME = "notif_mirror_log"
         private const val KEY_LOG = "log_entries"
+        private const val KEY_LOG_ENCRYPTED = "log_entries_encrypted"
     }
 
     private val prefs: SharedPreferences =
@@ -36,7 +37,7 @@ class NotificationLog(context: Context) {
             if (actionsJson.isNotEmpty()) put("actions", actionsJson)
         }
         entries.put(entry)
-        prefs.edit().putString(KEY_LOG, entries.toString()).apply()
+        saveEntries(entries)
     }
 
     fun getEntries(): List<LogEntry> {
@@ -61,13 +62,43 @@ class NotificationLog(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().putString(KEY_LOG, "[]").apply()
+        prefs.edit()
+            .remove(KEY_LOG)
+            .remove(KEY_LOG_ENCRYPTED)
+            .apply()
+    }
+
+    private fun saveEntries(entries: JSONArray) {
+        val json = entries.toString()
+        try {
+            val encrypted = CryptoHelper.encryptString(json, context)
+            if (encrypted != null) {
+                prefs.edit()
+                    .putString(KEY_LOG_ENCRYPTED, encrypted)
+                    .remove(KEY_LOG)
+                    .apply()
+                return
+            }
+        } catch (_: Exception) { }
+        // Fallback to plaintext if encryption fails or no key
+        prefs.edit().putString(KEY_LOG, json).apply()
     }
 
     private fun getEntriesRaw(): JSONArray {
+        // Try encrypted first
+        val encrypted = prefs.getString(KEY_LOG_ENCRYPTED, null)
+        if (encrypted != null) {
+            try {
+                val decrypted = CryptoHelper.decryptString(encrypted, context)
+                if (decrypted != null) return JSONArray(decrypted)
+            } catch (_: Exception) { }
+        }
+        // Fallback to plaintext
         val raw = prefs.getString(KEY_LOG, "[]") ?: "[]"
         return try {
-            JSONArray(raw)
+            val arr = JSONArray(raw)
+            if (arr.length() > 0) saveEntries(arr)
+            arr
         } catch (_: Exception) {
             JSONArray()
         }

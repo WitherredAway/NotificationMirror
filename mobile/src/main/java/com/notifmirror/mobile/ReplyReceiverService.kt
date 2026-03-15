@@ -24,6 +24,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/reply" -> handleReply(messageEvent)
             "/action" -> handleAction(messageEvent)
             "/open_settings" -> handleOpenSettings()
+            "/snooze" -> handleSnooze(messageEvent)
         }
     }
 
@@ -100,6 +101,30 @@ class ReplyReceiverService : WearableListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle action", e)
             sendActionResult(false, "Failed: ${e.message}")
+        }
+    }
+
+    private fun handleSnooze(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val notifKey = json.getString("key")
+            val durationMs = json.optLong("durationMs", 300000L) // default 5 min
+
+            Log.d(TAG, "Received snooze request for $notifKey, duration ${durationMs}ms")
+
+            // Get the NotificationListenerService instance to call snoozeNotification
+            val listener = NotificationListener.instance
+            if (listener != null) {
+                listener.snoozeNotification(notifKey, durationMs)
+                Log.d(TAG, "Snoozed notification $notifKey for ${durationMs}ms")
+                sendActionResult(true, "Snoozed for ${durationMs / 60000} min")
+            } else {
+                Log.w(TAG, "NotificationListener not available for snooze")
+                sendActionResult(false, "Notification listener not active")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle snooze", e)
+            sendActionResult(false, "Snooze failed: ${e.message}")
         }
     }
 

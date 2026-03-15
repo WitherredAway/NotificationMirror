@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
 import android.view.MotionEvent
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -133,6 +134,34 @@ class MainActivity : AppCompatActivity() {
         keepHistorySwitch.isChecked = historyPrefs.getBoolean("keep_notification_history", true)
         keepHistorySwitch.setOnCheckedChangeListener { _, isChecked ->
             historyPrefs.edit().putBoolean("keep_notification_history", isChecked).apply()
+        }
+
+        // Battery Saver toggle
+        val batterySaverSwitch = findViewById<SwitchCompat>(R.id.batterySaverSwitch)
+        val batterySaverThresholdLayout = findViewById<LinearLayout>(R.id.batterySaverThresholdLayout)
+        val batterySaverThresholdInput = findViewById<EditText>(R.id.batterySaverThresholdInput)
+
+        val batterySaverEnabled = historyPrefs.getBoolean("battery_saver_enabled", false)
+        val batterySaverThreshold = historyPrefs.getInt("battery_saver_threshold", 15)
+        batterySaverSwitch.isChecked = batterySaverEnabled
+        batterySaverThresholdLayout.visibility = if (batterySaverEnabled) android.view.View.VISIBLE else android.view.View.GONE
+        batterySaverThresholdInput.setText(batterySaverThreshold.toString())
+
+        batterySaverSwitch.setOnCheckedChangeListener { _, isChecked ->
+            historyPrefs.edit().putBoolean("battery_saver_enabled", isChecked).apply()
+            batterySaverThresholdLayout.visibility = if (isChecked) android.view.View.VISIBLE else android.view.View.GONE
+        }
+
+        batterySaverThresholdInput.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val threshold = batterySaverThresholdInput.text.toString().toIntOrNull()
+                if (threshold != null && threshold in 1..100) {
+                    historyPrefs.edit().putInt("battery_saver_threshold", threshold).apply()
+                } else {
+                    batterySaverThresholdInput.setText("15")
+                    historyPrefs.edit().putInt("battery_saver_threshold", 15).apply()
+                }
+            }
         }
 
         checkAndRequestPermissions()

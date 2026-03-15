@@ -32,16 +32,21 @@ class NotificationListener : NotificationListenerService() {
         private const val PATH_DISMISS = "/notification_dismiss"
 
         val pendingActions = mutableMapOf<String, Notification.Action>()
+        var instance: NotificationListener? = null
+            private set
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private lateinit var settings: SettingsManager
     private lateinit var notifLog: NotificationLog
+    private lateinit var offlineQueue: OfflineQueue
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         settings = SettingsManager(this)
         notifLog = NotificationLog(this)
+        offlineQueue = OfflineQueue(this)
         syncEncryptionKey()
     }
 
@@ -171,6 +176,8 @@ class NotificationListener : NotificationListenerService() {
             put("autoDismissSync", settings.getEffectiveAutoDismissSync(appPackageName))
             put("showOpenButton", settings.getEffectiveShowOpenButton(appPackageName))
             put("showMuteButton", settings.getEffectiveShowMuteButton(appPackageName))
+            put("showSnoozeButton", settings.getEffectiveShowSnoozeButton(appPackageName))
+            put("snoozeDuration", settings.getEffectiveSnoozeDuration(appPackageName))
             put("defaultVibration", settings.getDefaultVibrationPattern())
             put("keepHistory", settings.isKeepNotificationHistoryEnabled())
             // Send screen mode so watch knows whether to be silent
@@ -185,6 +192,9 @@ class NotificationListener : NotificationListenerService() {
             }
             // Send mute continuation setting (per-app with global fallback)
             put("muteContinuation", settings.getEffectiveMuteContinuation(appPackageName))
+            // Send battery saver settings so watch can check locally
+            put("batterySaverEnabled", settings.isBatterySaverEnabled())
+            put("batterySaverThreshold", settings.getBatterySaverThreshold())
             // Send effective vibration pattern (per-app or default)
             val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
             if (effectiveVib.isNotEmpty()) {
@@ -206,6 +216,14 @@ class NotificationListener : NotificationListenerService() {
 
                 if (nodes.isEmpty()) {
                     Log.w(TAG, "No connected watch nodes found")
+                    // Queue for offline delivery
+                    offlineQueue.enqueue(json)
+                    if (settings.isKeepNotificationHistoryEnabled()) {
+                        notifLog.addEntry(
+                            appPackageName, title, displayText, "QUEUED",
+                            "Watch disconnected, queued for delivery"
+                        )
+                    }
                     return@launch
                 }
 
@@ -219,6 +237,11 @@ class NotificationListener : NotificationListenerService() {
                         .sendMessage(node.id, PATH_NOTIFICATION, encryptedBytes)
                         .await()
                     Log.d(TAG, "Sent encrypted to node: ${node.displayName}")
+                }
+
+                // Also flush any queued notifications
+                if (!offlineQueue.isEmpty()) {
+                    flushOfflineQueue(nodes)
                 }
 
                 if (settings.isKeepNotificationHistoryEnabled()) {
@@ -276,6 +299,34 @@ class NotificationListener : NotificationListenerService() {
         }
     }
 
+    private suspend fun flushOfflineQueue(nodes: Collection<com.google.android.gms.wearable.Node>) {
+        try {
+            val queued = offlineQueue.dequeueAll()
+            Log.d(TAG, "Flushing ${queued.size} queued notifications")
+            val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+            for (queuedJson in queued) {
+                try {
+                    val plainBytes = queuedJson.toString().toByteArray(Charsets.UTF_8)
+                    val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
+                    for (node in nodes) {
+                        Wearable.getMessageClient(this@NotificationListener)
+                            .sendMessage(node.id, PATH_NOTIFICATION, encryptedBytes)
+                            .await()
+                    }
+                    val pkg = queuedJson.optString("package", "unknown")
+                    val title = queuedJson.optString("title", "")
+                    if (settings.isKeepNotificationHistoryEnabled()) {
+                        notifLog.addEntry(pkg, title, "", "DELIVERED", "From offline queue")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to send queued notification", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to flush offline queue", e)
+        }
+    }
+
     private suspend fun sendToWatch(data: ByteArray, path: String = PATH_NOTIFICATION) {
         val nodeClient = Wearable.getNodeClient(this)
         val nodes = nodeClient.connectedNodes.await()
@@ -289,6 +340,7 @@ class NotificationListener : NotificationListenerService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        instance = null
         scope.cancel()
     }
 }

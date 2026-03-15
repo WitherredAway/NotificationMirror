@@ -51,6 +51,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".SnoozeBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.notifmirror.wear.SNOOZE" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".NotificationReceiverService"
             android:exported="true">
@@ -78,6 +86,22 @@
             <meta-data
                 android:name="androidx.wear.tiles.PREVIEW"
                 android:resource="@mipmap/ic_launcher" />
+        </service>
+
+        <service
+            android:name=".NotificationComplicationService"
+            android:exported="true"
+            android:label="Latest Notification"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
         </service>
 
         <meta-data

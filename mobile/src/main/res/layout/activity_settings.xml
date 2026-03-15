@@ -88,6 +88,42 @@
 <EditText android:id="@+id/bigTextThresholdInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="characters" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
 </LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="SNOOZE" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Snooze Button" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Add snooze button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/showSnoozeButtonSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Snooze Duration" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Duration for the Snooze button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
+<EditText android:id="@+id/snoozeDurationInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="minutes" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
+</LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="BATTERY SAVER" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Battery Saver Mode" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Reduce mirroring when watch battery is low" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/batterySaverSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Battery Threshold" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Skip mirroring when watch battery is below this percentage" android:textSize="12sp" android:textColor="?colorOutline" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
+<EditText android:id="@+id/batterySaverThresholdInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="%" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
+</LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="COMPLICATION" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Complication Source" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="What to show on the watch face complication" android:textSize="12sp" android:textColor="?colorOutline" />
+<RadioGroup android:id="@+id/complicationSourceGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical">
+<RadioButton android:id="@+id/radioComplicationMostRecent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Most recent notification" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+<RadioButton android:id="@+id/radioComplicationSpecificApp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Specific app" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+</RadioGroup>
+<EditText android:id="@+id/complicationAppInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:hint="com.example.app" android:inputType="text" android:textSize="14sp" android:textColor="?colorOnSurface" android:textColorHint="?colorOutline" android:padding="10dp" android:background="@drawable/edit_text_bg" android:visibility="gone" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="QUICK MUTE" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Mute Duration" android:textSize="16sp" android:textColor="?colorOnSurface" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Duration for the Mute button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />

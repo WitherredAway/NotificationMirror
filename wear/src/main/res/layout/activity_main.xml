@@ -30,6 +30,15 @@
 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Keep History" android:textSize="12sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/keepHistorySwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="4dp">
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Battery Saver" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<androidx.appcompat.widget.SwitchCompat android:id="@+id/batterySaverSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+<LinearLayout android:id="@+id/batterySaverThresholdLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="4dp" android:visibility="gone">
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Threshold" android:textSize="11sp" android:textColor="?colorOutline" />
+<EditText android:id="@+id/batterySaverThresholdInput" android:layout_width="40dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="11sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="4dp" android:text="15" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="%" android:textSize="11sp" android:textColor="?colorOutline" />
+</LinearLayout>
 <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginBottom="20dp" android:orientation="horizontal" android:gravity="center_vertical" android:layout_gravity="center_horizontal">
 <TextView android:id="@+id/versionText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10sp" android:textColor="?colorOutline" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" \u00b7 " android:textSize="10sp" android:textColor="?colorOutline" />

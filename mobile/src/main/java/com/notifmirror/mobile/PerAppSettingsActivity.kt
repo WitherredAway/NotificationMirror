@@ -83,6 +83,8 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val overrideMuteDuration = findViewById<CheckBox>(R.id.overrideMuteDuration)
         val overrideScreenOffMode = findViewById<CheckBox>(R.id.overrideScreenOffMode)
         val overrideMuteContinuation = findViewById<CheckBox>(R.id.overrideMuteContinuation)
+        val overrideShowSnooze = findViewById<CheckBox>(R.id.overrideShowSnooze)
+        val overrideSnoozeDuration = findViewById<CheckBox>(R.id.overrideSnoozeDuration)
 
         // Value controls
         val mirrorOngoingSwitch = findViewById<SwitchMaterial>(R.id.perAppMirrorOngoing)
@@ -97,6 +99,8 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val muteDurationInput = findViewById<EditText>(R.id.perAppMuteDuration)
         val vibPatternInput = findViewById<EditText>(R.id.perAppVibPattern)
         val soundNameDisplay = findViewById<TextView>(R.id.perAppSoundName)
+        val showSnoozeSwitch = findViewById<SwitchMaterial>(R.id.perAppShowSnooze)
+        val snoozeDurationInput = findViewById<EditText>(R.id.perAppSnoozeDuration)
 
         // Load existing per-app settings
         overrideMirrorOngoing.isChecked = settings.isPerAppBooleanCustomized("mirror_ongoing", packageName)
@@ -144,6 +148,14 @@ class PerAppSettingsActivity : AppCompatActivity() {
         muteDurationInput.setText(settings.getEffectiveMuteDuration(packageName).toString())
         muteDurationInput.isEnabled = overrideMuteDuration.isChecked
 
+        overrideShowSnooze.isChecked = settings.isPerAppBooleanCustomized("show_snooze", packageName)
+        showSnoozeSwitch.isChecked = settings.getEffectiveShowSnoozeButton(packageName)
+        showSnoozeSwitch.isEnabled = overrideShowSnooze.isChecked
+
+        overrideSnoozeDuration.isChecked = settings.isPerAppIntCustomized("snooze_duration", packageName)
+        snoozeDurationInput.setText(settings.getEffectiveSnoozeDuration(packageName).toString())
+        snoozeDurationInput.isEnabled = overrideSnoozeDuration.isChecked
+
         val perAppScreenModeGroup = findViewById<RadioGroup>(R.id.perAppScreenModeGroup)
         overrideScreenOffMode.isChecked = settings.isPerAppIntCustomized("screen_off_mode", packageName)
         val effectiveScreenMode = settings.getEffectiveScreenOffMode(packageName)
@@ -181,6 +193,8 @@ class PerAppSettingsActivity : AppCompatActivity() {
         overrideBigText.setOnCheckedChangeListener { _, checked -> bigTextInput.isEnabled = checked }
         overrideMuteDuration.setOnCheckedChangeListener { _, checked -> muteDurationInput.isEnabled = checked }
         overrideScreenOffMode.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(perAppScreenModeGroup, checked) }
+        overrideShowSnooze.setOnCheckedChangeListener { _, checked -> showSnoozeSwitch.isEnabled = checked }
+        overrideSnoozeDuration.setOnCheckedChangeListener { _, checked -> snoozeDurationInput.isEnabled = checked }
 
         // Sound buttons
         findViewById<MaterialButton>(R.id.perAppPickSound).setOnClickListener {
@@ -278,6 +292,23 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 settings.setPerAppInt("mute_duration", packageName, duration)
             } else {
                 settings.clearPerAppInt("mute_duration", packageName)
+            }
+
+            if (overrideShowSnooze.isChecked) {
+                settings.setPerAppBoolean("show_snooze", packageName, showSnoozeSwitch.isChecked)
+            } else {
+                settings.clearPerAppBoolean("show_snooze", packageName)
+            }
+
+            if (overrideSnoozeDuration.isChecked) {
+                val snoozeDur = snoozeDurationInput.text.toString().trim().toIntOrNull()
+                if (snoozeDur == null || snoozeDur < 1) {
+                    Toast.makeText(this, "Snooze duration must be at least 1 minute", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                settings.setPerAppInt("snooze_duration", packageName, snoozeDur)
+            } else {
+                settings.clearPerAppInt("snooze_duration", packageName)
             }
 
             if (overrideScreenOffMode.isChecked) {

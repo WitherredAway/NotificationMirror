@@ -165,6 +165,26 @@
 <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppShowMute" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
 
+<!-- Show Snooze Button -->
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
+<CheckBox android:id="@+id/overrideShowSnooze" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Snooze Button" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Snooze button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppShowSnooze" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+
+<!-- Snooze Duration -->
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
+<CheckBox android:id="@+id/overrideSnoozeDuration" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Snooze Duration" android:textSize="15sp" android:textColor="?colorOnSurface" android:layout_marginStart="8dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:layout_marginStart="40dp" android:orientation="horizontal" android:gravity="center_vertical">
+<EditText android:id="@+id/perAppSnoozeDuration" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="14sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="minutes" android:textSize="13sp" android:textColor="?colorOnSurfaceVariant" />
+</LinearLayout>
+
 <!-- Big Text Threshold -->
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
 <CheckBox android:id="@+id/overrideBigText" android:layout_width="wrap_content" android:layout_height="wrap_content" />
