@@ -79,6 +79,10 @@
                     android:host="*"
                     android:pathPrefix="/crypto_key"
                     android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/mirroring_state"
+                    android:scheme="wear" />
             </intent-filter>
         </service>
 

@@ -1,5 +1,6 @@
 package com.notifmirror.wear
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -54,6 +55,12 @@ class NotificationReceiverService : WearableListenerService() {
                         // Retry any queued notifications that failed decryption
                         PendingNotificationQueue.retryAll(this)
                     }
+                } else if (path == "/mirroring_state") {
+                    val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
+                    val enabled = dataMap.getBoolean("enabled", true)
+                    val prefs = getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+                    prefs.edit().putBoolean("mirroring_enabled", enabled).apply()
+                    Log.d(TAG, "Mirroring state synced from phone: enabled=$enabled")
                 }
             }
         }
