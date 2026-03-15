@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.content.pm.PackageManager
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -18,6 +19,7 @@ import android.widget.ProgressBar
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
@@ -28,6 +30,7 @@ class AppSettingsActivity : AppCompatActivity() {
     private lateinit var settings: SettingsManager
     private var downloadProgressHandler: Handler? = null
     private var downloadProgressRunnable: Runnable? = null
+    private var selectedComplicationPackage: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,7 +63,7 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Complication section
         val complicationSourceGroup = findViewById<RadioGroup>(R.id.complicationSourceGroup)
-        val complicationAppInput = findViewById<EditText>(R.id.complicationAppInput)
+        val complicationAppButton = findViewById<MaterialButton>(R.id.complicationAppButton)
 
         // Mute section
         val muteDurationInput = findViewById<EditText>(R.id.muteDurationInput)
@@ -105,14 +108,19 @@ class AppSettingsActivity : AppCompatActivity() {
         batterySaverThresholdInput.setText(settings.getBatterySaverThreshold().toString())
 
         // Load current values - Complication
+        selectedComplicationPackage = settings.getComplicationApp()
         when (settings.getComplicationSource()) {
             "most_recent" -> complicationSourceGroup.check(R.id.radioComplicationMostRecent)
             "specific_app" -> {
                 complicationSourceGroup.check(R.id.radioComplicationSpecificApp)
-                complicationAppInput.visibility = View.VISIBLE
+                complicationAppButton.visibility = View.VISIBLE
             }
         }
-        complicationAppInput.setText(settings.getComplicationApp())
+        updateComplicationAppButtonText(complicationAppButton)
+
+        complicationAppButton.setOnClickListener {
+            showComplicationAppPicker(complicationAppButton)
+        }
 
         // Note: complicationSourceGroup listener is set below with showSave integration
 
@@ -185,7 +193,7 @@ class AppSettingsActivity : AppCompatActivity() {
         screenModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         priorityGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         complicationSourceGroup.setOnCheckedChangeListener { _, checkedId ->
-            complicationAppInput.visibility = if (checkedId == R.id.radioComplicationSpecificApp) View.VISIBLE else View.GONE
+            complicationAppButton.visibility = if (checkedId == R.id.radioComplicationSpecificApp) View.VISIBLE else View.GONE
             showSave()
         }
 
@@ -199,7 +207,6 @@ class AppSettingsActivity : AppCompatActivity() {
         defaultVibrationInput.addTextChangedListener(textWatcher)
         snoozeDurationInput.addTextChangedListener(textWatcher)
         batterySaverThresholdInput.addTextChangedListener(textWatcher)
-        complicationAppInput.addTextChangedListener(textWatcher)
 
         saveButton.setOnClickListener {
             val durationStr = muteDurationInput.text.toString().trim()
@@ -269,7 +276,7 @@ class AppSettingsActivity : AppCompatActivity() {
                 else -> "most_recent"
             }
             settings.setComplicationSource(complicationSource)
-            settings.setComplicationApp(complicationAppInput.text.toString().trim())
+            settings.setComplicationApp(selectedComplicationPackage)
 
             settings.setBigTextThreshold(bigTextThreshold)
             settings.setMuteDurationMinutes(duration)
@@ -281,6 +288,42 @@ class AppSettingsActivity : AppCompatActivity() {
             Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show()
             finish()
         }
+    }
+
+    private fun updateComplicationAppButtonText(button: MaterialButton) {
+        if (selectedComplicationPackage.isEmpty()) {
+            button.text = "Select App"
+        } else {
+            val appName = try {
+                val appInfo = packageManager.getApplicationInfo(selectedComplicationPackage, 0)
+                packageManager.getApplicationLabel(appInfo).toString()
+            } catch (_: PackageManager.NameNotFoundException) {
+                selectedComplicationPackage
+            }
+            button.text = appName
+        }
+    }
+
+    private fun showComplicationAppPicker(button: MaterialButton) {
+        val pm = packageManager
+        val intent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+        }
+        val apps = pm.queryIntentActivities(intent, 0)
+            .sortedBy { it.loadLabel(pm).toString().lowercase() }
+
+        val appNames = apps.map { it.loadLabel(pm).toString() }.toTypedArray()
+        val packageNames = apps.map { it.activityInfo.packageName }
+
+        AlertDialog.Builder(this)
+            .setTitle("Select App")
+            .setItems(appNames) { _, which ->
+                selectedComplicationPackage = packageNames[which]
+                updateComplicationAppButtonText(button)
+                findViewById<MaterialButton>(R.id.saveSettingsButton).visibility = View.VISIBLE
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun startDownloadWithProgress(downloadUrl: String, progressBar: ProgressBar, statusText: TextView) {

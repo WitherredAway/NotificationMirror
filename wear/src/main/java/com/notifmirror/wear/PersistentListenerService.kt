@@ -12,6 +12,10 @@ import android.util.Log
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class PersistentListenerService : Service(), MessageClient.OnMessageReceivedListener {
 
@@ -67,13 +71,9 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
                 if (decryptedData != null) {
                     NotificationHandler.handleNotification(this, NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedData))
                 } else {
-                    // Decryption failed — check if the raw data is valid JSON (plaintext)
-                    try {
-                        org.json.JSONObject(String(messageEvent.data))
-                        NotificationHandler.handleNotification(this, messageEvent)
-                    } catch (_: Exception) {
-                        Log.w(TAG, "Cannot decrypt notification and data is not valid JSON — key may not be synced yet")
-                    }
+                    // Decryption failed — request key re-sync from phone
+                    Log.w(TAG, "Cannot decrypt notification — requesting key re-sync from phone")
+                    requestKeyFromPhone()
                 }
             }
             "/notification_dismiss" -> NotificationHandler.handleDismissal(this, messageEvent)
@@ -85,8 +85,24 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
             val key = CryptoHelper.getKey(this) ?: return null
             CryptoHelper.decrypt(data, key)
         } catch (e: Exception) {
-            Log.w(TAG, "Decryption failed, trying as plaintext", e)
+            Log.w(TAG, "Decryption failed", e)
             null
+        }
+    }
+
+    private fun requestKeyFromPhone() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@PersistentListenerService).connectedNodes.await()
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@PersistentListenerService)
+                        .sendMessage(node.id, "/request_key", byteArrayOf())
+                        .await()
+                }
+                Log.d(TAG, "Sent /request_key to phone")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to request key from phone", e)
+            }
         }
     }
 

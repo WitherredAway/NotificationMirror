@@ -25,6 +25,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/action" -> handleAction(messageEvent)
             "/open_settings" -> handleOpenSettings()
             "/snooze" -> handleSnooze(messageEvent)
+            "/request_key" -> handleKeyRequest()
         }
     }
 
@@ -125,6 +126,32 @@ class ReplyReceiverService : WearableListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle snooze", e)
             sendActionResult(false, "Snooze failed: ${e.message}")
+        }
+    }
+
+    private fun handleKeyRequest() {
+        Log.d(TAG, "Watch requested encryption key — re-syncing")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Try via NotificationListener instance first (it has the full sync logic)
+                val listener = NotificationListener.instance
+                if (listener != null) {
+                    listener.resyncEncryptionKey()
+                } else {
+                    // Fallback: sync key directly via DataClient
+                    val keyBytes = CryptoHelper.getKeyBytes(this@ReplyReceiverService)
+                    val putReq = com.google.android.gms.wearable.PutDataMapRequest.create("/crypto_key").apply {
+                        dataMap.putByteArray("aes_key", keyBytes)
+                        dataMap.putLong("timestamp", System.currentTimeMillis())
+                    }
+                    Wearable.getDataClient(this@ReplyReceiverService)
+                        .putDataItem(putReq.asPutDataRequest().setUrgent())
+                        .await()
+                    Log.d(TAG, "Encryption key synced to watch (direct)")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to re-sync encryption key", e)
+            }
         }
     }
 

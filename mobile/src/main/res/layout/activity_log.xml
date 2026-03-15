@@ -27,17 +27,6 @@
             android:textColor="?colorOnSurface" />
 
         <ImageButton
-            android:id="@+id/searchButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_search"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:scaleType="centerInside"
-            android:padding="8dp"
-            android:contentDescription="Search"
-            android:tint="?colorOnSurfaceVariant" />
-
-        <ImageButton
             android:id="@+id/filterButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
@@ -70,6 +59,22 @@
             android:contentDescription="Clear log"
             android:tint="?colorOnSurfaceVariant" />
     </LinearLayout>
+
+    <!-- Search bar (always visible) -->
+    <EditText
+        android:id="@+id/searchInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:hint="Search (regex)..."
+        android:inputType="text"
+        android:textSize="14sp"
+        android:textColor="?colorOnSurface"
+        android:textColorHint="?colorOutline"
+        android:padding="10dp"
+        android:background="@drawable/edit_text_bg"
+        android:imeOptions="actionSearch" />
 
     <!-- Count text -->
     <TextView

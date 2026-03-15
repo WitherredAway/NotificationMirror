@@ -137,6 +137,27 @@ class MainActivity : AppCompatActivity() {
 
         checkForUpdates()
         checkAndRequestPermissions()
+
+        // Sync encryption key to watch on app launch
+        syncEncryptionKeyFromMainActivity()
+    }
+
+    private fun syncEncryptionKeyFromMainActivity() {
+        scope.launch {
+            try {
+                val keyBytes = CryptoHelper.getKeyBytes(this@MainActivity)
+                val putReq = com.google.android.gms.wearable.PutDataMapRequest.create("/crypto_key").apply {
+                    dataMap.putByteArray("aes_key", keyBytes)
+                    dataMap.putLong("timestamp", System.currentTimeMillis())
+                }
+                Wearable.getDataClient(this@MainActivity)
+                    .putDataItem(putReq.asPutDataRequest().setUrgent())
+                    .await()
+                Log.d(TAG, "Encryption key synced to watch from MainActivity")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to sync encryption key from MainActivity", e)
+            }
+        }
     }
 
     override fun onResume() {
@@ -341,14 +362,9 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // Encrypt test notification data just like real notifications
-                val messageBytes = try {
-                    val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
-                    val key = CryptoHelper.getOrCreateKey(this@MainActivity)
-                    CryptoHelper.encrypt(plainBytes, key)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Encryption failed for test notification, sending plaintext", e)
-                    json.toString().toByteArray(Charsets.UTF_8)
-                }
+                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                val key = CryptoHelper.getOrCreateKey(this@MainActivity)
+                val messageBytes = CryptoHelper.encrypt(plainBytes, key)
 
                 for (node in nodes) {
                     Wearable.getMessageClient(this@MainActivity)

@@ -8,7 +8,12 @@ import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
 class NotificationReceiverService : WearableListenerService() {
@@ -25,13 +30,9 @@ class NotificationReceiverService : WearableListenerService() {
                 if (decryptedData != null) {
                     NotificationHandler.handleNotification(this, DecryptedMessageEvent(messageEvent.path, decryptedData))
                 } else {
-                    // Decryption failed — check if the raw data is valid JSON (plaintext)
-                    try {
-                        JSONObject(String(messageEvent.data))
-                        NotificationHandler.handleNotification(this, messageEvent)
-                    } catch (_: Exception) {
-                        Log.w(TAG, "Cannot decrypt notification and data is not valid JSON — key may not be synced yet")
-                    }
+                    // Decryption failed — request key re-sync from phone
+                    Log.w(TAG, "Cannot decrypt notification — requesting key re-sync from phone")
+                    requestKeyFromPhone()
                 }
             }
             "/notification_dismiss" -> NotificationHandler.handleDismissal(this, messageEvent)
@@ -60,8 +61,24 @@ class NotificationReceiverService : WearableListenerService() {
             val key = CryptoHelper.getKey(this) ?: return null
             CryptoHelper.decrypt(data, key)
         } catch (e: Exception) {
-            Log.w(TAG, "Decryption failed, trying as plaintext", e)
+            Log.w(TAG, "Decryption failed", e)
             null
+        }
+    }
+
+    private fun requestKeyFromPhone() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@NotificationReceiverService).connectedNodes.await()
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@NotificationReceiverService)
+                        .sendMessage(node.id, "/request_key", byteArrayOf())
+                        .await()
+                }
+                Log.d(TAG, "Sent /request_key to phone")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to request key from phone", e)
+            }
         }
     }
 
@@ -77,7 +94,7 @@ class NotificationReceiverService : WearableListenerService() {
             ActionBroadcastReceiver.awaitingResult = false
 
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, message as CharSequence, Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle action result", e)

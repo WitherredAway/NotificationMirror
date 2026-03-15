@@ -3,11 +3,12 @@ package com.notifmirror.mobile
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
@@ -31,6 +32,7 @@ class LogActivity : AppCompatActivity() {
 
     private lateinit var notifLog: NotificationLog
     private lateinit var recyclerView: RecyclerView
+    private lateinit var searchInput: EditText
     private lateinit var countText: TextView
     private lateinit var emptyText: TextView
     private lateinit var filterButton: ImageButton
@@ -49,9 +51,9 @@ class LogActivity : AppCompatActivity() {
         setContentView(R.layout.activity_log)
 
         recyclerView = findViewById(R.id.logRecyclerView)
+        searchInput = findViewById(R.id.searchInput)
         countText = findViewById(R.id.countText)
         emptyText = findViewById(R.id.emptyText)
-        val searchButton = findViewById<ImageButton>(R.id.searchButton)
         filterButton = findViewById(R.id.filterButton)
         val exportButton = findViewById<ImageButton>(R.id.exportLogButton)
         val clearButton = findViewById<ImageButton>(R.id.clearLogButton)
@@ -92,9 +94,15 @@ class LogActivity : AppCompatActivity() {
             exportLog()
         }
 
-        searchButton.setOnClickListener {
-            showSearchDialog()
-        }
+        // Live search filtering as user types
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                searchQuery = s?.toString()?.trim() ?: ""
+                displayFiltered()
+            }
+        })
 
         filterButton.setOnClickListener {
             showFilterDialog()
@@ -108,42 +116,6 @@ class LogActivity : AppCompatActivity() {
         super.onResume()
         loadEntries()
         displayFiltered()
-    }
-
-    private fun showSearchDialog() {
-        val input = EditText(this).apply {
-            hint = "Search (regex)"
-            setText(searchQuery)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-            setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12))
-        }
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Search")
-            .setView(input)
-            .setPositiveButton("Search") { _, _ ->
-                searchQuery = input.text.toString().trim()
-                displayFiltered()
-            }
-            .setNeutralButton("Clear") { _, _ ->
-                searchQuery = ""
-                displayFiltered()
-            }
-            .setNegativeButton("Cancel", null)
-            .create()
-
-        dialog.show()
-
-        input.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
-                searchQuery = input.text.toString().trim()
-                displayFiltered()
-                dialog.dismiss()
-                true
-            } else {
-                false
-            }
-        }
     }
 
     private fun showFilterDialog() {

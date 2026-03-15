@@ -52,24 +52,33 @@ class NotificationListener : NotificationListenerService() {
 
     private fun syncEncryptionKey(retryCount: Int = 0) {
         scope.launch {
-            try {
-                val keyBytes = CryptoHelper.getKeyBytes(this@NotificationListener)
-                val putReq = PutDataMapRequest.create("/crypto_key").apply {
-                    dataMap.putByteArray("aes_key", keyBytes)
-                    dataMap.putLong("timestamp", System.currentTimeMillis())
-                }
-                Wearable.getDataClient(this@NotificationListener)
-                    .putDataItem(putReq.asPutDataRequest().setUrgent())
-                    .await()
-                Log.d(TAG, "Encryption key synced to watch")
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to sync encryption key (attempt ${retryCount + 1})", e)
-                if (retryCount < 3) {
-                    kotlinx.coroutines.delay(2000L * (retryCount + 1))
-                    syncEncryptionKey(retryCount + 1)
-                }
+            syncEncryptionKeyBlocking(retryCount)
+        }
+    }
+
+    private suspend fun syncEncryptionKeyBlocking(retryCount: Int = 0) {
+        try {
+            val keyBytes = CryptoHelper.getKeyBytes(this@NotificationListener)
+            val putReq = PutDataMapRequest.create("/crypto_key").apply {
+                dataMap.putByteArray("aes_key", keyBytes)
+                dataMap.putLong("timestamp", System.currentTimeMillis())
+            }
+            Wearable.getDataClient(this@NotificationListener)
+                .putDataItem(putReq.asPutDataRequest().setUrgent())
+                .await()
+            Log.d(TAG, "Encryption key synced to watch")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to sync encryption key (attempt ${retryCount + 1})", e)
+            if (retryCount < 3) {
+                kotlinx.coroutines.delay(2000L * (retryCount + 1))
+                syncEncryptionKeyBlocking(retryCount + 1)
             }
         }
+    }
+
+    /** Called by ReplyReceiverService when the watch requests the encryption key */
+    suspend fun resyncEncryptionKey() {
+        syncEncryptionKeyBlocking(0)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -245,15 +254,13 @@ class NotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
-                // Encrypt notification data before sending (fallback to plaintext if encryption fails)
+                // Ensure encryption key is synced to watch before sending
+                syncEncryptionKeyBlocking()
+
+                // Encrypt notification data before sending
                 val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
-                val messageBytes = try {
-                    val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
-                    CryptoHelper.encrypt(plainBytes, key)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Encryption failed, sending plaintext", e)
-                    plainBytes
-                }
+                val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+                val messageBytes = CryptoHelper.encrypt(plainBytes, key)
 
                 for (node in nodes) {
                     Wearable.getMessageClient(this@NotificationListener)
@@ -329,16 +336,11 @@ class NotificationListener : NotificationListenerService() {
         try {
             val queued = offlineQueue.dequeueAll()
             Log.d(TAG, "Flushing ${queued.size} queued notifications")
+            val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
             for (queuedJson in queued) {
                 try {
                     val plainBytes = queuedJson.toString().toByteArray(Charsets.UTF_8)
-                    val messageBytes = try {
-                        val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
-                        CryptoHelper.encrypt(plainBytes, key)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Encryption failed for queued notification, sending plaintext", e)
-                        plainBytes
-                    }
+                    val messageBytes = CryptoHelper.encrypt(plainBytes, key)
                     for (node in nodes) {
                         Wearable.getMessageClient(this@NotificationListener)
                             .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
