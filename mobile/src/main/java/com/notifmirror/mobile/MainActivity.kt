@@ -24,6 +24,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,11 +50,13 @@ class MainActivity : AppCompatActivity() {
         private const val PATH_NOTIFICATION = "/notification"
     }
 
-    private lateinit var statusText: TextView
-    private lateinit var enableButton: Button
-    private lateinit var appWhitelistButton: Button
-    private lateinit var keywordFilterButton: Button
-    private lateinit var viewLogButton: Button
+    private lateinit var statusCard: LinearLayout
+    private lateinit var statusIcon: ImageView
+    private lateinit var statusTitle: TextView
+    private lateinit var statusSubtitle: TextView
+    private lateinit var statAppsCount: TextView
+    private lateinit var statFiltersCount: TextView
+    private lateinit var statLogCount: TextView
     private lateinit var settingsManager: SettingsManager
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -69,33 +72,35 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         settingsManager = SettingsManager(this)
-        statusText = findViewById(R.id.statusText)
-        enableButton = findViewById(R.id.enableButton)
-        appWhitelistButton = findViewById(R.id.appWhitelistButton)
-        keywordFilterButton = findViewById(R.id.keywordFilterButton)
-        viewLogButton = findViewById(R.id.viewLogButton)
+        statusCard = findViewById(R.id.statusCard)
+        statusIcon = findViewById(R.id.statusIcon)
+        statusTitle = findViewById(R.id.statusTitle)
+        statusSubtitle = findViewById(R.id.statusSubtitle)
+        statAppsCount = findViewById(R.id.statAppsCount)
+        statFiltersCount = findViewById(R.id.statFiltersCount)
+        statLogCount = findViewById(R.id.statLogCount)
 
-        enableButton.setOnClickListener {
+        findViewById<LinearLayout>(R.id.enableButton).setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
 
-        appWhitelistButton.setOnClickListener {
+        findViewById<LinearLayout>(R.id.appWhitelistButton).setOnClickListener {
             startActivity(Intent(this, AppPickerActivity::class.java))
         }
 
-        keywordFilterButton.setOnClickListener {
+        findViewById<LinearLayout>(R.id.keywordFilterButton).setOnClickListener {
             startActivity(Intent(this, FilterSettingsActivity::class.java))
         }
 
-        viewLogButton.setOnClickListener {
+        findViewById<LinearLayout>(R.id.viewLogButton).setOnClickListener {
             startActivity(Intent(this, LogActivity::class.java))
         }
 
-        findViewById<Button>(R.id.settingsButton).setOnClickListener {
+        findViewById<LinearLayout>(R.id.settingsButton).setOnClickListener {
             startActivity(Intent(this, AppSettingsActivity::class.java))
         }
 
-        findViewById<Button>(R.id.testNotifButton).setOnClickListener {
+        findViewById<LinearLayout>(R.id.testNotifButton).setOnClickListener {
             showTestNotificationDialog()
         }
 
@@ -352,45 +357,35 @@ class MainActivity : AppCompatActivity() {
         val whitelistKeywords = settings.getKeywordWhitelist()
         val blacklistKeywords = settings.getKeywordBlacklist()
 
-        val statusParts = mutableListOf<String>()
-
+        // Update status card
         if (enabled) {
-            statusParts.add("Notification mirroring is ACTIVE.")
-            enableButton.text = "Manage Notification Access"
+            statusCard.setBackgroundResource(R.drawable.bg_status_active)
+            statusIcon.setImageResource(R.drawable.ic_check_circle)
+            statusTitle.text = "Mirroring Active"
+            if (batteryExempt) {
+                statusSubtitle.text = "All permissions granted"
+            } else {
+                statusSubtitle.text = "Battery restricted \u2014 may stop in background"
+            }
         } else {
-            statusParts.add("Notification mirroring is INACTIVE.\nPlease grant notification access.")
-            enableButton.text = "Enable Notification Access"
+            statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
+            statusIcon.setImageResource(R.drawable.ic_error_circle)
+            statusTitle.text = "Mirroring Inactive"
+            statusSubtitle.text = "Tap Notification Access to enable"
         }
 
-        if (!batteryExempt) {
-            statusParts.add("Battery: Restricted (may stop in background)")
-        } else {
-            statusParts.add("Battery: Unrestricted")
-        }
-
-        statusParts.add("")
-
+        // Update stats
         if (whitelistedApps.isEmpty()) {
-            statusParts.add("Apps: All apps (no filter)")
+            statAppsCount.text = "All"
         } else {
-            statusParts.add("Apps: ${whitelistedApps.size} whitelisted")
+            statAppsCount.text = whitelistedApps.size.toString()
         }
 
-        if (whitelistKeywords.isNotEmpty()) {
-            statusParts.add("Keyword whitelist: ${whitelistKeywords.size} pattern(s)")
-        }
-
-        if (blacklistKeywords.isNotEmpty()) {
-            statusParts.add("Keyword blacklist: ${blacklistKeywords.size} pattern(s)")
-        }
+        val totalFilters = whitelistKeywords.size + blacklistKeywords.size
+        statFiltersCount.text = totalFilters.toString()
 
         val logCount = NotificationLog(this).getEntries().size
-        if (logCount > 0) {
-            statusParts.add("")
-            statusParts.add("Log: $logCount entries")
-        }
-
-        statusText.text = statusParts.joinToString("\n")
+        statLogCount.text = logCount.toString()
     }
 
     private fun isNotificationListenerEnabled(): Boolean {

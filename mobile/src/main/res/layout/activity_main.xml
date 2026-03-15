@@ -1,150 +1,98 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?android:colorBackground">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center_horizontal">
-
-        <ImageView
-            android:id="@+id/icon"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_marginTop="32dp"
-            android:src="@mipmap/ic_launcher"
-            android:contentDescription="App icon" />
-
-        <TextView
-            android:id="@+id/titleText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Notification Mirror"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="?colorOnSurface" />
-
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:gravity="center"
-            android:text="Checking notification access..."
-            android:textSize="14sp"
-            android:textColor="?colorOnSurfaceVariant"
-            android:lineSpacingExtra="4dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/enableButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="24dp"
-            android:text="Enable Notification Access"
-            android:textAllCaps="false"
-            android:textSize="15sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/appWhitelistButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:text="Select Apps to Mirror"
-            android:textAllCaps="false"
-            android:textSize="15sp"
-            style="@style/Widget.NotifMirror.Button.Passive" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/keywordFilterButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:text="Keyword Filters (Regex)"
-            android:textAllCaps="false"
-            android:textSize="15sp"
-            style="@style/Widget.NotifMirror.Button.Passive" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/viewLogButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:text="View Notification Log"
-            android:textAllCaps="false"
-            android:textSize="15sp"
-            style="@style/Widget.NotifMirror.Button.Passive" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settingsButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:text="Settings"
-            android:textAllCaps="false"
-            android:textSize="15sp"
-            style="@style/Widget.NotifMirror.Button.Passive" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/testNotifButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:text="Send Test Notification"
-            android:textAllCaps="false"
-            android:textSize="15sp"
-            style="@style/Widget.NotifMirror.Button.Passive" />
-
-        <TextView
-            android:id="@+id/infoText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:gravity="center"
-            android:text="Make sure the companion app is also installed on your Wear OS watch."
-            android:textSize="13sp"
-            android:textColor="?colorOutline" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="24dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_gravity="center_horizontal">
-
-            <TextView
-                android:id="@+id/versionText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="12sp"
-                android:textColor="?colorOutline" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=" · "
-                android:textSize="12sp"
-                android:textColor="?colorOutline" />
-
-            <TextView
-                android:id="@+id/githubLink"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="GitHub"
-                android:textSize="12sp"
-                android:textColor="?colorPrimary"
-                android:clickable="true"
-                android:focusable="true" />
-
-        </LinearLayout>
-
-    </LinearLayout>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="?android:colorBackground" android:fillViewport="true">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="48dp" android:paddingBottom="24dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="4dp">
+<ImageView android:id="@+id/icon" android:layout_width="48dp" android:layout_height="48dp" android:src="@mipmap/ic_launcher" android:contentDescription="App icon" />
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="16dp">
+<TextView android:id="@+id/titleText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Mirror" android:textSize="22sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp">
+<TextView android:id="@+id/versionText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" · " android:textSize="12sp" android:textColor="?colorOutline" />
+<TextView android:id="@+id/githubLink" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GitHub" android:textSize="12sp" android:textColor="?colorPrimary" android:clickable="true" android:focusable="true" />
+</LinearLayout>
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:background="@drawable/bg_status_active">
+<ImageView android:id="@+id/statusIcon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_check_circle" android:contentDescription="Status" />
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="12dp">
+<TextView android:id="@+id/statusTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mirroring Active" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
+<TextView android:id="@+id/statusSubtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="All permissions granted" android:textSize="12sp" android:textColor="?colorOnSurfaceVariant" />
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginEnd="6dp" android:background="@drawable/bg_card">
+<TextView android:id="@+id/statAppsCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="All" android:textSize="20sp" android:textStyle="bold" android:textColor="?colorPrimary" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Apps" android:textSize="11sp" android:textColor="?colorOnSurfaceVariant" android:layout_marginTop="2dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginHorizontal="6dp" android:background="@drawable/bg_card">
+<TextView android:id="@+id/statFiltersCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="20sp" android:textStyle="bold" android:textColor="?colorPrimary" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Filters" android:textSize="11sp" android:textColor="?colorOnSurfaceVariant" android:layout_marginTop="2dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginStart="6dp" android:background="@drawable/bg_card">
+<TextView android:id="@+id/statLogCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="20sp" android:textStyle="bold" android:textColor="?colorPrimary" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Logged" android:textSize="11sp" android:textColor="?colorOnSurfaceVariant" android:layout_marginTop="2dp" />
+</LinearLayout>
+</LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:layout_marginStart="4dp" android:text="SETUP" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="4dp">
+<LinearLayout android:id="@+id/enableButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_shield" android:contentDescription="Notification Access" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Access" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Required for mirroring" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+</LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:layout_marginStart="4dp" android:text="CONFIGURE" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="4dp">
+<LinearLayout android:id="@+id/appWhitelistButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_apps" android:contentDescription="App Whitelist" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="App Whitelist" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Choose which apps to mirror" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="70dp" android:layout_marginEnd="16dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+<LinearLayout android:id="@+id/keywordFilterButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_filter" android:contentDescription="Keyword Filters" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Keyword Filters" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Filter by regex patterns" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="70dp" android:layout_marginEnd="16dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+<LinearLayout android:id="@+id/settingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Settings" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Settings" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Behavior, notifications, vibration, sounds" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+</LinearLayout>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:layout_marginStart="4dp" android:text="TOOLS" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="4dp">
+<LinearLayout android:id="@+id/viewLogButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_history" android:contentDescription="Notification Log" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Log" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="View mirrored notification history" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="70dp" android:layout_marginEnd="16dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+<LinearLayout android:id="@+id/testNotifButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_send" android:contentDescription="Send Test Notification" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Send Test Notification" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Send a test notification to your watch" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+</LinearLayout>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:layout_marginBottom="8dp" android:gravity="center" android:text="Make sure the companion app is also installed on your Wear OS watch." android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
 </ScrollView>
