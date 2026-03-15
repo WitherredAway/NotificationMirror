@@ -17,8 +17,12 @@ class SettingsManager(context: Context) {
         private const val KEY_SOUND_PREFIX = "sound_"
         private const val KEY_SOUND_NAME_PREFIX = "sound_name_"
         private const val KEY_DEFAULT_VIBRATION = "default_vibration_pattern"
-        private const val KEY_MIRROR_ONGOING = "mirror_ongoing"
-        private const val KEY_MIRROR_PERSISTENT = "mirror_persistent"
+        private const val KEY_ONGOING_MODE = "ongoing_mode"
+
+        // Ongoing/persistent notification modes
+        const val ONGOING_NONE = 0
+        const val ONGOING_ONLY = 1
+        const val ONGOING_ALL_PERSISTENT = 2
         private const val KEY_NOTIF_PRIORITY = "notification_priority"
         private const val KEY_BIG_TEXT_THRESHOLD = "big_text_threshold"
         private const val KEY_AUTO_CANCEL = "auto_cancel"
@@ -50,6 +54,19 @@ class SettingsManager(context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    // Cache compiled Regex patterns to avoid re-compiling on every notification
+    private val regexCache = mutableMapOf<String, Regex?>()
+
+    private fun getCachedRegex(pattern: String): Regex? {
+        return regexCache.getOrPut(pattern) {
+            try {
+                Regex(pattern, RegexOption.IGNORE_CASE)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
 
     // --- App Whitelist ---
 
@@ -113,20 +130,12 @@ class SettingsManager(context: Context) {
         prefs.edit().putInt(KEY_MUTE_DURATION, minutes).apply()
     }
 
-    // --- Mirror Ongoing Notifications (music, timers, etc.) ---
+    // --- Ongoing/Persistent Mode (unified 3-option selector) ---
 
-    fun isMirrorOngoingEnabled(): Boolean = prefs.getBoolean(KEY_MIRROR_ONGOING, false)
+    fun getOngoingMode(): Int = prefs.getInt(KEY_ONGOING_MODE, ONGOING_NONE)
 
-    fun setMirrorOngoingEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_MIRROR_ONGOING, enabled).apply()
-    }
-
-    // --- Mirror Persistent/Foreground Notifications (foreground services) ---
-
-    fun isMirrorPersistentEnabled(): Boolean = prefs.getBoolean(KEY_MIRROR_PERSISTENT, false)
-
-    fun setMirrorPersistentEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_MIRROR_PERSISTENT, enabled).apply()
+    fun setOngoingMode(mode: Int) {
+        prefs.edit().putInt(KEY_ONGOING_MODE, mode).apply()
     }
 
     // --- Notification Priority ---
@@ -404,12 +413,8 @@ class SettingsManager(context: Context) {
         return getPerAppInt("priority", packageName, getNotificationPriority())
     }
 
-    fun getEffectiveMirrorOngoing(packageName: String): Boolean {
-        return getPerAppBoolean("mirror_ongoing", packageName, isMirrorOngoingEnabled())
-    }
-
-    fun getEffectiveMirrorPersistent(packageName: String): Boolean {
-        return getPerAppBoolean("mirror_persistent", packageName, isMirrorPersistentEnabled())
+    fun getEffectiveOngoingMode(packageName: String): Int {
+        return getPerAppInt("ongoing_mode", packageName, getOngoingMode())
     }
 
     fun getEffectiveAutoCancel(packageName: String): Boolean {
@@ -498,22 +503,16 @@ class SettingsManager(context: Context) {
 
         val blacklist = getPerAppKeywordBlacklist(packageName)
         for (pattern in blacklist) {
-            try {
-                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
-                    return false
-                }
-            } catch (_: Exception) { }
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return false
         }
 
         val whitelist = getPerAppKeywordWhitelist(packageName)
         if (whitelist.isEmpty()) return true
 
         for (pattern in whitelist) {
-            try {
-                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
-                    return true
-                }
-            } catch (_: Exception) { }
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return true
         }
 
         return false
@@ -521,7 +520,7 @@ class SettingsManager(context: Context) {
 
     // Check if any per-app setting is customized
     fun hasAnyPerAppCustomization(packageName: String): Boolean {
-        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
+        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
             "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
         for (s in settings) {
@@ -536,7 +535,7 @@ class SettingsManager(context: Context) {
 
     // Clear all per-app settings
     fun clearAllPerAppSettings(packageName: String) {
-        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
+        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
             "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
         val editor = prefs.edit()
@@ -558,26 +557,16 @@ class SettingsManager(context: Context) {
 
         val blacklist = getKeywordBlacklist()
         for (pattern in blacklist) {
-            try {
-                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
-                    return false
-                }
-            } catch (_: Exception) {
-                // Invalid regex, skip
-            }
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return false
         }
 
         val whitelist = getKeywordWhitelist()
         if (whitelist.isEmpty()) return true
 
         for (pattern in whitelist) {
-            try {
-                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
-                    return true
-                }
-            } catch (_: Exception) {
-                // Invalid regex, skip
-            }
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return true
         }
 
         return false

@@ -11,6 +11,7 @@ class NotificationLog(private val context: Context) {
         private const val PREFS_NAME = "notif_mirror_log"
         private const val KEY_LOG = "log_entries"
         private const val KEY_LOG_ENCRYPTED = "log_entries_encrypted"
+        private const val ONE_WEEK_MS = 7L * 24 * 60 * 60 * 1000
     }
 
     private val prefs: SharedPreferences =
@@ -25,7 +26,7 @@ class NotificationLog(private val context: Context) {
         notifKey: String = "",
         actionsJson: String = ""
     ) {
-        val entries = getEntriesRaw()
+        var entries = getEntriesRaw()
         val entry = JSONObject().apply {
             put("time", System.currentTimeMillis())
             put("package", packageName)
@@ -37,6 +38,7 @@ class NotificationLog(private val context: Context) {
             if (actionsJson.isNotEmpty()) put("actions", actionsJson)
         }
         entries.put(entry)
+        entries = pruneOldEntries(entries)
         saveEntries(entries)
     }
 
@@ -66,6 +68,18 @@ class NotificationLog(private val context: Context) {
             .remove(KEY_LOG)
             .remove(KEY_LOG_ENCRYPTED)
             .apply()
+    }
+
+    private fun pruneOldEntries(entries: JSONArray): JSONArray {
+        val cutoff = System.currentTimeMillis() - ONE_WEEK_MS
+        val pruned = JSONArray()
+        for (i in 0 until entries.length()) {
+            val obj = entries.getJSONObject(i)
+            if (obj.optLong("time", 0) >= cutoff) {
+                pruned.put(obj)
+            }
+        }
+        return pruned
     }
 
     private fun saveEntries(entries: JSONArray) {

@@ -9,11 +9,18 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.BatteryManager
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import com.google.android.gms.wearable.MessageEvent
 import org.json.JSONObject
@@ -29,9 +36,9 @@ object NotificationHandler {
     const val EXTRA_ACTION_INDEX = "extra_action_index"
 
     // Track notification ID per conversation key (reuse for stacking)
-    private val notifIdMap = mutableMapOf<String, Int>()
+    private val notifIdMap = java.util.concurrent.ConcurrentHashMap<String, Int>()
     // Track message history per conversation key for stacking
-    private val conversationMessages = mutableMapOf<String, MutableList<Pair<String, String>>>()
+    private val conversationMessages = java.util.concurrent.ConcurrentHashMap<String, MutableList<Pair<String, String>>>()
     private var nextId = 1000
     private const val SUMMARY_ID_OFFSET = 500000
 
@@ -91,6 +98,14 @@ object NotificationHandler {
 
             Log.d(TAG, "Received notification: $title - $text")
 
+            // Respect watch-side mirroring toggle (synced from phone via DataClient)
+            val watchMirroringEnabled = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+                .getBoolean("mirroring_enabled", true)
+            if (!watchMirroringEnabled) {
+                Log.d(TAG, "Skipping notification — mirroring disabled on watch")
+                return
+            }
+
             val muteManager = MuteManager(context)
             if (muteManager.isAppMuted(packageName)) {
                 val shortPkg = packageName.split(".").lastOrNull() ?: packageName
@@ -102,9 +117,10 @@ object NotificationHandler {
             }
 
             // Smart grouping: derive a conversation key from the notification
-            // For messaging apps, group by title (sender/chat name) within the same app
-            // This groups "John" messages together even if they have different notification keys
-            val conversationKey = deriveConversationKey(packageName, key, title)
+            // Uses isMessagingStyle flag from phone (auto-detected via EXTRA_MESSAGES)
+            // to group by sender/chat name instead of hardcoding app names
+            val isMessagingStyle = json.optBoolean("isMessagingStyle", false)
+            val conversationKey = deriveConversationKey(packageName, key, title, isMessagingStyle)
             // Track reverse mapping for dismissals
             notifKeyToConversationKey[key] = conversationKey
 
@@ -114,7 +130,26 @@ object NotificationHandler {
 
             // Track conversation messages for stacking (cap at 20 to avoid unbounded memory growth)
             val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
-            msgList.add(Pair(title, text))
+
+            // If the phone sent pre-extracted conversation messages (e.g. during sync),
+            // seed the history from them instead of just adding the top-level text
+            val phoneConversationMsgs = json.optJSONArray("conversationMessages")
+            if (phoneConversationMsgs != null && phoneConversationMsgs.length() > 0 && msgList.isEmpty()) {
+                for (i in 0 until phoneConversationMsgs.length()) {
+                    val msgObj = phoneConversationMsgs.getJSONObject(i)
+                    val sender = msgObj.optString("sender", title)
+                    val msgText = msgObj.optString("text", "")
+                    if (msgText.isNotEmpty()) {
+                        msgList.add(Pair(sender, msgText))
+                    }
+                }
+            }
+
+            // Always add the current message (avoid duplicating the last phone message)
+            val lastMsg = msgList.lastOrNull()
+            if (lastMsg == null || lastMsg.first != title || lastMsg.second != text) {
+                msgList.add(Pair(title, text))
+            }
             while (msgList.size > 20) { msgList.removeAt(0) }
 
             val actionCount = actionsArray?.length() ?: 0
@@ -244,13 +279,21 @@ object NotificationHandler {
             -1 -> NotificationManager.IMPORTANCE_LOW
             else -> NotificationManager.IMPORTANCE_HIGH
         }
-        // Include hashes of vibration, sound, importance, and silent flag in channel ID
-        // so that any settings change creates a fresh channel (Android caches channel settings)
-        val vibHash = vibrationPattern.contentHashCode()
-        val soundHash = if (customSoundUri.isNotEmpty()) customSoundUri.hashCode() else 0
-        val importanceHash = if (isSilent) -1 else importance
-        val settingsSuffix = "_v${vibHash}_s${soundHash}_i${importanceHash}"
-        val effectiveChannelId = channelId + settingsSuffix
+        // Resolve sound URI for this app from watch-side per-app settings
+        val watchSoundPrefs = context.getSharedPreferences("notif_sound_settings", Context.MODE_PRIVATE)
+        val perAppSoundUri = watchSoundPrefs.getString("sound_$packageName", null)
+        // null = use default, "" = silent, otherwise a specific URI
+        val soundUri: Uri? = when {
+            isSilent -> null
+            perAppSoundUri == "" -> null // explicitly silent
+            perAppSoundUri != null -> Uri.parse(perAppSoundUri) // specific sound
+            customSoundUri == "silent" -> null
+            else -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) // default
+        }
+
+        // Build a channel ID that includes a hash of the sound setting so channel changes take effect
+        val soundHash = (perAppSoundUri ?: customSoundUri).hashCode().toString(16)
+        val effectiveChannelId = channelId + "_s" + soundHash
 
         // Delete any old channels for this app so settings always take effect
         val existingChannels = nm.notificationChannels
@@ -267,22 +310,18 @@ object NotificationHandler {
             if (isSilent) NotificationManager.IMPORTANCE_LOW else importance
         ).apply {
             description = "Mirrored notifications from $appLabel"
-            enableVibration(true)
-            this.vibrationPattern = vibrationPattern
-            this.group = groupId
-            if (customSoundUri.isNotEmpty()) {
-                // Phone content:// URIs won't resolve on the watch.
-                // Use the system default notification sound as the channel sound
-                // so Android treats this as a distinct sound channel vs the silent/default ones.
-                val watchSoundUri = android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
-                setSound(
-                    watchSoundUri,
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
+            // Vibration is handled manually via Vibrator API
+            enableVibration(false)
+            // Sound is handled via the channel natively
+            if (soundUri != null) {
+                setSound(soundUri, AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build())
+            } else {
+                setSound(null, null)
             }
+            this.group = groupId
         }
         nm.createNotificationChannel(channel)
 
@@ -320,14 +359,19 @@ object NotificationHandler {
             builder.setSubText(appLabel)
         }
 
-        // Stack conversation messages if multiple exist
+        // Stack conversation messages using MessagingStyle for better WearOS rendering
         if (!hideContent && conversationHistory.size > 1) {
-            // Show all stacked messages separated by newlines using BigTextStyle
             val recent = conversationHistory.takeLast(20)
-            val stackedText = recent.joinToString("\n") { (_, msg) -> msg }
-            builder.setContentText("${conversationHistory.size} messages")
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(stackedText)
-                .setSummaryText("${conversationHistory.size} messages"))
+            val selfPerson = Person.Builder().setName("Me").build()
+            val messagingStyle = NotificationCompat.MessagingStyle(selfPerson)
+                .setConversationTitle(if (recent.map { it.first }.distinct().size > 1) appLabel else null)
+            for ((idx, pair) in recent.withIndex()) {
+                val (senderName, msgText) = pair
+                val sender = Person.Builder().setName(senderName).build()
+                // Use incrementing timestamps so messages are ordered correctly
+                messagingStyle.addMessage(msgText, System.currentTimeMillis() - (recent.size - idx) * 1000L, sender)
+            }
+            builder.setStyle(messagingStyle)
             builder.setNumber(conversationHistory.size)
         } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -443,6 +487,11 @@ object NotificationHandler {
 
         nm.notify(notifId, builder.build())
 
+        // Manually vibrate if not a silent update and not isSilent
+        if (!silentUpdate && !isSilent) {
+            vibrateManually(context, vibrationPattern)
+        }
+
         // Create/update summary notification for the per-app group
         val summaryId = packageName.hashCode() + SUMMARY_ID_OFFSET
         val summaryBuilder = NotificationCompat.Builder(context, effectiveChannelId)
@@ -457,6 +506,25 @@ object NotificationHandler {
             .setStyle(NotificationCompat.InboxStyle()
                 .setSummaryText(appLabel))
         nm.notify(summaryId, summaryBuilder.build())
+    }
+
+    /**
+     * Manually vibrate the watch using Vibrator API.
+     * This bypasses the notification channel vibration which Android caches.
+     */
+    private fun vibrateManually(context: Context, pattern: LongArray) {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vm.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to vibrate manually", e)
+        }
     }
 
     private fun getVibrationPattern(
@@ -524,24 +592,12 @@ object NotificationHandler {
 
     /**
      * Derive a conversation-level grouping key from notification metadata.
-     * For messaging apps, groups by sender/chat name (title) within the same app.
+     * For messaging apps (detected via MessagingStyle on the phone side),
+     * groups by sender/chat name (title) within the same app.
      * For other apps, falls back to the notification key.
      */
-    private fun deriveConversationKey(packageName: String, notifKey: String, title: String): String {
-        // Known messaging apps where title = sender/conversation name
-        val isMessagingApp = packageName.contains("whatsapp") ||
-            packageName.contains("telegram") ||
-            packageName.contains("messenger") ||
-            packageName.contains("signal") ||
-            packageName.contains("discord") ||
-            packageName.contains("slack") ||
-            packageName.contains("instagram") ||
-            packageName.contains("sms") ||
-            packageName.contains("mms") ||
-            packageName.contains("messaging") ||
-            packageName.contains("gmail")
-
-        return if (isMessagingApp && title.isNotEmpty()) {
+    private fun deriveConversationKey(packageName: String, notifKey: String, title: String, isMessagingStyle: Boolean): String {
+        return if (isMessagingStyle && title.isNotEmpty()) {
             // Group by app + sender/conversation title
             "$packageName:$title"
         } else {
@@ -551,7 +607,7 @@ object NotificationHandler {
     }
 
     // Reverse lookup: find conversation key from notification key
-    private val notifKeyToConversationKey = mutableMapOf<String, String>()
+    private val notifKeyToConversationKey = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     private val KNOWN_WATCH_PACKAGES = mapOf(
         "com.google.android.apps.messaging" to "com.google.android.apps.messaging",

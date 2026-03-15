@@ -31,7 +31,7 @@ class NotificationListener : NotificationListenerService() {
         private const val PATH_NOTIFICATION = "/notification"
         private const val PATH_DISMISS = "/notification_dismiss"
 
-        val pendingActions = mutableMapOf<String, Notification.Action>()
+        val pendingActions = java.util.concurrent.ConcurrentHashMap<String, Notification.Action>()
         // Track notification keys that were actually sent/queued to the watch
         // so we only send dismiss events for notifications the watch knows about
         private val sentNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
@@ -94,14 +94,17 @@ class NotificationListener : NotificationListenerService() {
         if (sbn.packageName == packageName) return
         // Master mirroring toggle
         if (!settings.isMirroringEnabled()) return
-        // Separate ongoing (music, timers) from persistent (foreground services)
+        // Background notification filter: None / Ongoing only / All persistent
         if (sbn.isOngoing) {
-            val notification = sbn.notification ?: return
-            val isForegroundService = notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
-            if (isForegroundService) {
-                if (!settings.getEffectiveMirrorPersistent(sbn.packageName)) return
-            } else {
-                if (!settings.getEffectiveMirrorOngoing(sbn.packageName)) return
+            val ongoingMode = settings.getEffectiveOngoingMode(sbn.packageName)
+            when (ongoingMode) {
+                SettingsManager.ONGOING_NONE -> return
+                SettingsManager.ONGOING_ONLY -> {
+                    val notification = sbn.notification ?: return
+                    val isForegroundService = notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
+                    if (isForegroundService) return
+                }
+                // ONGOING_ALL_PERSISTENT -> allow everything through
             }
         }
 
@@ -135,6 +138,9 @@ class NotificationListener : NotificationListenerService() {
         if (title.isEmpty() && text.isEmpty()) return
 
         val displayText = bigText ?: text
+
+        // Extract stacked/conversation messages if available
+        val conversationMessages = extractConversationMessages(notification, title, displayText)
 
         // Check app whitelist
         if (!settings.isAppWhitelisted(sbn.packageName)) {
@@ -197,6 +203,18 @@ class NotificationListener : NotificationListenerService() {
             put("actions", actionsJson)
             if (iconBase64 != null) {
                 put("icon", iconBase64)
+            }
+            // Include stacked conversation messages so the watch can render them
+            if (conversationMessages.isNotEmpty()) {
+                val msgsArray = JSONArray()
+                for ((sender, msgText) in conversationMessages) {
+                    msgsArray.put(JSONObject().apply {
+                        put("sender", sender)
+                        put("text", msgText)
+                    })
+                }
+                put("conversationMessages", msgsArray)
+                put("isMessagingStyle", true)
             }
             put("muteDuration", settings.getEffectiveMuteDuration(appPackageName))
             // Send all configurable values to watch (per-app with fallback to global)
@@ -325,14 +343,17 @@ class NotificationListener : NotificationListenerService() {
                     if (sbn.packageName == packageName) continue
                     if (!settings.isMirroringEnabled()) continue
 
-                    // Ongoing/persistent filter
+                    // Ongoing/persistent filter (use 3-option mode, same as onNotificationPosted)
                     if (sbn.isOngoing) {
-                        val notification = sbn.notification ?: continue
-                        val isForegroundService = notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
-                        if (isForegroundService) {
-                            if (!settings.getEffectiveMirrorPersistent(sbn.packageName)) continue
-                        } else {
-                            if (!settings.getEffectiveMirrorOngoing(sbn.packageName)) continue
+                        val ongoingMode = settings.getEffectiveOngoingMode(sbn.packageName)
+                        when (ongoingMode) {
+                            SettingsManager.ONGOING_NONE -> continue
+                            SettingsManager.ONGOING_ONLY -> {
+                                val notification2 = sbn.notification ?: continue
+                                val isForegroundService = notification2.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
+                                if (isForegroundService) continue
+                            }
+                            // ONGOING_ALL_PERSISTENT -> allow everything through
                         }
                     }
 
@@ -364,6 +385,9 @@ class NotificationListener : NotificationListenerService() {
                     if (title.isEmpty() && text.isEmpty()) continue
 
                     val displayText = bigText ?: text
+
+                    // Extract stacked/conversation messages if available
+                    val conversationMessages = extractConversationMessages(notification, title, displayText)
 
                     // App whitelist filter
                     if (!settings.isAppWhitelisted(sbn.packageName)) continue
@@ -412,6 +436,18 @@ class NotificationListener : NotificationListenerService() {
                         put("subText", subText ?: "")
                         put("postTime", postTime)
                         put("actions", actionsJson)
+                        // Include stacked conversation messages so the watch can render them
+                        if (conversationMessages.isNotEmpty()) {
+                            val msgsArray = JSONArray()
+                            for ((sender, msgText) in conversationMessages) {
+                                msgsArray.put(JSONObject().apply {
+                                    put("sender", sender)
+                                    put("text", msgText)
+                                })
+                            }
+                            put("conversationMessages", msgsArray)
+                            put("isMessagingStyle", true)
+                        }
                         if (iconBase64 != null) put("icon", iconBase64)
                         put("muteDuration", settings.getEffectiveMuteDuration(appPackageName))
                         put("notifPriority", settings.getEffectivePriority(appPackageName))
@@ -490,7 +526,10 @@ class NotificationListener : NotificationListenerService() {
 
         scope.launch {
             try {
-                sendToWatch(json.toString().toByteArray(), PATH_DISMISS)
+                val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
+                sendToWatch(encryptedBytes, PATH_DISMISS)
                 if (settings.isKeepNotificationHistoryEnabled()) {
                     val appLabel = try {
                         val ai = packageManager.getApplicationInfo(sbn.packageName, 0)
@@ -505,6 +544,49 @@ class NotificationListener : NotificationListenerService() {
                 Log.e(TAG, "Failed to send dismissal to watch", e)
             }
         }
+    }
+
+    /**
+     * Extract conversation/stacked messages from a notification.
+     * Checks MessagingStyle EXTRA_MESSAGES first, then InboxStyle EXTRA_TEXT_LINES.
+     * Returns a list of (sender, text) pairs, or empty if no stacked messages found.
+     */
+    private fun extractConversationMessages(notification: Notification, title: String, text: String): List<Pair<String, String>> {
+        val extras = notification.extras ?: return emptyList()
+        val messages = mutableListOf<Pair<String, String>>()
+
+        // Try MessagingStyle messages first (EXTRA_MESSAGES)
+        val msgBundle = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        if (msgBundle != null && msgBundle.isNotEmpty()) {
+            for (item in msgBundle) {
+                if (item is android.os.Bundle) {
+                    val sender = item.getCharSequence("sender")?.toString()
+                        ?: item.getCharSequence("sender_person")?.toString()
+                        ?: title
+                    val msgText = item.getCharSequence("text")?.toString() ?: continue
+                    messages.add(Pair(sender, msgText))
+                }
+            }
+            if (messages.isNotEmpty()) return messages
+        }
+
+        // Try InboxStyle text lines (EXTRA_TEXT_LINES)
+        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+        if (textLines != null && textLines.isNotEmpty()) {
+            for (line in textLines) {
+                val lineStr = line?.toString() ?: continue
+                // InboxStyle lines often have "Sender: message" format
+                val colonIdx = lineStr.indexOf(": ")
+                if (colonIdx > 0 && colonIdx < 30) {
+                    messages.add(Pair(lineStr.substring(0, colonIdx), lineStr.substring(colonIdx + 2)))
+                } else {
+                    messages.add(Pair(title, lineStr))
+                }
+            }
+            if (messages.isNotEmpty()) return messages
+        }
+
+        return emptyList()
     }
 
     private fun getAppIconBase64(packageName: String): String? {

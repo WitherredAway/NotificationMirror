@@ -37,8 +37,17 @@ class NotificationReceiverService : WearableListenerService() {
                     requestKeyFromPhone()
                 }
             }
-            "/notification_dismiss" -> NotificationHandler.handleDismissal(this, messageEvent)
+            "/notification_dismiss" -> {
+                val decryptedDismiss = decryptMessageData(messageEvent.data)
+                if (decryptedDismiss != null) {
+                    NotificationHandler.handleDismissal(this, DecryptedMessageEvent(messageEvent.path, decryptedDismiss))
+                } else {
+                    // Fallback: try as plaintext for backward compatibility
+                    NotificationHandler.handleDismissal(this, messageEvent)
+                }
+            }
             "/action_result" -> handleActionResult(messageEvent)
+            "/set_app_sound" -> handleSetAppSound(messageEvent)
         }
     }
 
@@ -89,6 +98,31 @@ class NotificationReceiverService : WearableListenerService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to request key from phone", e)
             }
+        }
+    }
+
+    /**
+     * Handle per-app sound selection sent from the phone.
+     * Stores the selected sound URI in watch SharedPreferences so
+     * NotificationHandler can use it when creating notification channels.
+     */
+    private fun handleSetAppSound(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val packageName = json.getString("package")
+            val soundUri = json.getString("soundUri")
+
+            val prefs = getSharedPreferences("notif_sound_settings", Context.MODE_PRIVATE)
+            if (soundUri == "default") {
+                // Remove per-app override — use system default
+                prefs.edit().remove("sound_$packageName").apply()
+            } else {
+                // "" = silent, or a specific URI string
+                prefs.edit().putString("sound_$packageName", soundUri).apply()
+            }
+            Log.d(TAG, "Set sound for $packageName: $soundUri")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle set_app_sound", e)
         }
     }
 

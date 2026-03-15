@@ -57,7 +57,7 @@ class MuteManager(context: Context) {
         val now = System.currentTimeMillis()
         val muted = mutableMapOf<String, Long>()
         prefs.all.forEach { (key, value) ->
-            if (key.startsWith("mute_") && value is Long && value > now) {
+            if (key.startsWith("mute_") && key != "mute___all__" && value is Long && value > now) {
                 muted[key.removePrefix("mute_")] = value
             }
         }
