@@ -44,6 +44,7 @@ object NotificationHandler {
             val subText = json.optString("subText", "")
             val actionsArray = json.optJSONArray("actions")
             val iconBase64 = json.optString("icon", "")
+            val appLabel = json.optString("appLabel", "")
 
             val notifPriority = json.optInt("notifPriority", 1)
             val bigTextThreshold = json.optInt("bigTextThreshold", 40)
@@ -88,8 +89,11 @@ object NotificationHandler {
                 }
             } else null
 
+            // Use phone-provided app label, fallback to local resolution
+            val resolvedAppLabel = if (appLabel.isNotEmpty()) appLabel else getAppLabel(packageName)
+
             showNotification(
-                context, notifId, key, packageName, title, text, subText, actionsArray, iconBitmap,
+                context, notifId, key, packageName, resolvedAppLabel, title, text, subText, actionsArray, iconBitmap,
                 notifPriority, bigTextThreshold, autoCancel, showOpenButton, showMuteButton,
                 muteDuration, defaultVibration, customVibrationPattern, customSoundUri, isSilent
             )
@@ -140,6 +144,7 @@ object NotificationHandler {
         notifId: Int,
         notifKey: String,
         packageName: String,
+        appLabel: String,
         title: String,
         text: String,
         subText: String,
@@ -158,7 +163,6 @@ object NotificationHandler {
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val appLabel = getAppLabel(packageName)
         val channelId = CHANNEL_PREFIX + packageName
         val groupId = GROUP_PREFIX + packageName
 

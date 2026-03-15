@@ -13,9 +13,16 @@
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mirror Ongoing Notifications" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Include persistent/ongoing notifications (music, timers, etc.)" android:textSize="12sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Mirror ongoing notifications like music players, timers, etc." android:textSize="12sp" android:textColor="?colorOutline" />
 </LinearLayout>
 <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/mirrorOngoingSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mirror Persistent Notifications" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Mirror foreground service notifications (downloads, navigation, etc.)" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/mirrorPersistentSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">

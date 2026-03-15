@@ -44,7 +44,16 @@ class NotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-        if (sbn.isOngoing && !settings.isMirrorOngoingEnabled()) return
+        // Separate ongoing (music, timers) from persistent (foreground services)
+        if (sbn.isOngoing) {
+            val notification = sbn.notification ?: return
+            val isForegroundService = notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
+            if (isForegroundService) {
+                if (!settings.isMirrorPersistentEnabled()) return
+            } else {
+                if (!settings.isMirrorOngoingEnabled()) return
+            }
+        }
 
         // Check DND mode (only if DND sync is enabled)
         if (settings.isDndSyncEnabled()) {
@@ -113,9 +122,18 @@ class NotificationListener : NotificationListenerService() {
             }
         }
 
+        // Resolve actual app label from PackageManager
+        val appLabel = try {
+            val ai = packageManager.getApplicationInfo(appPackageName, 0)
+            packageManager.getApplicationLabel(ai).toString()
+        } catch (_: Exception) {
+            appPackageName.split(".").lastOrNull()?.replaceFirstChar { it.uppercase() } ?: appPackageName
+        }
+
         val json = JSONObject().apply {
             put("key", notifKey)
             put("package", appPackageName)
+            put("appLabel", appLabel)
             put("title", title)
             put("text", displayText)
             put("subText", subText ?: "")

@@ -18,6 +18,7 @@ class SettingsManager(context: Context) {
         private const val KEY_SOUND_NAME_PREFIX = "sound_name_"
         private const val KEY_DEFAULT_VIBRATION = "default_vibration_pattern"
         private const val KEY_MIRROR_ONGOING = "mirror_ongoing"
+        private const val KEY_MIRROR_PERSISTENT = "mirror_persistent"
         private const val KEY_NOTIF_PRIORITY = "notification_priority"
         private const val KEY_BIG_TEXT_THRESHOLD = "big_text_threshold"
         private const val KEY_AUTO_CANCEL = "auto_cancel"
@@ -101,12 +102,20 @@ class SettingsManager(context: Context) {
         prefs.edit().putInt(KEY_MUTE_DURATION, minutes).apply()
     }
 
-    // --- Mirror Ongoing Notifications ---
+    // --- Mirror Ongoing Notifications (music, timers, etc.) ---
 
     fun isMirrorOngoingEnabled(): Boolean = prefs.getBoolean(KEY_MIRROR_ONGOING, false)
 
     fun setMirrorOngoingEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_MIRROR_ONGOING, enabled).apply()
+    }
+
+    // --- Mirror Persistent/Foreground Notifications (foreground services) ---
+
+    fun isMirrorPersistentEnabled(): Boolean = prefs.getBoolean(KEY_MIRROR_PERSISTENT, false)
+
+    fun setMirrorPersistentEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MIRROR_PERSISTENT, enabled).apply()
     }
 
     // --- Notification Priority ---
