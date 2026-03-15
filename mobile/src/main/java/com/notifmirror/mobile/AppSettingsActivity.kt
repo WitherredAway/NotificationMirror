@@ -1,6 +1,9 @@
 package com.notifmirror.mobile
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.View
 import android.widget.EditText
 import android.widget.RadioGroup
 import android.widget.Toast
@@ -70,6 +73,27 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Load current values - Vibration
         defaultVibrationInput.setText(settings.getDefaultVibrationPattern())
+
+        // Show save button when any setting changes
+        val showSave = { saveButton.visibility = View.VISIBLE }
+
+        val switches = listOf(dndSwitch, mirrorOngoingSwitch, mirrorPersistentSwitch,
+            autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch)
+        for (sw in switches) {
+            sw.setOnCheckedChangeListener { _, _ -> showSave() }
+        }
+
+        screenModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
+        priorityGroup.setOnCheckedChangeListener { _, _ -> showSave() }
+
+        val textWatcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) { showSave() }
+        }
+        bigTextThresholdInput.addTextChangedListener(textWatcher)
+        muteDurationInput.addTextChangedListener(textWatcher)
+        defaultVibrationInput.addTextChangedListener(textWatcher)
 
         saveButton.setOnClickListener {
             val durationStr = muteDurationInput.text.toString().trim()

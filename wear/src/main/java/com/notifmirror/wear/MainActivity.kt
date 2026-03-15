@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -13,8 +14,15 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.color.DynamicColors
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class MainActivity : AppCompatActivity() {
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -58,6 +66,34 @@ class MainActivity : AppCompatActivity() {
                 startActivity(intent)
             } catch (e: Exception) {
                 Toast.makeText(this, "Could not open notification settings", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        findViewById<LinearLayout>(R.id.phoneSettingsButton).setOnClickListener {
+            scope.launch {
+                try {
+                    val nodeClient = Wearable.getNodeClient(this@MainActivity)
+                    val nodes = nodeClient.connectedNodes.await()
+                    if (nodes.isEmpty()) {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "No phone connected", Toast.LENGTH_SHORT).show()
+                        }
+                        return@launch
+                    }
+                    for (node in nodes) {
+                        Wearable.getMessageClient(this@MainActivity)
+                            .sendMessage(node.id, "/open_settings", ByteArray(0))
+                            .await()
+                    }
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Opening settings on phone", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Log.e("NotifMirrorWear", "Failed to open phone settings", e)
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Failed to reach phone", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
 
