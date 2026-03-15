@@ -71,8 +71,9 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
                 if (decryptedData != null) {
                     NotificationHandler.handleNotification(this, NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedData))
                 } else {
-                    // Decryption failed — request key re-sync from phone
-                    Log.w(TAG, "Cannot decrypt notification — requesting key re-sync from phone")
+                    // Decryption failed — queue for retry and request key re-sync
+                    Log.w(TAG, "Cannot decrypt notification — queuing and requesting key re-sync")
+                    PendingNotificationQueue.enqueue(messageEvent.data)
                     requestKeyFromPhone()
                 }
             }

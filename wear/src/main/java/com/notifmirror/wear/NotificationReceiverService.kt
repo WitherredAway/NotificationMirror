@@ -30,8 +30,9 @@ class NotificationReceiverService : WearableListenerService() {
                 if (decryptedData != null) {
                     NotificationHandler.handleNotification(this, DecryptedMessageEvent(messageEvent.path, decryptedData))
                 } else {
-                    // Decryption failed — request key re-sync from phone
-                    Log.w(TAG, "Cannot decrypt notification — requesting key re-sync from phone")
+                    // Decryption failed — queue for retry and request key re-sync
+                    Log.w(TAG, "Cannot decrypt notification — queuing and requesting key re-sync")
+                    PendingNotificationQueue.enqueue(messageEvent.data)
                     requestKeyFromPhone()
                 }
             }
@@ -50,6 +51,8 @@ class NotificationReceiverService : WearableListenerService() {
                     if (keyBytes != null) {
                         CryptoHelper.importKey(this, keyBytes)
                         Log.d(TAG, "Encryption key received and stored")
+                        // Retry any queued notifications that failed decryption
+                        PendingNotificationQueue.retryAll(this)
                     }
                 }
             }
