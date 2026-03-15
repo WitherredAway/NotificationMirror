@@ -103,7 +103,7 @@ class FilterSettingsActivity : AppCompatActivity() {
             } catch (_: Exception) { }
         }
 
-        val entries = notifLog.getEntries().take(50)
+        val entries = notifLog.getEntries()
         previewContainer.removeAllViews()
 
         if (entries.isEmpty()) {
@@ -111,7 +111,7 @@ class FilterSettingsActivity : AppCompatActivity() {
             return
         }
 
-        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val sdf = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault())
         var matchCount = 0
         var filterCount = 0
 
@@ -133,17 +133,29 @@ class FilterSettingsActivity : AppCompatActivity() {
             val appView = itemView.findViewById<TextView>(R.id.previewApp)
             val timeView = itemView.findViewById<TextView>(R.id.previewTime)
             val titleView = itemView.findViewById<TextView>(R.id.previewTitle)
+            val textView = itemView.findViewById<TextView>(R.id.previewText)
             val reasonView = itemView.findViewById<TextView>(R.id.previewReason)
 
             appView.text = getAppDisplayName(entry.packageName)
             timeView.text = sdf.format(Date(entry.time))
-            val truncTitle = if (entry.title.length > 60) entry.title.take(60) + "..." else entry.title
-            titleView.text = truncTitle
+
+            if (entry.title.isNotEmpty()) {
+                titleView.text = entry.title
+                titleView.visibility = android.view.View.VISIBLE
+            } else {
+                titleView.visibility = android.view.View.GONE
+            }
+
+            if (entry.text.isNotEmpty()) {
+                textView.text = entry.text
+                textView.visibility = android.view.View.VISIBLE
+            } else {
+                textView.visibility = android.view.View.GONE
+            }
 
             if (passes) {
                 statusView.text = "PASS"
                 statusView.setTextColor(getColor(android.R.color.holo_green_dark))
-                card.setCardBackgroundColor(getColor(android.R.color.transparent))
             } else {
                 statusView.text = "BLOCK"
                 statusView.setTextColor(getColor(android.R.color.holo_red_light))
@@ -161,7 +173,7 @@ class FilterSettingsActivity : AppCompatActivity() {
             previewContainer.addView(itemView)
         }
 
-        previewHeader.text = "$matchCount would pass, $filterCount would be blocked (last ${entries.size} notifications)"
+        previewHeader.text = "$matchCount would pass, $filterCount would be blocked (${entries.size} notifications)"
     }
 
     private fun saveFilters(): Boolean {
