@@ -254,9 +254,6 @@ class NotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
-                // Ensure encryption key is synced to watch before sending
-                syncEncryptionKeyBlocking()
-
                 // Encrypt notification data before sending
                 val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
                 val key = CryptoHelper.getOrCreateKey(this@NotificationListener)

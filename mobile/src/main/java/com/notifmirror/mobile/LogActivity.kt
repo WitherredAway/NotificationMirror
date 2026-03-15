@@ -304,14 +304,6 @@ class LogActivity : AppCompatActivity() {
         override fun getItemCount() = entries.size
     }
 
-    private fun dpToPx(dp: Int): Int {
-        return TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP,
-            dp.toFloat(),
-            resources.displayMetrics
-        ).toInt()
-    }
-
     private fun triggerAction(notifKey: String, actionIndex: Int, hasRemoteInput: Boolean) {
         if (hasRemoteInput) {
             val input = EditText(this).apply {

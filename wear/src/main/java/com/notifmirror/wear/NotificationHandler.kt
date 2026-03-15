@@ -156,7 +156,6 @@ object NotificationHandler {
             // Sync complication settings from phone to watch
             val complicationSource = json.optString("complicationSource", "")
             if (complicationSource.isNotEmpty()) {
-                val watchSettings = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
                 watchSettings.edit()
                     .putString("complication_source", complicationSource)
                     .putString("complication_app", json.optString("complicationApp", ""))
