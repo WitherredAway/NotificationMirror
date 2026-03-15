@@ -58,6 +58,7 @@ class AppSettingsActivity : AppCompatActivity() {
         // Behavior section
         val dndSwitch = findViewById<SwitchMaterial>(R.id.dndSyncSwitch)
         val mirrorOngoingSwitch = findViewById<SwitchMaterial>(R.id.mirrorOngoingSwitch)
+        val mirrorPersistentSwitch = findViewById<SwitchMaterial>(R.id.mirrorPersistentSwitch)
         val autoDismissSwitch = findViewById<SwitchMaterial>(R.id.autoDismissSwitch)
         val screenModeGroup = findViewById<RadioGroup>(R.id.screenModeGroup)
 
@@ -86,6 +87,7 @@ class AppSettingsActivity : AppCompatActivity() {
         // Load current values - Behavior
         dndSwitch.isChecked = settings.isDndSyncEnabled()
         mirrorOngoingSwitch.isChecked = settings.isMirrorOngoingEnabled()
+        mirrorPersistentSwitch.isChecked = settings.isMirrorPersistentEnabled()
         autoDismissSwitch.isChecked = settings.isAutoDismissSyncEnabled()
 
         when (settings.getScreenOffMode()) {
@@ -253,6 +255,7 @@ class AppSettingsActivity : AppCompatActivity() {
             // Save all settings
             settings.setDndSyncEnabled(dndSwitch.isChecked)
             settings.setMirrorOngoingEnabled(mirrorOngoingSwitch.isChecked)
+            settings.setMirrorPersistentEnabled(mirrorPersistentSwitch.isChecked)
             settings.setAutoDismissSyncEnabled(autoDismissSwitch.isChecked)
 
             val mode = when (screenModeGroup.checkedRadioButtonId) {
