@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DynamicColors.applyToActivityIfAvailable(this)
+        // Don't use DynamicColors on watch — use hardcoded colors matching phone app
         setContentView(R.layout.activity_main)
 
         // Rotary/bezel scrolling support

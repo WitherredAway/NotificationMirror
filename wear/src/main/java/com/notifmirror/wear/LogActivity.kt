@@ -52,7 +52,7 @@ class LogActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DynamicColors.applyToActivityIfAvailable(this)
+        // Don't use DynamicColors on watch — use hardcoded colors matching phone app
         setContentView(R.layout.activity_log)
 
         recyclerView = findViewById(R.id.logRecyclerView)
