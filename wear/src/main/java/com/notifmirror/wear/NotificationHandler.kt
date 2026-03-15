@@ -114,10 +114,17 @@ object NotificationHandler {
             for (id in ids) {
                 nm.cancel(id)
             }
-            // Cancel the summary notification too
-            nm.cancel(key.hashCode() + SUMMARY_ID_OFFSET)
 
             val packageName = json.optString("package", "")
+            // Cancel the per-app summary if no more notifications for this package
+            if (packageName.isNotEmpty()) {
+                val hasOtherNotifs = notifIdsMap.keys.any { k ->
+                    k.contains(packageName)
+                }
+                if (!hasOtherNotifs) {
+                    nm.cancel(packageName.hashCode() + SUMMARY_ID_OFFSET)
+                }
+            }
             if (packageName.isNotEmpty()) {
                 NotificationTileService.decrementCount(context, packageName)
             }
@@ -196,12 +203,12 @@ object NotificationHandler {
 
         val builder = NotificationCompat.Builder(context, effectiveChannelId)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
+            .setContentTitle("$appLabel: $title")
             .setContentText(text)
             .setPriority(if (isSilent) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(autoCancel)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setGroup(notifKey)
+            .setGroup(groupId)
 
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
@@ -309,14 +316,14 @@ object NotificationHandler {
 
         nm.notify(notifId, builder.build())
 
-        // Create/update summary notification for the conversation group
-        val summaryId = notifKey.hashCode() + SUMMARY_ID_OFFSET
+        // Create/update summary notification for the per-app group
+        val summaryId = packageName.hashCode() + SUMMARY_ID_OFFSET
         val summaryBuilder = NotificationCompat.Builder(context, effectiveChannelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(appLabel)
             .setContentText(title)
             .setSubText(appLabel)
-            .setGroup(notifKey)
+            .setGroup(groupId)
             .setGroupSummary(true)
             .setAutoCancel(true)
             .setStyle(NotificationCompat.InboxStyle()

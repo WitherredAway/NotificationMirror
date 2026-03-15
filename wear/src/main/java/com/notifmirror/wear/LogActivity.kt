@@ -264,13 +264,10 @@ class LogActivity : AppCompatActivity() {
                         .sendMessage(node.id, "/action", json.toString().toByteArray())
                         .await()
                 }
-                runOnUiThread {
-                    Toast.makeText(this@LogActivity, "Action sent", Toast.LENGTH_SHORT).show()
-                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send action", e)
                 runOnUiThread {
-                    Toast.makeText(this@LogActivity, "Failed to send", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@LogActivity, "Failed to send action", Toast.LENGTH_SHORT).show()
                 }
             }
         }

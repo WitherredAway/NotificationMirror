@@ -62,7 +62,6 @@ class ReplyActivity : AppCompatActivity() {
             val text = replyInput.text.toString().trim()
             if (text.isNotEmpty() && notifKey != null) {
                 sendReply(notifKey, text, notifId, actionIndex)
-                Toast.makeText(this, "Reply sent", Toast.LENGTH_SHORT).show()
                 finish()
             }
         }
