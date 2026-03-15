@@ -227,7 +227,9 @@ class NotificationListener : NotificationListenerService() {
                     if (settings.isKeepNotificationHistoryEnabled()) {
                         notifLog.addEntry(
                             appPackageName, title, displayText, "QUEUED",
-                            "Watch disconnected, queued for delivery"
+                            "Watch disconnected, queued for delivery",
+                            notifKey = notifKey,
+                            actionsJson = actionsJson.toString()
                         )
                     }
                     return@launch
@@ -253,7 +255,9 @@ class NotificationListener : NotificationListenerService() {
                 if (settings.isKeepNotificationHistoryEnabled()) {
                     notifLog.addEntry(
                         appPackageName, title, displayText, "SENT",
-                        "${actionsJson.length()} actions, sent to ${nodes.size} node(s)"
+                        "${actionsJson.length()} actions, sent to ${nodes.size} node(s)",
+                        notifKey = notifKey,
+                        actionsJson = actionsJson.toString()
                     )
                 }
             } catch (e: Exception) {

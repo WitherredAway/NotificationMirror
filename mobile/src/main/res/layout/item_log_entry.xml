@@ -80,6 +80,15 @@
                 android:textColor="?colorOutline"
                 android:singleLine="true"
                 android:ellipsize="end" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/logActionsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                app:chipSpacingHorizontal="4dp"
+                app:chipSpacingVertical="2dp"
+                android:visibility="gone" />
         </LinearLayout>
 
     </LinearLayout>
