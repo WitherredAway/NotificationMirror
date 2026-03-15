@@ -271,6 +271,7 @@ class NotificationListener : NotificationListenerService() {
         val json = JSONObject().apply {
             put("action", "dismiss")
             put("key", sbn.key)
+            put("package", sbn.packageName)
         }
 
         scope.launch {

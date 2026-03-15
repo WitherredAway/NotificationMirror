@@ -83,7 +83,16 @@ class AppPickerActivity : AppCompatActivity() {
 
             runOnUiThread {
                 allApps = freshApps
-                adapter.updateList(allApps)
+                val query = searchInput.text?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
+                    }
+                }
+                adapter.updateList(filtered)
             }
         }.start()
     }

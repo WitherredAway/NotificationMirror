@@ -36,6 +36,8 @@ class LogActivity : AppCompatActivity() {
     private var allEntries: List<NotificationLog.LogEntry> = emptyList()
     private var filteredEntries: List<NotificationLog.LogEntry> = emptyList()
     private var displayedCount = 0
+    private val displayedItems = mutableListOf<NotificationLog.LogEntry>()
+    private var logAdapter: LogEntryAdapter? = null
     private var appList: List<String> = emptyList()
     private var selectedApp: String = "All Apps"
 
@@ -184,17 +186,22 @@ class LogActivity : AppCompatActivity() {
         recyclerView.visibility = View.VISIBLE
         filteredEntries = filtered
         displayedCount = minOf(PAGE_SIZE, filtered.size)
-        recyclerView.adapter = LogEntryAdapter(filtered.subList(0, displayedCount))
+        displayedItems.clear()
+        displayedItems.addAll(filtered.subList(0, displayedCount))
+        logAdapter = LogEntryAdapter(displayedItems)
+        recyclerView.adapter = logAdapter
     }
 
     private fun loadMore() {
         if (displayedCount >= filteredEntries.size) return
+        val oldCount = displayedCount
         val newCount = minOf(displayedCount + PAGE_SIZE, filteredEntries.size)
         displayedCount = newCount
-        recyclerView.adapter = LogEntryAdapter(filteredEntries.subList(0, displayedCount))
+        displayedItems.addAll(filteredEntries.subList(oldCount, newCount))
+        logAdapter?.notifyItemRangeInserted(oldCount, newCount - oldCount)
     }
 
-    private inner class LogEntryAdapter(private val entries: List<NotificationLog.LogEntry>) :
+    private inner class LogEntryAdapter(private val entries: MutableList<NotificationLog.LogEntry>) :
         RecyclerView.Adapter<LogEntryAdapter.ViewHolder>() {
 
         private val sdf = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault())
