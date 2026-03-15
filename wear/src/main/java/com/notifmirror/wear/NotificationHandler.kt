@@ -149,7 +149,7 @@ object NotificationHandler {
                 conversationHistory = messages
             )
 
-            NotificationTileService.incrementCount(context, packageName)
+            if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
             // Update the notification content complication
             NotificationComplicationService.updateComplication(context, resolvedAppLabel, packageName, title, text)
 
