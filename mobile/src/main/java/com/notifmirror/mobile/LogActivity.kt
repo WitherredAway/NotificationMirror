@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -19,7 +20,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.color.DynamicColors
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,8 +35,11 @@ import java.util.Locale
 class LogActivity : AppCompatActivity() {
 
     companion object {
+        private const val TAG = "NotifMirrorLog"
         private const val PAGE_SIZE = 50
     }
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private lateinit var notifLog: NotificationLog
     private lateinit var recyclerView: RecyclerView
@@ -237,6 +248,7 @@ class LogActivity : AppCompatActivity() {
             val title: TextView = view.findViewById(R.id.logTitle)
             val text: TextView = view.findViewById(R.id.logText)
             val actionsContainer: ChipGroup = view.findViewById(R.id.logActionsContainer)
+            val repushButton: ImageButton = view.findViewById(R.id.logRepushButton)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -263,6 +275,11 @@ class LogActivity : AppCompatActivity() {
                 holder.text.visibility = View.VISIBLE
             } else {
                 holder.text.visibility = View.GONE
+            }
+
+            // Re-push button — re-sends notification to watch
+            holder.repushButton.setOnClickListener {
+                repushNotification(entry)
             }
 
             // Add action buttons as chips
@@ -302,6 +319,54 @@ class LogActivity : AppCompatActivity() {
         }
 
         override fun getItemCount() = entries.size
+    }
+
+    /**
+     * Re-push a notification from history back to the watch.
+     * Builds a minimal JSON payload and sends it via MessageClient.
+     */
+    private fun repushNotification(entry: NotificationLog.LogEntry) {
+        scope.launch {
+            try {
+                val json = JSONObject().apply {
+                    put("packageName", entry.packageName)
+                    put("title", entry.title)
+                    put("text", entry.text)
+                    put("isRepush", true)
+                }
+
+                // Encrypt before sending
+                val encrypted = CryptoHelper.encryptString(json.toString(), this@LogActivity)
+                if (encrypted == null) {
+                    runOnUiThread {
+                        Toast.makeText(this@LogActivity, "Encryption failed", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+
+                val nodes = Wearable.getNodeClient(this@LogActivity).connectedNodes.await()
+                if (nodes.isEmpty()) {
+                    runOnUiThread {
+                        Toast.makeText(this@LogActivity, "Watch not connected", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@LogActivity)
+                        .sendMessage(node.id, "/notification", encrypted.toByteArray())
+                        .await()
+                }
+                runOnUiThread {
+                    Toast.makeText(this@LogActivity, "Notification re-pushed", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to re-push notification", e)
+                runOnUiThread {
+                    Toast.makeText(this@LogActivity, "Failed to re-push", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun triggerAction(notifKey: String, actionIndex: Int, hasRemoteInput: Boolean) {

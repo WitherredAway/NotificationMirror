@@ -62,25 +62,16 @@
     android:textColor="?colorPrimary"
     android:letterSpacing="0.1" />
 
-<!-- Mirror Ongoing -->
+<!-- Background Notifications Mode -->
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<CheckBox android:id="@+id/overrideMirrorOngoing" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mirror Ongoing" android:textSize="15sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Music, timers, etc." android:textSize="12sp" android:textColor="?colorOutline" />
+<CheckBox android:id="@+id/overrideOngoingMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Background Notifications" android:textSize="15sp" android:textColor="?colorOnSurface" android:layout_marginStart="8dp" />
 </LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppMirrorOngoing" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-
-<!-- Mirror Persistent -->
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
-<CheckBox android:id="@+id/overrideMirrorPersistent" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mirror Persistent" android:textSize="15sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Foreground services" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppMirrorPersistent" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
+<RadioGroup android:id="@+id/perAppOngoingModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:layout_marginStart="40dp" android:orientation="vertical">
+<RadioButton android:id="@+id/perAppOngoingNone" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="None" android:textSize="14sp" android:textColor="?colorOnSurface" />
+<RadioButton android:id="@+id/perAppOngoingOnly" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Ongoing only" android:textSize="14sp" android:textColor="?colorOnSurface" />
+<RadioButton android:id="@+id/perAppOngoingAll" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="All persistent" android:textSize="14sp" android:textColor="?colorOnSurface" />
+</RadioGroup>
 
 <!-- Screen-Off Mode -->
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
@@ -307,21 +298,58 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_marginTop="2dp"
-    android:text="Comma-separated ms values. Leave empty for default."
+    android:text="Override the default vibration for this app"
     android:textSize="12sp"
     android:textColor="?colorOutline" />
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/perAppVibPresetButton"
+    style="@style/Widget.Material3.Button.OutlinedButton"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:text="Use Default"
+    android:textAllCaps="false"
+    android:textSize="14sp"
+    android:gravity="start|center_vertical"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:drawableEnd="@android:drawable/arrow_down_float" />
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/perAppVibPreviewButton"
+    style="@style/Widget.Material3.Button.TonalButton"
+    android:layout_width="wrap_content"
+    android:layout_height="40dp"
+    android:text="Preview"
+    android:textAllCaps="false"
+    android:textSize="13sp" />
+<TextView
+    android:id="@+id/perAppVibPatternLabel"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_weight="1"
+    android:layout_marginStart="12dp"
+    android:textSize="12sp"
+    android:textColor="?colorOutline" />
+</LinearLayout>
 <EditText
     android:id="@+id/perAppVibPattern"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginTop="8dp"
-    android:hint="0,200,100,200"
+    android:hint="Custom: e.g. 0,200,100,200"
     android:inputType="text"
     android:textSize="14sp"
     android:textColor="?colorOnSurface"
     android:textColorHint="?colorOutline"
     android:padding="10dp"
-    android:background="@drawable/edit_text_bg" />
+    android:background="@drawable/edit_text_bg"
+    android:visibility="gone" />
 
 <!-- SOUND Section -->
 <TextView

@@ -3,11 +3,15 @@ package com.notifmirror.wear
 import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Icon
 import android.util.Log
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.LongTextComplicationData
+import androidx.wear.watchface.complications.data.MonochromaticImage
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
@@ -66,14 +70,15 @@ class NotificationComplicationService : ComplicationDataSourceService() {
                 val text = prefs.getString("app_text_$filterApp", "") ?: ""
                 val appLabel = prefs.getString("app_label_$filterApp", "") ?: ""
                 val time = prefs.getLong("app_time_$filterApp", 0)
-                return ComplicationInfo(appLabel, title, text, time)
+                return ComplicationInfo(appLabel, title, text, time, filterApp)
             }
 
             val title = prefs.getString(KEY_LAST_TITLE, "") ?: ""
             val text = prefs.getString(KEY_LAST_TEXT, "") ?: ""
             val appLabel = prefs.getString(KEY_LAST_APP, "") ?: ""
             val time = prefs.getLong(KEY_LAST_TIME, 0)
-            return ComplicationInfo(appLabel, title, text, time)
+            val pkg = prefs.getString(KEY_LAST_PACKAGE, "") ?: ""
+            return ComplicationInfo(appLabel, title, text, time, pkg)
         }
     }
 
@@ -81,8 +86,35 @@ class NotificationComplicationService : ComplicationDataSourceService() {
         val appLabel: String,
         val title: String,
         val text: String,
-        val time: Long
+        val time: Long,
+        val packageName: String = ""
     )
+
+    /**
+     * Try to get the app icon for the given package as a MonochromaticImage.
+     * Falls back to null if the package is not found.
+     */
+    private fun getAppIcon(packageName: String): MonochromaticImage? {
+        if (packageName.isEmpty()) return null
+        return try {
+            val drawable = packageManager.getApplicationIcon(packageName)
+            val bitmap = if (drawable is BitmapDrawable) {
+                Bitmap.createScaledBitmap(drawable.bitmap, 48, 48, true)
+            } else {
+                val bmp = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                drawable.setBounds(0, 0, 48, 48)
+                drawable.draw(canvas)
+                bmp
+            }
+            MonochromaticImage.Builder(
+                image = Icon.createWithBitmap(bitmap)
+            ).build()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get app icon for complication: $packageName", e)
+            null
+        }
+    }
 
     override fun onComplicationRequest(
         request: ComplicationRequest,
@@ -90,30 +122,49 @@ class NotificationComplicationService : ComplicationDataSourceService() {
     ) {
         val info = getLatestNotification(this)
 
+        val monoIcon = MonochromaticImage.Builder(
+            image = Icon.createWithResource(this, R.drawable.ic_notification)
+        ).build()
+
+        // Try to get app-specific icon
+        val appIcon = getAppIcon(info.packageName)
+
         val data = when (request.complicationType) {
             ComplicationType.SHORT_TEXT -> {
-                val displayText = if (info.title.isNotEmpty()) info.title else "No notifs"
+                // Show notification content only (not app name)
+                val displayText = if (info.text.isNotEmpty()) info.text
+                    else if (info.title.isNotEmpty()) info.title
+                    else "No notifs"
+                val truncated = if (displayText.length > 20) displayText.take(17) + "..." else displayText
                 ShortTextComplicationData.Builder(
-                    text = PlainComplicationText.Builder(displayText).build(),
+                    text = PlainComplicationText.Builder(truncated).build(),
                     contentDescription = PlainComplicationText.Builder(
                         "${info.appLabel}: ${info.title} - ${info.text}"
                     ).build()
-                ).build()
+                )
+                    .setMonochromaticImage(appIcon ?: monoIcon)
+                    .build()
             }
             ComplicationType.LONG_TEXT -> {
                 if (info.title.isEmpty()) {
                     LongTextComplicationData.Builder(
                         text = PlainComplicationText.Builder("No notifications").build(),
                         contentDescription = PlainComplicationText.Builder("No notifications received").build()
-                    ).build()
+                    )
+                        .setMonochromaticImage(monoIcon)
+                        .build()
                 } else {
+                    // Show notification content only
+                    val contentText = info.text.ifEmpty { info.title }
+                    val truncated = if (contentText.length > 30) contentText.take(27) + "..." else contentText
                     LongTextComplicationData.Builder(
-                        text = PlainComplicationText.Builder(info.text.ifEmpty { info.title }).build(),
+                        text = PlainComplicationText.Builder(truncated).build(),
                         contentDescription = PlainComplicationText.Builder(
                             "${info.appLabel}: ${info.title} - ${info.text}"
                         ).build()
                     )
-                        .setTitle(PlainComplicationText.Builder("${info.appLabel}: ${info.title}").build())
+                        .setMonochromaticImage(appIcon ?: monoIcon)
+                        .setTitle(PlainComplicationText.Builder(info.appLabel).build())
                         .build()
                 }
             }
@@ -130,17 +181,26 @@ class NotificationComplicationService : ComplicationDataSourceService() {
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
         return when (type) {
             ComplicationType.SHORT_TEXT -> {
+                val previewIcon = MonochromaticImage.Builder(
+                    image = Icon.createWithResource(this, R.drawable.ic_notification)
+                ).build()
                 ShortTextComplicationData.Builder(
                     text = PlainComplicationText.Builder("WhatsApp").build(),
                     contentDescription = PlainComplicationText.Builder("Latest notification").build()
-                ).build()
+                )
+                    .setMonochromaticImage(previewIcon)
+                    .build()
             }
             ComplicationType.LONG_TEXT -> {
+                val previewIcon = MonochromaticImage.Builder(
+                    image = Icon.createWithResource(this, R.drawable.ic_notification)
+                ).build()
                 LongTextComplicationData.Builder(
                     text = PlainComplicationText.Builder("Hey, how are you?").build(),
                     contentDescription = PlainComplicationText.Builder("Latest notification content").build()
                 )
-                    .setTitle(PlainComplicationText.Builder("WhatsApp: John").build())
+                    .setMonochromaticImage(previewIcon)
+                    .setTitle(PlainComplicationText.Builder("WhatsApp").build())
                     .build()
             }
             else -> null

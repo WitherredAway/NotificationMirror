@@ -1,6 +1,8 @@
 package com.notifmirror.wear
 
 import android.app.AlertDialog
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -15,6 +17,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.gms.wearable.Wearable
@@ -336,6 +339,7 @@ class LogActivity : AppCompatActivity() {
             val title: TextView = view.findViewById(R.id.logTitle)
             val text: TextView = view.findViewById(R.id.logText)
             val actionsContainer: ChipGroup = view.findViewById(R.id.logActionsContainer)
+            val repushButton: ImageButton = view.findViewById(R.id.logRepushButton)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -362,6 +366,11 @@ class LogActivity : AppCompatActivity() {
                 holder.text.visibility = View.VISIBLE
             } else {
                 holder.text.visibility = View.GONE
+            }
+
+            // Re-push button — re-posts notification locally on watch
+            holder.repushButton.setOnClickListener {
+                repushNotification(entry)
             }
 
             // Add action buttons as chips
@@ -411,5 +420,34 @@ class LogActivity : AppCompatActivity() {
         }
 
         override fun getItemCount() = entries.size
+    }
+
+    /**
+     * Re-push a notification from history — re-posts it locally on the watch.
+     */
+    private fun repushNotification(entry: NotificationLog.LogEntry) {
+        val nm = getSystemService(NotificationManager::class.java)
+
+        // Ensure channel exists
+        val channelId = "repush_${entry.packageName}"
+        if (nm.getNotificationChannel(channelId) == null) {
+            val channel = NotificationChannel(
+                channelId,
+                "Re-pushed: ${entry.packageName}",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            nm.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(entry.title)
+            .setContentText(entry.text)
+            .setAutoCancel(true)
+            .build()
+
+        val notifId = (entry.packageName + entry.title + entry.text).hashCode()
+        nm.notify(notifId, notification)
+        Toast.makeText(this, "Notification re-pushed", Toast.LENGTH_SHORT).show()
     }
 }

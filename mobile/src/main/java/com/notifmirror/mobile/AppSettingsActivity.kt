@@ -46,8 +46,7 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Behavior section
         val dndSwitch = findViewById<SwitchMaterial>(R.id.dndSyncSwitch)
-        val mirrorOngoingSwitch = findViewById<SwitchMaterial>(R.id.mirrorOngoingSwitch)
-        val mirrorPersistentSwitch = findViewById<SwitchMaterial>(R.id.mirrorPersistentSwitch)
+        val ongoingModeGroup = findViewById<RadioGroup>(R.id.ongoingModeGroup)
         val autoDismissSwitch = findViewById<SwitchMaterial>(R.id.autoDismissSwitch)
         val screenModeGroup = findViewById<RadioGroup>(R.id.screenModeGroup)
 
@@ -74,13 +73,20 @@ class AppSettingsActivity : AppCompatActivity() {
         val muteDurationInput = findViewById<EditText>(R.id.muteDurationInput)
 
         // Vibration section
+        val vibrationPresetButton = findViewById<MaterialButton>(R.id.vibrationPresetButton)
+        val vibrationPreviewButton = findViewById<MaterialButton>(R.id.vibrationPreviewButton)
+        val vibrationPatternLabel = findViewById<TextView>(R.id.vibrationPatternLabel)
         val defaultVibrationInput = findViewById<EditText>(R.id.defaultVibrationInput)
         val saveButton = findViewById<MaterialButton>(R.id.saveSettingsButton)
+        var currentVibrationPattern = settings.getDefaultVibrationPattern()
 
         // Load current values - Behavior
         dndSwitch.isChecked = settings.isDndSyncEnabled()
-        mirrorOngoingSwitch.isChecked = settings.isMirrorOngoingEnabled()
-        mirrorPersistentSwitch.isChecked = settings.isMirrorPersistentEnabled()
+        when (settings.getOngoingMode()) {
+            SettingsManager.ONGOING_NONE -> ongoingModeGroup.check(R.id.radioOngoingNone)
+            SettingsManager.ONGOING_ONLY -> ongoingModeGroup.check(R.id.radioOngoingOnly)
+            SettingsManager.ONGOING_ALL_PERSISTENT -> ongoingModeGroup.check(R.id.radioOngoingAll)
+        }
         autoDismissSwitch.isChecked = settings.isAutoDismissSyncEnabled()
 
         when (settings.getScreenOffMode()) {
@@ -129,8 +135,7 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Note: complicationSourceGroup listener is set below with showSave integration
 
-        // Load current values - Vibration
-        defaultVibrationInput.setText(settings.getDefaultVibrationPattern())
+        // Load current values - Vibration (setup moved after showSave is defined below)
 
         // Hide when locked
         val hideWhenLockedSwitch = findViewById<SwitchMaterial>(R.id.hideWhenLockedSwitch)
@@ -187,7 +192,7 @@ class AppSettingsActivity : AppCompatActivity() {
         // Show save button when any setting changes
         val showSave = { saveButton.visibility = View.VISIBLE }
 
-        val switches = listOf(dndSwitch, mirrorOngoingSwitch, mirrorPersistentSwitch,
+        val switches = listOf(dndSwitch,
             autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch,
             hideWhenLockedSwitch, muteContinuationSwitch, keepHistorySwitch,
             showSnoozeButtonSwitch, batterySaverSwitch)
@@ -196,6 +201,7 @@ class AppSettingsActivity : AppCompatActivity() {
         }
 
         screenModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
+        ongoingModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         priorityGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         complicationSourceGroup.setOnCheckedChangeListener { _, checkedId ->
             complicationAppButton.visibility = if (checkedId == R.id.radioComplicationSpecificApp) View.VISIBLE else View.GONE
@@ -209,9 +215,21 @@ class AppSettingsActivity : AppCompatActivity() {
         }
         bigTextThresholdInput.addTextChangedListener(textWatcher)
         muteDurationInput.addTextChangedListener(textWatcher)
-        defaultVibrationInput.addTextChangedListener(textWatcher)
         snoozeDurationInput.addTextChangedListener(textWatcher)
         batterySaverThresholdInput.addTextChangedListener(textWatcher)
+
+        // Vibration preset picker (needs showSave defined above)
+        VibrationPatternHelper.setupVibrationUI(
+            context = this,
+            presetButton = vibrationPresetButton,
+            previewButton = vibrationPreviewButton,
+            patternLabel = vibrationPatternLabel,
+            customInput = defaultVibrationInput,
+            currentPattern = currentVibrationPattern
+        ) { pattern ->
+            currentVibrationPattern = pattern
+            showSave()
+        }
 
         saveButton.setOnClickListener {
             val durationStr = muteDurationInput.text.toString().trim()
@@ -227,8 +245,8 @@ class AppSettingsActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val defaultVib = defaultVibrationInput.text.toString().trim()
-            if (defaultVib.isNotEmpty() && !isValidVibrationPattern(defaultVib)) {
+            val defaultVib = currentVibrationPattern
+            if (defaultVib.isNotEmpty() && !VibrationPatternHelper.isValidPattern(defaultVib)) {
                 Toast.makeText(this, "Invalid default vibration pattern", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -247,8 +265,12 @@ class AppSettingsActivity : AppCompatActivity() {
 
             // All validation passed — save all settings
             settings.setDndSyncEnabled(dndSwitch.isChecked)
-            settings.setMirrorOngoingEnabled(mirrorOngoingSwitch.isChecked)
-            settings.setMirrorPersistentEnabled(mirrorPersistentSwitch.isChecked)
+            val ongoingMode = when (ongoingModeGroup.checkedRadioButtonId) {
+                R.id.radioOngoingOnly -> SettingsManager.ONGOING_ONLY
+                R.id.radioOngoingAll -> SettingsManager.ONGOING_ALL_PERSISTENT
+                else -> SettingsManager.ONGOING_NONE
+            }
+            settings.setOngoingMode(ongoingMode)
             settings.setAutoDismissSyncEnabled(autoDismissSwitch.isChecked)
 
             val mode = when (screenModeGroup.checkedRadioButtonId) {
@@ -489,16 +511,4 @@ class AppSettingsActivity : AppCompatActivity() {
         stopDownloadProgress()
     }
 
-    private fun isValidVibrationPattern(pattern: String): Boolean {
-        val parts = pattern.split(",").map { it.trim() }
-        if (parts.size < 2) return false
-        return parts.all { part ->
-            try {
-                part.toLong()
-                true
-            } catch (_: NumberFormatException) {
-                false
-            }
-        }
-    }
 }

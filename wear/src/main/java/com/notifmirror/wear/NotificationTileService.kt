@@ -20,7 +20,13 @@ class NotificationTileService : TileService() {
 
     companion object {
         private const val PREFS_NAME = "notif_tile_counts"
-        private const val RESOURCES_VERSION = "1"
+        private const val RESOURCES_VERSION = "2"
+
+        private const val RES_ICON_PAUSE = "ic_pause"
+        private const val RES_ICON_PLAY = "ic_play"
+        private const val RES_ICON_MUTE = "ic_mute"
+        private const val RES_ICON_UNMUTE = "ic_unmute"
+        private const val RES_ICON_INFO = "ic_info"
 
         fun incrementCount(context: Context, packageName: String) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -83,6 +89,56 @@ class NotificationTileService : TileService() {
         return Futures.immediateFuture(
             ResourceBuilders.Resources.Builder()
                 .setVersion(RESOURCES_VERSION)
+                .addIdToImageMapping(
+                    RES_ICON_PAUSE,
+                    ResourceBuilders.ImageResource.Builder()
+                        .setAndroidResourceByResId(
+                            ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                .setResourceId(R.drawable.ic_pause)
+                                .build()
+                        )
+                        .build()
+                )
+                .addIdToImageMapping(
+                    RES_ICON_PLAY,
+                    ResourceBuilders.ImageResource.Builder()
+                        .setAndroidResourceByResId(
+                            ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                .setResourceId(R.drawable.ic_play)
+                                .build()
+                        )
+                        .build()
+                )
+                .addIdToImageMapping(
+                    RES_ICON_MUTE,
+                    ResourceBuilders.ImageResource.Builder()
+                        .setAndroidResourceByResId(
+                            ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                .setResourceId(R.drawable.ic_mute)
+                                .build()
+                        )
+                        .build()
+                )
+                .addIdToImageMapping(
+                    RES_ICON_UNMUTE,
+                    ResourceBuilders.ImageResource.Builder()
+                        .setAndroidResourceByResId(
+                            ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                .setResourceId(R.drawable.ic_unmute)
+                                .build()
+                        )
+                        .build()
+                )
+                .addIdToImageMapping(
+                    RES_ICON_INFO,
+                    ResourceBuilders.ImageResource.Builder()
+                        .setAndroidResourceByResId(
+                            ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                .setResourceId(R.drawable.ic_info)
+                                .build()
+                        )
+                        .build()
+                )
                 .build()
         )
     }
@@ -100,7 +156,7 @@ class NotificationTileService : TileService() {
         val colorPrimary = resolveThemeColor(com.google.android.material.R.attr.colorPrimary, 0xFFD0BCFF.toInt())
         val colorOnSurface = resolveThemeColor(com.google.android.material.R.attr.colorOnSurface, 0xFFE6E1E5.toInt())
         val colorOnSurfaceVariant = resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFFCAC4D0.toInt())
-        val colorSurfaceVariant = 0xFF49454F.toInt()
+        val colorSurfaceVariant = resolveThemeColor(com.google.android.material.R.attr.colorSurfaceVariant, 0xFF49454F.toInt())
 
         val prefs = getSharedPreferences("notif_mirror_settings", MODE_PRIVATE)
         val mirroringEnabled = prefs.getBoolean("mirroring_enabled", true)
@@ -191,28 +247,30 @@ class NotificationTileService : TileService() {
 
         // Toggle Mirroring button
         val mirrorLabel = if (mirroringEnabled) "Pause" else "Resume"
-        buttonRow.addContent(buildActionButton(mirrorLabel, TileActionActivity.ACTION_TOGGLE_MIRRORING, colorPrimary, colorSurfaceVariant))
+        val mirrorIcon = if (mirroringEnabled) RES_ICON_PAUSE else RES_ICON_PLAY
+        buttonRow.addContent(buildActionButton(mirrorLabel, mirrorIcon, TileActionActivity.ACTION_TOGGLE_MIRRORING, colorPrimary, colorSurfaceVariant))
 
         // Spacer between buttons
         buttonRow.addContent(
             LayoutElementBuilders.Spacer.Builder()
-                .setWidth(DimensionBuilders.dp(4f))
+                .setWidth(DimensionBuilders.dp(6f))
                 .build()
         )
 
         // Mute All button
         val muteLabel = if (allMuted) "Unmute" else "Mute"
-        buttonRow.addContent(buildActionButton(muteLabel, TileActionActivity.ACTION_MUTE_ALL, colorPrimary, colorSurfaceVariant))
+        val muteIcon = if (allMuted) RES_ICON_UNMUTE else RES_ICON_MUTE
+        buttonRow.addContent(buildActionButton(muteLabel, muteIcon, TileActionActivity.ACTION_MUTE_ALL, colorPrimary, colorSurfaceVariant))
 
         // Spacer between buttons
         buttonRow.addContent(
             LayoutElementBuilders.Spacer.Builder()
-                .setWidth(DimensionBuilders.dp(4f))
+                .setWidth(DimensionBuilders.dp(6f))
                 .build()
         )
 
         // Connection Details button
-        buttonRow.addContent(buildActionButton("Info", TileActionActivity.ACTION_CONNECTION_DETAILS, colorPrimary, colorSurfaceVariant))
+        buttonRow.addContent(buildActionButton("Info", RES_ICON_INFO, TileActionActivity.ACTION_CONNECTION_DETAILS, colorPrimary, colorSurfaceVariant))
 
         columnBuilder.addContent(buttonRow.build())
 
@@ -227,27 +285,51 @@ class NotificationTileService : TileService() {
 
     private fun buildActionButton(
         label: String,
+        iconResId: String,
         action: String,
-        textColor: Int,
+        accentColor: Int,
         bgColor: Int
     ): LayoutElementBuilders.LayoutElement {
-        return LayoutElementBuilders.Box.Builder()
+        val buttonContent = LayoutElementBuilders.Column.Builder()
             .setWidth(DimensionBuilders.wrap())
             .setHeight(DimensionBuilders.wrap())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(
+                LayoutElementBuilders.Image.Builder()
+                    .setResourceId(iconResId)
+                    .setWidth(DimensionBuilders.dp(18f))
+                    .setHeight(DimensionBuilders.dp(18f))
+                    .setColorFilter(
+                        LayoutElementBuilders.ColorFilter.Builder()
+                            .setTint(ColorBuilders.argb(accentColor))
+                            .build()
+                    )
+                    .build()
+            )
+            .addContent(
+                LayoutElementBuilders.Spacer.Builder()
+                    .setHeight(DimensionBuilders.dp(2f))
+                    .build()
+            )
             .addContent(
                 LayoutElementBuilders.Text.Builder()
                     .setText(label)
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
-                            .setSize(DimensionBuilders.sp(10f))
-                            .setColor(ColorBuilders.argb(textColor))
-                            .setWeight(LayoutElementBuilders.FONT_WEIGHT_BOLD)
+                            .setSize(DimensionBuilders.sp(9f))
+                            .setColor(ColorBuilders.argb(accentColor))
                             .build()
                     )
                     .build()
             )
+            .build()
+
+        return LayoutElementBuilders.Box.Builder()
+            .setWidth(DimensionBuilders.dp(48f))
+            .setHeight(DimensionBuilders.dp(48f))
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(buttonContent)
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setClickable(
@@ -268,15 +350,7 @@ class NotificationTileService : TileService() {
                                     )
                                     .build()
                             )
-                            .setId("action_$action")
-                            .build()
-                    )
-                    .setPadding(
-                        ModifiersBuilders.Padding.Builder()
-                            .setStart(DimensionBuilders.dp(8f))
-                            .setEnd(DimensionBuilders.dp(8f))
-                            .setTop(DimensionBuilders.dp(4f))
-                            .setBottom(DimensionBuilders.dp(4f))
+                            .setId("action_" + action)
                             .build()
                     )
                     .setBackground(
@@ -284,7 +358,7 @@ class NotificationTileService : TileService() {
                             .setColor(ColorBuilders.argb(bgColor))
                             .setCorner(
                                 ModifiersBuilders.Corner.Builder()
-                                    .setRadius(DimensionBuilders.dp(12f))
+                                    .setRadius(DimensionBuilders.dp(14f))
                                     .build()
                             )
                             .build()

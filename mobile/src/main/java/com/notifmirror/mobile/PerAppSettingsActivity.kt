@@ -1,8 +1,7 @@
 package com.notifmirror.mobile
 
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
@@ -10,39 +9,36 @@ import android.widget.ImageView
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import org.json.JSONObject
 
 class PerAppSettingsActivity : AppCompatActivity() {
 
-    companion object {
-        const val EXTRA_PACKAGE_NAME = "extra_package_name"
-    }
-
     private lateinit var settings: SettingsManager
     private lateinit var packageName: String
-    private var selectedSoundUri: Uri? = null
-    private var selectedSoundName = ""
+    private var selectedSoundUri: String = "default"
+    private var selectedSoundName = "Default"
+    private var currentVibPattern = ""
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    private val ringtonePicker = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            if (uri != null) {
-                selectedSoundUri = uri
-                val ringtone = RingtoneManager.getRingtone(this, uri)
-                selectedSoundName = ringtone?.getTitle(this) ?: uri.toString()
-                findViewById<TextView>(R.id.perAppSoundName).apply {
-                    text = "Sound: $selectedSoundName"
-                    visibility = View.VISIBLE
-                }
-            }
-        }
+    // Watch sounds synced via DataClient — loaded dynamically
+    private var watchSoundNames = mutableListOf<String>()
+    private var watchSoundUris = mutableListOf<String>()
+
+    companion object {
+        const val EXTRA_PACKAGE_NAME = "extra_package_name"
+        private const val TAG = "PerAppSettings"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,8 +68,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         appPackage.text = packageName
 
         // Override checkboxes
-        val overrideMirrorOngoing = findViewById<CheckBox>(R.id.overrideMirrorOngoing)
-        val overrideMirrorPersistent = findViewById<CheckBox>(R.id.overrideMirrorPersistent)
+        val overrideOngoingMode = findViewById<CheckBox>(R.id.overrideOngoingMode)
         val overrideAutoDismiss = findViewById<CheckBox>(R.id.overrideAutoDismiss)
         val overridePriority = findViewById<CheckBox>(R.id.overridePriority)
         val overrideAutoCancel = findViewById<CheckBox>(R.id.overrideAutoCancel)
@@ -87,8 +82,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val overrideSnoozeDuration = findViewById<CheckBox>(R.id.overrideSnoozeDuration)
 
         // Value controls
-        val mirrorOngoingSwitch = findViewById<SwitchMaterial>(R.id.perAppMirrorOngoing)
-        val mirrorPersistentSwitch = findViewById<SwitchMaterial>(R.id.perAppMirrorPersistent)
+        val perAppOngoingModeGroup = findViewById<RadioGroup>(R.id.perAppOngoingModeGroup)
         val muteContinuationSwitch = findViewById<SwitchMaterial>(R.id.perAppMuteContinuation)
         val autoDismissSwitch = findViewById<SwitchMaterial>(R.id.perAppAutoDismiss)
         val priorityGroup = findViewById<RadioGroup>(R.id.perAppPriorityGroup)
@@ -97,6 +91,9 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val showMuteSwitch = findViewById<SwitchMaterial>(R.id.perAppShowMute)
         val bigTextInput = findViewById<EditText>(R.id.perAppBigTextThreshold)
         val muteDurationInput = findViewById<EditText>(R.id.perAppMuteDuration)
+        val vibPresetButton = findViewById<MaterialButton>(R.id.perAppVibPresetButton)
+        val vibPreviewButton = findViewById<MaterialButton>(R.id.perAppVibPreviewButton)
+        val vibPatternLabel = findViewById<TextView>(R.id.perAppVibPatternLabel)
         val vibPatternInput = findViewById<EditText>(R.id.perAppVibPattern)
         val soundNameDisplay = findViewById<TextView>(R.id.perAppSoundName)
         val showSnoozeSwitch = findViewById<SwitchMaterial>(R.id.perAppShowSnooze)
@@ -105,13 +102,13 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val keywordBlacklistInput = findViewById<EditText>(R.id.perAppKeywordBlacklist)
 
         // Load existing per-app settings
-        overrideMirrorOngoing.isChecked = settings.isPerAppBooleanCustomized("mirror_ongoing", packageName)
-        mirrorOngoingSwitch.isChecked = settings.getEffectiveMirrorOngoing(packageName)
-        mirrorOngoingSwitch.isEnabled = overrideMirrorOngoing.isChecked
-
-        overrideMirrorPersistent.isChecked = settings.isPerAppBooleanCustomized("mirror_persistent", packageName)
-        mirrorPersistentSwitch.isChecked = settings.getEffectiveMirrorPersistent(packageName)
-        mirrorPersistentSwitch.isEnabled = overrideMirrorPersistent.isChecked
+        overrideOngoingMode.isChecked = settings.isPerAppIntCustomized("ongoing_mode", packageName)
+        when (settings.getEffectiveOngoingMode(packageName)) {
+            SettingsManager.ONGOING_NONE -> perAppOngoingModeGroup.check(R.id.perAppOngoingNone)
+            SettingsManager.ONGOING_ONLY -> perAppOngoingModeGroup.check(R.id.perAppOngoingOnly)
+            SettingsManager.ONGOING_ALL_PERSISTENT -> perAppOngoingModeGroup.check(R.id.perAppOngoingAll)
+        }
+        setRadioGroupEnabled(perAppOngoingModeGroup, overrideOngoingMode.isChecked)
 
         overrideMuteContinuation.isChecked = settings.isPerAppBooleanCustomized("mute_continuation", packageName)
         muteContinuationSwitch.isChecked = settings.getEffectiveMuteContinuation(packageName)
@@ -178,24 +175,35 @@ class PerAppSettingsActivity : AppCompatActivity() {
             keywordBlacklistInput.setText(perAppBlacklist.joinToString("\n"))
         }
 
-        // Load vibration
-        val customVib = settings.getVibrationPattern(packageName)
-        if (customVib.isNotEmpty()) {
-            vibPatternInput.setText(customVib)
+        // Load vibration with preset picker
+        currentVibPattern = settings.getVibrationPattern(packageName)
+        VibrationPatternHelper.setupVibrationUI(
+            context = this,
+            presetButton = vibPresetButton,
+            previewButton = vibPreviewButton,
+            patternLabel = vibPatternLabel,
+            customInput = vibPatternInput,
+            currentPattern = currentVibPattern,
+            allowUseDefault = true
+        ) { pattern ->
+            currentVibPattern = pattern
         }
 
-        // Load sound
-        val customSoundUri = settings.getSoundUri(packageName)
-        if (customSoundUri.isNotEmpty()) {
-            selectedSoundUri = Uri.parse(customSoundUri)
-            selectedSoundName = settings.getSoundDisplayName(packageName)
+        // Load saved sound selection
+        val savedSoundUri = settings.getSoundUri(packageName)
+        val savedSoundName = settings.getSoundDisplayName(packageName)
+        if (savedSoundUri.isNotEmpty()) {
+            selectedSoundUri = savedSoundUri
+            selectedSoundName = savedSoundName.ifEmpty { savedSoundUri }
             soundNameDisplay.text = "Sound: $selectedSoundName"
             soundNameDisplay.visibility = View.VISIBLE
         }
 
+        // Load watch sounds from DataClient
+        loadWatchSounds(soundNameDisplay)
+
         // Wire up override checkboxes to enable/disable controls
-        overrideMirrorOngoing.setOnCheckedChangeListener { _, checked -> mirrorOngoingSwitch.isEnabled = checked }
-        overrideMirrorPersistent.setOnCheckedChangeListener { _, checked -> mirrorPersistentSwitch.isEnabled = checked }
+        overrideOngoingMode.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(perAppOngoingModeGroup, checked) }
         overrideMuteContinuation.setOnCheckedChangeListener { _, checked -> muteContinuationSwitch.isEnabled = checked }
         overrideAutoDismiss.setOnCheckedChangeListener { _, checked -> autoDismissSwitch.isEnabled = checked }
         overridePriority.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(priorityGroup, checked) }
@@ -210,37 +218,43 @@ class PerAppSettingsActivity : AppCompatActivity() {
 
         // Sound buttons
         findViewById<MaterialButton>(R.id.perAppPickSound).setOnClickListener {
-            val intent = android.content.Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
-                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Notification Sound")
-                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                if (selectedSoundUri != null) {
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedSoundUri)
-                }
+            if (watchSoundNames.isEmpty()) {
+                Toast.makeText(this, "No watch sounds available. Open the watch app to sync.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
             }
-            ringtonePicker.launch(intent)
+            val names = watchSoundNames.toTypedArray()
+            val currentIndex = watchSoundUris.indexOf(selectedSoundUri).coerceAtLeast(0)
+            AlertDialog.Builder(this)
+                .setTitle("Select Watch Sound")
+                .setSingleChoiceItems(names, currentIndex) { dialog, which ->
+                    selectedSoundUri = watchSoundUris[which]
+                    selectedSoundName = watchSoundNames[which]
+                    soundNameDisplay.text = "Sound: $selectedSoundName"
+                    soundNameDisplay.visibility = View.VISIBLE
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
 
         findViewById<MaterialButton>(R.id.perAppClearSound).setOnClickListener {
-            selectedSoundUri = null
-            selectedSoundName = ""
+            selectedSoundUri = "default"
+            selectedSoundName = "Default"
             soundNameDisplay.visibility = View.GONE
         }
 
         // Save button
         findViewById<MaterialButton>(R.id.perAppSaveButton).setOnClickListener {
             // Save boolean overrides
-            if (overrideMirrorOngoing.isChecked) {
-                settings.setPerAppBoolean("mirror_ongoing", packageName, mirrorOngoingSwitch.isChecked)
+            if (overrideOngoingMode.isChecked) {
+                val ongoingMode = when (perAppOngoingModeGroup.checkedRadioButtonId) {
+                    R.id.perAppOngoingOnly -> SettingsManager.ONGOING_ONLY
+                    R.id.perAppOngoingAll -> SettingsManager.ONGOING_ALL_PERSISTENT
+                    else -> SettingsManager.ONGOING_NONE
+                }
+                settings.setPerAppInt("ongoing_mode", packageName, ongoingMode)
             } else {
-                settings.clearPerAppBoolean("mirror_ongoing", packageName)
-            }
-
-            if (overrideMirrorPersistent.isChecked) {
-                settings.setPerAppBoolean("mirror_persistent", packageName, mirrorPersistentSwitch.isChecked)
-            } else {
-                settings.clearPerAppBoolean("mirror_persistent", packageName)
+                settings.clearPerAppInt("ongoing_mode", packageName)
             }
 
             if (overrideMuteContinuation.isChecked) {
@@ -362,23 +376,23 @@ class PerAppSettingsActivity : AppCompatActivity() {
             }
 
             // Save vibration
-            val vibPattern = vibPatternInput.text.toString().trim()
-            if (vibPattern.isNotEmpty()) {
-                if (!isValidVibrationPattern(vibPattern)) {
-                    Toast.makeText(this, "Invalid vibration pattern. Use comma-separated numbers.", Toast.LENGTH_LONG).show()
+            if (currentVibPattern.isNotEmpty()) {
+                if (!VibrationPatternHelper.isValidPattern(currentVibPattern)) {
+                    Toast.makeText(this, "Invalid vibration pattern.", Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
-                settings.setVibrationPattern(packageName, vibPattern)
+                settings.setVibrationPattern(packageName, currentVibPattern)
             } else {
                 settings.removeVibrationPattern(packageName)
             }
 
-            // Save sound
-            if (selectedSoundUri != null) {
-                settings.setSoundUri(packageName, selectedSoundUri.toString(), selectedSoundName)
+            // Save sound and send to watch
+            if (selectedSoundUri != "default") {
+                settings.setSoundUri(packageName, selectedSoundUri, selectedSoundName)
             } else {
                 settings.removeSoundUri(packageName)
             }
+            sendSoundSelectionToWatch(packageName, selectedSoundUri)
 
             Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show()
             finish()
@@ -399,22 +413,77 @@ class PerAppSettingsActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Load the list of available notification sounds from the watch via DataClient.
+     * The watch syncs this list when its app is opened.
+     */
+    private fun loadWatchSounds(soundNameDisplay: TextView) {
+        scope.launch {
+            try {
+                val dataItems = Wearable.getDataClient(this@PerAppSettingsActivity)
+                    .getDataItems(android.net.Uri.parse("wear://*/watch_sounds"))
+                    .await()
+
+                for (item in dataItems) {
+                    val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
+                    val soundsJson = dataMap.getString("sounds_json") ?: continue
+                    val arr = JSONArray(soundsJson)
+
+                    watchSoundNames.clear()
+                    watchSoundUris.clear()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        watchSoundNames.add(obj.getString("name"))
+                        watchSoundUris.add(obj.getString("uri"))
+                    }
+                    Log.d(TAG, "Loaded ${watchSoundNames.size} watch sounds")
+                    break
+                }
+                dataItems.release()
+
+                // Update display if saved sound matches a watch sound
+                if (selectedSoundUri != "default") {
+                    val idx = watchSoundUris.indexOf(selectedSoundUri)
+                    if (idx >= 0) {
+                        selectedSoundName = watchSoundNames[idx]
+                        soundNameDisplay.text = "Sound: $selectedSoundName"
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load watch sounds", e)
+            }
+        }
+    }
+
+    /**
+     * Send the selected sound URI to the watch so it can store it
+     * and apply it to the notification channel for this app.
+     */
+    private fun sendSoundSelectionToWatch(pkg: String, soundUri: String) {
+        scope.launch {
+            try {
+                val json = JSONObject().apply {
+                    put("package", pkg)
+                    put("soundUri", soundUri)
+                }
+                val nodes = Wearable.getNodeClient(this@PerAppSettingsActivity)
+                    .connectedNodes.await()
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@PerAppSettingsActivity)
+                        .sendMessage(node.id, "/set_app_sound", json.toString().toByteArray())
+                        .await()
+                }
+                Log.d(TAG, "Sent sound selection to watch: $pkg -> $soundUri")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to send sound selection to watch", e)
+            }
+        }
+    }
+
     private fun setRadioGroupEnabled(group: RadioGroup, enabled: Boolean) {
         for (i in 0 until group.childCount) {
             group.getChildAt(i).isEnabled = enabled
         }
     }
 
-    private fun isValidVibrationPattern(pattern: String): Boolean {
-        val parts = pattern.split(",").map { it.trim() }
-        if (parts.size < 2) return false
-        return parts.all { part ->
-            try {
-                part.toLong()
-                true
-            } catch (_: NumberFormatException) {
-                false
-            }
-        }
-    }
 }

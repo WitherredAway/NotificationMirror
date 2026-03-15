@@ -27,6 +27,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/snooze" -> handleSnooze(messageEvent)
             "/request_key" -> handleKeyRequest()
             "/mirroring_toggle" -> handleMirroringToggle(messageEvent)
+            "/request_sync" -> handleRequestSync()
         }
     }
 
@@ -139,6 +140,21 @@ class ReplyReceiverService : WearableListenerService() {
             settings.setMirroringEnabled(enabled)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle mirroring toggle", e)
+        }
+    }
+
+    /**
+     * Handle sync request from watch — re-sends all active notifications.
+     */
+    private fun handleRequestSync() {
+        Log.d(TAG, "Received sync request from watch")
+        val listener = NotificationListener.instance
+        if (listener != null) {
+            listener.syncAllActiveNotifications { count ->
+                Log.d(TAG, "Synced $count notifications to watch (requested by watch)")
+            }
+        } else {
+            Log.w(TAG, "NotificationListener not active — cannot sync")
         }
     }
 
