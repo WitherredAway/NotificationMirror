@@ -60,6 +60,10 @@
                     android:host="*"
                     android:pathPrefix="/notification"
                     android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/action_result"
+                    android:scheme="wear" />
             </intent-filter>
         </service>
 

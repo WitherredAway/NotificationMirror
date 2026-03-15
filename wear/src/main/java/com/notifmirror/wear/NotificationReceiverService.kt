@@ -31,6 +31,9 @@ class NotificationReceiverService : WearableListenerService() {
 
             Log.d(TAG, "Action result: success=$success message=$message")
 
+            // Clear the timeout flag so the timeout toast doesn't fire
+            ActionBroadcastReceiver.awaitingResult = false
+
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
             }

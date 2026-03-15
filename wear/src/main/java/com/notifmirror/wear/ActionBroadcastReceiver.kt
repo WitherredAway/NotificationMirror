@@ -4,7 +4,10 @@ import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +20,8 @@ class ActionBroadcastReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "NotifMirrorAction"
+        private const val ACTION_RESULT_TIMEOUT_MS = 5000L
+        var awaitingResult = false
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -35,6 +40,8 @@ class ActionBroadcastReceiver : BroadcastReceiver() {
             put("actionIndex", actionIndex)
         }
 
+        awaitingResult = true
+
         scope.launch {
             try {
                 val nodeClient = Wearable.getNodeClient(context)
@@ -51,8 +58,20 @@ class ActionBroadcastReceiver : BroadcastReceiver() {
                     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(notifId)
                 }
+
+                // Timeout: if no /action_result received in 5s, show timeout toast
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (awaitingResult) {
+                        awaitingResult = false
+                        Toast.makeText(context, "No response from phone", Toast.LENGTH_SHORT).show()
+                    }
+                }, ACTION_RESULT_TIMEOUT_MS)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send action to phone", e)
+                awaitingResult = false
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, "Failed to reach phone", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
