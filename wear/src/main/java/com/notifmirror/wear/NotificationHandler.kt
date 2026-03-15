@@ -266,7 +266,7 @@ object NotificationHandler {
 
         val channel = NotificationChannel(
             effectiveChannelId,
-            "$appLabel Notifications",
+            appLabel,
             if (isSilent) NotificationManager.IMPORTANCE_LOW else importance
         ).apply {
             description = "Mirrored notifications from $appLabel"
@@ -466,7 +466,7 @@ object NotificationHandler {
 
         // Create/update summary notification for the per-app group
         val summaryId = packageName.hashCode() + SUMMARY_ID_OFFSET
-        val summaryBuilder = NotificationCompat.Builder(context, effectiveChannelId)
+        val summaryBuilder = NotificationCompat.Builder(context, actualChannelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(appLabel)
             .setContentText(title)
