@@ -221,7 +221,19 @@ class AppSettingsActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Save all settings
+            val snoozeDur = snoozeDurationInput.text.toString().trim().toIntOrNull()
+            if (snoozeDur == null || snoozeDur < 1) {
+                Toast.makeText(this, "Snooze duration must be at least 1 minute", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val batteryThreshold = batterySaverThresholdInput.text.toString().trim().toIntOrNull()
+            if (batteryThreshold == null || batteryThreshold !in 1..100) {
+                Toast.makeText(this, "Battery threshold must be between 1 and 100", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // All validation passed — save all settings
             settings.setDndSyncEnabled(dndSwitch.isChecked)
             settings.setMirrorOngoingEnabled(mirrorOngoingSwitch.isChecked)
             settings.setMirrorPersistentEnabled(mirrorPersistentSwitch.isChecked)
@@ -249,19 +261,7 @@ class AppSettingsActivity : AppCompatActivity() {
             settings.setMuteContinuationEnabled(muteContinuationSwitch.isChecked)
             settings.setShowSnoozeButtonEnabled(showSnoozeButtonSwitch.isChecked)
             settings.setBatterySaverEnabled(batterySaverSwitch.isChecked)
-
-            val snoozeDur = snoozeDurationInput.text.toString().trim().toIntOrNull()
-            if (snoozeDur == null || snoozeDur < 1) {
-                Toast.makeText(this, "Snooze duration must be at least 1 minute", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
             settings.setSnoozeDurationMinutes(snoozeDur)
-
-            val batteryThreshold = batterySaverThresholdInput.text.toString().trim().toIntOrNull()
-            if (batteryThreshold == null || batteryThreshold !in 1..100) {
-                Toast.makeText(this, "Battery threshold must be between 1 and 100", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
             settings.setBatterySaverThreshold(batteryThreshold)
 
             val complicationSource = when (complicationSourceGroup.checkedRadioButtonId) {
