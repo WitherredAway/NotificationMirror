@@ -35,6 +35,17 @@
             android:textColor="?colorOnSurfaceVariant" />
     </LinearLayout>
 
+    <ImageView
+        android:id="@+id/appSettings"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="8dp"
+        android:src="@drawable/ic_settings"
+        android:contentDescription="App settings"
+        android:background="?selectableItemBackgroundBorderless"
+        android:padding="6dp"
+        android:visibility="gone" />
+
     <CheckBox
         android:id="@+id/appCheckbox"
         android:layout_width="wrap_content"

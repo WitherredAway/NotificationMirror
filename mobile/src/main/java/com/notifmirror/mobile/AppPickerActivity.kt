@@ -1,5 +1,6 @@
 package com.notifmirror.mobile
 
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -103,6 +104,7 @@ class AppPickerActivity : AppCompatActivity() {
             val name: TextView = view.findViewById(R.id.appName)
             val pkg: TextView = view.findViewById(R.id.appPackage)
             val checkbox: CheckBox = view.findViewById(R.id.appCheckbox)
+            val settingsIcon: ImageView = view.findViewById(R.id.appSettings)
         }
 
         fun updateList(newApps: List<AppInfo>) {
@@ -123,20 +125,30 @@ class AppPickerActivity : AppCompatActivity() {
             if (app.icon != null) {
                 holder.icon.setImageDrawable(app.icon)
             }
-            holder.checkbox.isChecked = selectedApps.contains(app.packageName)
+            val isSelected = selectedApps.contains(app.packageName)
+            holder.checkbox.isChecked = isSelected
+            holder.settingsIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
 
             val clickListener = View.OnClickListener {
                 if (selectedApps.contains(app.packageName)) {
                     selectedApps.remove(app.packageName)
                     holder.checkbox.isChecked = false
+                    holder.settingsIcon.visibility = View.GONE
                 } else {
                     selectedApps.add(app.packageName)
                     holder.checkbox.isChecked = true
+                    holder.settingsIcon.visibility = View.VISIBLE
                 }
             }
 
             holder.itemView.setOnClickListener(clickListener)
             holder.checkbox.setOnClickListener(clickListener)
+
+            holder.settingsIcon.setOnClickListener {
+                val intent = Intent(this@AppPickerActivity, PerAppSettingsActivity::class.java)
+                intent.putExtra(PerAppSettingsActivity.EXTRA_PACKAGE_NAME, app.packageName)
+                startActivity(intent)
+            }
         }
 
         override fun getItemCount() = apps.size
