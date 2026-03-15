@@ -4,7 +4,8 @@ import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,21 +27,27 @@ class MainActivity : AppCompatActivity() {
         DynamicColors.applyToActivityIfAvailable(this)
         setContentView(R.layout.activity_main)
 
+        val statusCard = findViewById<LinearLayout>(R.id.statusCard)
+        val statusIcon = findViewById<ImageView>(R.id.statusIcon)
         val statusText = findViewById<TextView>(R.id.statusText)
-        val settingsButton = findViewById<Button>(R.id.notifSettingsButton)
-        val logButton = findViewById<Button>(R.id.viewLogButton)
 
         Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
             if (nodes.isNotEmpty()) {
-                statusText.text = "Connected to phone.\n\nMirrored notifications will appear automatically."
+                statusCard.setBackgroundResource(R.drawable.bg_status_active)
+                statusIcon.setImageResource(R.drawable.ic_check_circle)
+                statusText.text = "Connected to phone"
             } else {
-                statusText.text = "Not connected to phone.\n\nMake sure your phone is nearby and the companion app is installed."
+                statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
+                statusIcon.setImageResource(R.drawable.ic_error_circle)
+                statusText.text = "Not connected to phone"
             }
         }.addOnFailureListener {
-            statusText.text = "Could not check connection.\n\nMake sure Google Play Services is available."
+            statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
+            statusIcon.setImageResource(R.drawable.ic_error_circle)
+            statusText.text = "Connection check failed"
         }
 
-        settingsButton.setOnClickListener {
+        findViewById<LinearLayout>(R.id.notifSettingsButton).setOnClickListener {
             try {
                 val intent = Intent().apply {
                     component = ComponentName(
@@ -54,7 +61,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        logButton.setOnClickListener {
+        findViewById<LinearLayout>(R.id.viewLogButton).setOnClickListener {
             startActivity(Intent(this, LogActivity::class.java))
         }
 

@@ -1,86 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center"
-    android:background="?android:colorBackground">
-
-    <TextView
-        android:id="@+id/titleText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Notification Mirror"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:textColor="?colorOnSurface"
-        android:gravity="center" />
-
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:text="Checking connection..."
-        android:textSize="12sp"
-        android:textColor="?colorOnSurfaceVariant"
-        android:lineSpacingExtra="3dp" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/notifSettingsButton"
-        android:layout_width="match_parent"
-        android:layout_height="40dp"
-        android:layout_marginTop="14dp"
-        android:text="Notification Settings"
-        android:textAllCaps="false"
-        android:textSize="12sp"
-        style="@style/Widget.NotifMirror.Button.Passive" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/viewLogButton"
-        android:layout_width="match_parent"
-        android:layout_height="40dp"
-        android:layout_marginTop="8dp"
-        android:text="View Log"
-        android:textAllCaps="false"
-        android:textSize="12sp"
-        style="@style/Widget.NotifMirror.Button.Passive" />
-
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_gravity="center_horizontal">
-
-        <TextView
-            android:id="@+id/versionText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="10sp"
-            android:textColor="?colorOutline" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=" · "
-            android:textSize="10sp"
-            android:textColor="?colorOutline" />
-
-        <TextView
-            android:id="@+id/githubLink"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="GitHub"
-            android:textSize="10sp"
-            android:textColor="?colorPrimary"
-            android:clickable="true"
-            android:focusable="true" />
-
-    </LinearLayout>
-
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="?android:colorBackground" android:fillViewport="true">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp" android:gravity="center_horizontal">
+<ImageView android:layout_width="36dp" android:layout_height="36dp" android:layout_marginTop="20dp" android:src="@mipmap/ic_launcher" android:contentDescription="App icon" />
+<TextView android:id="@+id/titleText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Notification Mirror" android:textSize="14sp" android:textStyle="bold" android:textColor="?colorOnSurface" android:gravity="center" />
+<LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="10dp" android:background="@drawable/bg_status_active">
+<ImageView android:id="@+id/statusIcon" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_check_circle" android:contentDescription="Status" />
+<TextView android:id="@+id/statusText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:text="Connected" android:textSize="12sp" android:textColor="?colorOnSurface" />
 </LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
+<LinearLayout android:id="@+id/notifSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Settings" /></FrameLayout>
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Notification Settings" android:textSize="13sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+<LinearLayout android:id="@+id/viewLogButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_history" android:contentDescription="Log" /></FrameLayout>
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Notification Log" android:textSize="13sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginBottom="20dp" android:orientation="horizontal" android:gravity="center_vertical" android:layout_gravity="center_horizontal">
+<TextView android:id="@+id/versionText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" \u00b7 " android:textSize="10sp" android:textColor="?colorOutline" />
+<TextView android:id="@+id/githubLink" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GitHub" android:textSize="10sp" android:textColor="?colorPrimary" android:clickable="true" android:focusable="true" />
+</LinearLayout>
+</LinearLayout>
+</ScrollView>
