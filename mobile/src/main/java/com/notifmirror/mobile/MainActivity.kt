@@ -140,6 +140,10 @@ class MainActivity : AppCompatActivity() {
             showTestNotificationDialog()
         }
 
+        findViewById<LinearLayout>(R.id.syncNotifsButton).setOnClickListener {
+            syncCurrentNotifications()
+        }
+
         val versionText = findViewById<TextView>(R.id.versionText)
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
@@ -261,6 +265,20 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     updateBanner.visibility = View.GONE
                 }
+            }
+        }
+    }
+
+    private fun syncCurrentNotifications() {
+        val listener = NotificationListener.instance
+        if (listener == null) {
+            Toast.makeText(this, "Notification listener not active", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, "Syncing notifications...", Toast.LENGTH_SHORT).show()
+        listener.syncAllActiveNotifications { count ->
+            runOnUiThread {
+                Toast.makeText(this, "Synced $count notification${if (count != 1) "s" else ""} to watch", Toast.LENGTH_SHORT).show()
             }
         }
     }

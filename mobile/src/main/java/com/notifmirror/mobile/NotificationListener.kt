@@ -298,6 +298,180 @@ class NotificationListener : NotificationListenerService() {
         }
     }
 
+    /**
+     * Re-sends all currently active notifications to the watch, respecting all filters.
+     * Returns the number of notifications synced.
+     */
+    fun syncAllActiveNotifications(onComplete: ((Int) -> Unit)? = null) {
+        scope.launch {
+            try {
+                val activeNotifications = getActiveNotifications() ?: run {
+                    onComplete?.invoke(0)
+                    return@launch
+                }
+
+                val nodeClient = Wearable.getNodeClient(this@NotificationListener)
+                val nodes = nodeClient.connectedNodes.await()
+                if (nodes.isEmpty()) {
+                    Log.w(TAG, "No connected watch nodes for sync")
+                    onComplete?.invoke(0)
+                    return@launch
+                }
+
+                val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+                var syncCount = 0
+
+                for (sbn in activeNotifications) {
+                    if (sbn.packageName == packageName) continue
+                    if (!settings.isMirroringEnabled()) continue
+
+                    // Ongoing/persistent filter
+                    if (sbn.isOngoing) {
+                        val notification = sbn.notification ?: continue
+                        val isForegroundService = notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
+                        if (isForegroundService) {
+                            if (!settings.getEffectiveMirrorPersistent(sbn.packageName)) continue
+                        } else {
+                            if (!settings.getEffectiveMirrorOngoing(sbn.packageName)) continue
+                        }
+                    }
+
+                    // DND filter
+                    if (settings.isDndSyncEnabled()) {
+                        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        val interruptionFilter = nm.currentInterruptionFilter
+                        if (interruptionFilter == NotificationManager.INTERRUPTION_FILTER_NONE ||
+                            interruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS) {
+                            continue
+                        }
+                    }
+
+                    // Screen-off mode filter
+                    val screenMode = settings.getEffectiveScreenOffMode(sbn.packageName)
+                    if (screenMode == SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY) {
+                        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                        if (pm.isInteractive) continue
+                    }
+
+                    val notification = sbn.notification ?: continue
+                    val extras = notification.extras ?: continue
+
+                    val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+                    val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+                    val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+                    val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
+
+                    if (title.isEmpty() && text.isEmpty()) continue
+
+                    val displayText = bigText ?: text
+
+                    // App whitelist filter
+                    if (!settings.isAppWhitelisted(sbn.packageName)) continue
+
+                    // Global keyword filter
+                    if (!settings.passesKeywordFilter(title, displayText)) continue
+
+                    // Per-app keyword filter
+                    if (!settings.passesPerAppKeywordFilter(sbn.packageName, title, displayText)) continue
+
+                    val notifKey = sbn.key
+                    val appPackageName = sbn.packageName
+                    val postTime = sbn.postTime
+
+                    val iconBase64 = getAppIconBase64(appPackageName)
+
+                    val actionsJson = JSONArray()
+                    val actions = notification.actions
+                    if (actions != null) {
+                        for ((index, action) in actions.withIndex()) {
+                            val actionKey = "$notifKey:$index"
+                            pendingActions[actionKey] = action
+                            val hasRemoteInput = action.remoteInputs != null && action.remoteInputs.isNotEmpty()
+                            val actionJson = JSONObject().apply {
+                                put("index", index)
+                                put("title", action.title?.toString() ?: "Action $index")
+                                put("hasRemoteInput", hasRemoteInput)
+                            }
+                            actionsJson.put(actionJson)
+                        }
+                    }
+
+                    val appLabel = try {
+                        val ai = packageManager.getApplicationInfo(appPackageName, 0)
+                        packageManager.getApplicationLabel(ai).toString()
+                    } catch (_: Exception) {
+                        appPackageName.split(".").lastOrNull()?.replaceFirstChar { it.uppercase() } ?: appPackageName
+                    }
+
+                    val json = JSONObject().apply {
+                        put("key", notifKey)
+                        put("package", appPackageName)
+                        put("appLabel", appLabel)
+                        put("title", title)
+                        put("text", displayText)
+                        put("subText", subText ?: "")
+                        put("postTime", postTime)
+                        put("actions", actionsJson)
+                        if (iconBase64 != null) put("icon", iconBase64)
+                        put("muteDuration", settings.getEffectiveMuteDuration(appPackageName))
+                        put("notifPriority", settings.getEffectivePriority(appPackageName))
+                        put("bigTextThreshold", settings.getEffectiveBigTextThreshold(appPackageName))
+                        put("autoCancel", settings.getEffectiveAutoCancel(appPackageName))
+                        put("autoDismissSync", settings.getEffectiveAutoDismissSync(appPackageName))
+                        put("showOpenButton", settings.getEffectiveShowOpenButton(appPackageName))
+                        put("showMuteButton", settings.getEffectiveShowMuteButton(appPackageName))
+                        put("showSnoozeButton", settings.getEffectiveShowSnoozeButton(appPackageName))
+                        put("snoozeDuration", settings.getEffectiveSnoozeDuration(appPackageName))
+                        put("defaultVibration", settings.getDefaultVibrationPattern())
+                        put("keepHistory", settings.isKeepNotificationHistoryEnabled())
+                        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                        if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
+                            put("silent", true)
+                        }
+                        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                        if (settings.isHideWhenLockedEnabled() && km.isKeyguardLocked) {
+                            put("hideContent", true)
+                        }
+                        put("muteContinuation", settings.getEffectiveMuteContinuation(appPackageName))
+                        put("batterySaverEnabled", settings.isBatterySaverEnabled())
+                        put("batterySaverThreshold", settings.getBatterySaverThreshold())
+                        val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
+                        if (effectiveVib.isNotEmpty()) put("vibrationPattern", effectiveVib)
+                        val customSound = settings.getEffectiveSoundUri(appPackageName)
+                        if (customSound.isNotEmpty()) put("soundUri", customSound)
+                        put("complicationSource", settings.getComplicationSource())
+                        val complicationApp = settings.getComplicationApp()
+                        if (complicationApp.isNotEmpty()) put("complicationApp", complicationApp)
+                    }
+
+                    val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                    val messageBytes = CryptoHelper.encrypt(plainBytes, key)
+
+                    for (node in nodes) {
+                        Wearable.getMessageClient(this@NotificationListener)
+                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                            .await()
+                    }
+                    sentNotificationKeys.add(notifKey)
+                    syncCount++
+                    Log.d(TAG, "Synced notification: $title from $appPackageName")
+                }
+
+                Log.d(TAG, "Sync complete: $syncCount notifications sent")
+                if (settings.isKeepNotificationHistoryEnabled()) {
+                    notifLog.addEntry(
+                        "system", "Sync", "$syncCount notifications synced to watch",
+                        "SYNC", "Manual sync from phone"
+                    )
+                }
+                onComplete?.invoke(syncCount)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync notifications", e)
+                onComplete?.invoke(0)
+            }
+        }
+    }
+
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         val keysToRemove = pendingActions.keys.filter { it.startsWith(sbn.key + ":") }
         keysToRemove.forEach { pendingActions.remove(it) }
