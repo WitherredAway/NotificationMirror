@@ -17,21 +17,24 @@ So that's why this app exists! It basically lets you have the watch app installe
 ## Features
 
 ### Core
-- **Notification mirroring** — captures phone notifications via `NotificationListenerService` and forwards them to your Wear OS watch via Wearable Data Layer API (`MessageClient`)
-- **Inline reply** — reply to mirrored notifications directly from the watch (WhatsApp, Telegram, Discord, etc.) via `RemoteInput`
-- **All notification actions forwarded** — not just reply, but every action button (mark as read, archive, mute, etc.) is mirrored to the watch
+- **Notification mirroring** — mirrors phone notifications to your Wear OS watch in real time
+- **Inline reply** — reply to mirrored notifications directly from the watch (WhatsApp, Telegram, Discord, etc.)
+- **All notification buttons** — not just reply, but every action button (mark as read, archive, mute, etc.) works from the watch
+- **Action feedback** — watch shows real success/failure result after pressing action buttons (e.g. "Reply sent" or "Notification no longer exists")
 - **Auto-dismiss sync** — when a notification is dismissed on the phone, it's automatically dismissed on the watch (configurable)
+- **Message stacking** — multiple messages in the same conversation stack up instead of replacing each other
 
 ### Filtering
 - **App whitelist** — pick which apps' notifications get mirrored; if none selected, all apps are mirrored
-- **Keyword whitelist (regex)** — only mirror notifications matching these patterns
-- **Keyword blacklist (regex)** — never mirror notifications matching these patterns
+- **Keyword whitelist (regex)** — only mirror notifications matching certain words/patterns
+- **Keyword blacklist (regex)** — block notifications matching certain words/patterns
 
 ### Watch Notifications
-- **Per-app notification groups** — each source app's notifications stack separately on the watch (own channels/groups)
-- **App icons** — the phone serializes each app's icon as a large icon displayed on the watch notification
-- **"Open on Watch" button** — if the source app has a companion app on the watch (WhatsApp, Spotify, etc.), a button appears to open it (configurable)
+- **Per-app notification groups** — each app's notifications are grouped separately on the watch, with the app name shown in each notification title
+- **App icons** — each notification shows the source app's icon
+- **"Open on Watch" button** — if the source app has a companion watch app (WhatsApp, Spotify, etc.), a button appears to open it (configurable)
 - **Quick-mute from watch** — every mirrored notification has a "Mute Xmin" button to temporarily stop mirroring that app (duration configurable)
+- **Per-app custom sounds** — set a custom notification sound for any app
 - **Per-app vibration patterns** — set custom vibration patterns for any app
 - **Default vibration pattern** — customizable fallback pattern for apps without a custom one
 - **Notification priority** — configurable (High / Default / Low)
@@ -44,17 +47,22 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Mirror ongoing notifications** — optionally mirror persistent notifications (music players, timers, etc.)
 
 ### Notification Log
-- **Permanent log** — all SENT notifications are logged (no expiry, only cleared manually)
+- **Permanent log** — all sent notifications are logged (no expiry, only cleared manually)
 - **Search (regex)** — search through logs with regex on both phone and watch
 - **App filter dropdown** — filter log by source app
-- **Export** — export logs as CSV + JSON via Android share sheet (phone)
+- **Functional action buttons in log** — replay actions and reply to notifications directly from the log
+- **Export** — export logs as CSV + JSON via share sheet (phone)
+- **Circular watch-optimized UI** — log on watch is designed for round WearOS displays
 
 ### Watch App
 - **Notification Settings shortcut** — button to open WearOS granular notification settings
 - **Wear Tile** — "Notification Counts" tile for your watch face showing per-app notification counts
+- **Auto permission requests** — watch app asks for required permissions on first launch
 
 ### Phone App
 - **Test notification button** — send a custom test notification to the watch on behalf of any app
+- **Auto permission requests** — phone app asks for notification access and unrestricted battery on launch
+- **GitHub link** — quick link to the project repo shown in the app
 
 ## Setup
 
