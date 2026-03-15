@@ -12,6 +12,7 @@ import androidx.wear.tiles.ResourceBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import androidx.wear.tiles.TimelineBuilders
+import android.util.TypedValue
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 
@@ -86,7 +87,19 @@ class NotificationTileService : TileService() {
         )
     }
 
+    private fun resolveThemeColor(attrResId: Int, fallback: Int): Int {
+        val typedValue = TypedValue()
+        return if (theme.resolveAttribute(attrResId, typedValue, true)) {
+            typedValue.data
+        } else {
+            fallback
+        }
+    }
+
     private fun buildLayout(counts: Map<String, Int>, total: Int): LayoutElementBuilders.LayoutElement {
+        val colorPrimary = resolveThemeColor(com.google.android.material.R.attr.colorPrimary, 0xFFD0BCFF.toInt())
+        val colorOnSurface = resolveThemeColor(com.google.android.material.R.attr.colorOnSurface, 0xFFE6E1E5.toInt())
+        val colorOnSurfaceVariant = resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFFCAC4D0.toInt())
         val columnBuilder = LayoutElementBuilders.Column.Builder()
             .setWidth(DimensionBuilders.expand())
             .setHeight(DimensionBuilders.expand())
@@ -99,7 +112,7 @@ class NotificationTileService : TileService() {
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
                         .setSize(DimensionBuilders.sp(14f))
-                        .setColor(ColorBuilders.argb(0xFFD0BCFF.toInt()))
+                        .setColor(ColorBuilders.argb(colorPrimary))
                         .setWeight(LayoutElementBuilders.FONT_WEIGHT_BOLD)
                         .build()
                 )
@@ -120,7 +133,7 @@ class NotificationTileService : TileService() {
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
                         .setSize(DimensionBuilders.sp(12f))
-                        .setColor(ColorBuilders.argb(0xFFE6E1E5.toInt()))
+                        .setColor(ColorBuilders.argb(colorOnSurface))
                         .build()
                 )
                 .build()
@@ -143,7 +156,7 @@ class NotificationTileService : TileService() {
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
                             .setSize(DimensionBuilders.sp(11f))
-                            .setColor(ColorBuilders.argb(0xFFCAC4D0.toInt()))
+                            .setColor(ColorBuilders.argb(colorOnSurfaceVariant))
                             .build()
                     )
                     .build()
@@ -157,7 +170,7 @@ class NotificationTileService : TileService() {
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
                             .setSize(DimensionBuilders.sp(11f))
-                            .setColor(ColorBuilders.argb(0xFFCAC4D0.toInt()))
+                            .setColor(ColorBuilders.argb(colorOnSurfaceVariant))
                             .build()
                     )
                     .build()

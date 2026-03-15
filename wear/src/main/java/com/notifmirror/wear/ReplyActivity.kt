@@ -9,6 +9,7 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.color.DynamicColors
 import androidx.core.app.RemoteInput
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
@@ -48,7 +49,7 @@ class ReplyActivity : AppCompatActivity() {
         }
 
         // Fallback: show a text input UI for manual reply
-        // Don't use DynamicColors on watch — use hardcoded colors matching phone app
+        DynamicColors.applyToActivityIfAvailable(this)
         setContentView(R.layout.activity_reply)
 
         val titleText = findViewById<TextView>(R.id.replyTitle)
