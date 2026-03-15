@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="?android:colorBackground" android:fillViewport="true">
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/mainScrollView" android:layout_width="match_parent" android:layout_height="match_parent" android:background="?android:colorBackground" android:fillViewport="true" android:focusable="true" android:focusableInTouchMode="true">
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp" android:gravity="center_horizontal">
 <ImageView android:layout_width="36dp" android:layout_height="36dp" android:layout_marginTop="20dp" android:src="@mipmap/ic_launcher" android:contentDescription="App icon" />
 <TextView android:id="@+id/titleText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Notification Mirror" android:textSize="14sp" android:textStyle="bold" android:textColor="?colorOnSurface" android:gravity="center" />

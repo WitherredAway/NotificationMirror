@@ -5,8 +5,11 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.util.TypedValue
+import android.view.MotionEvent
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +37,19 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         DynamicColors.applyToActivityIfAvailable(this)
         setContentView(R.layout.activity_main)
+
+        // Rotary/bezel scrolling support
+        val scrollView = findViewById<ScrollView>(R.id.mainScrollView)
+        scrollView.requestFocus()
+        scrollView.setOnGenericMotionListener { v, event ->
+            if (event.action == MotionEvent.ACTION_SCROLL) {
+                val delta = -event.getAxisValue(MotionEvent.AXIS_SCROLL)
+                v.scrollBy(0, (delta * dpToPx(40)).toInt())
+                true
+            } else {
+                false
+            }
+        }
 
         val statusCard = findViewById<LinearLayout>(R.id.statusCard)
         val statusIcon = findViewById<ImageView>(R.id.statusIcon)
@@ -112,6 +128,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkAndRequestPermissions()
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
     }
 
     private fun checkAndRequestPermissions() {
