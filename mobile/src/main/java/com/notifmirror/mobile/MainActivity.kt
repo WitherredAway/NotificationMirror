@@ -100,6 +100,17 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LogActivity::class.java))
         }
 
+        // Stat cards navigate to their respective pages
+        findViewById<LinearLayout>(R.id.statAppsCard).setOnClickListener {
+            startActivity(Intent(this, AppPickerActivity::class.java))
+        }
+        findViewById<LinearLayout>(R.id.statFiltersCard).setOnClickListener {
+            startActivity(Intent(this, FilterSettingsActivity::class.java))
+        }
+        findViewById<LinearLayout>(R.id.statLogCard).setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
+
         findViewById<LinearLayout>(R.id.settingsButton).setOnClickListener {
             startActivity(Intent(this, AppSettingsActivity::class.java))
         }
