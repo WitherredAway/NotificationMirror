@@ -71,16 +71,6 @@
                 android:maxLines="3"
                 android:ellipsize="end" />
 
-            <TextView
-                android:id="@+id/logDetail"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textSize="11sp"
-                android:textColor="?colorOutline"
-                android:singleLine="true"
-                android:ellipsize="end" />
-
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/logActionsContainer"
                 android:layout_width="match_parent"
