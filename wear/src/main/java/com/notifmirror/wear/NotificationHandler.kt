@@ -26,9 +26,10 @@ object NotificationHandler {
     const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
     const val EXTRA_ACTION_INDEX = "extra_action_index"
 
-    private val notifIdMap = mutableMapOf<String, Int>()
-    private val notifTextMap = mutableMapOf<String, String>()
+    // Track ALL notification IDs per key so we can dismiss them all
+    private val notifIdsMap = mutableMapOf<String, MutableList<Int>>()
     private var nextId = 1000
+    private const val SUMMARY_ID_OFFSET = 500000
 
     private val DEFAULT_VIBRATION = longArrayOf(0, 200, 100, 200)
 
@@ -65,18 +66,10 @@ object NotificationHandler {
                 return
             }
 
-            // Generate unique notification IDs for different messages with the same key
-            // (e.g. WhatsApp updates the same notification with each new message)
-            val previousText = notifTextMap[key]
-            val notifId = if (previousText != null && previousText != text) {
-                // Text changed — new message arrived, assign a new ID so both show
-                val newId = nextId++
-                notifIdMap[key] = newId
-                newId
-            } else {
-                notifIdMap.getOrPut(key) { nextId++ }
-            }
-            notifTextMap[key] = text
+            // Always assign a new unique notification ID for every message
+            // so even identical messages show separately
+            val notifId = nextId++
+            notifIdsMap.getOrPut(key) { mutableListOf() }.add(notifId)
 
             val actionCount = actionsArray?.length() ?: 0
             notifLog.addEntry(
@@ -114,17 +107,22 @@ object NotificationHandler {
             val json = JSONObject(String(messageEvent.data))
             val key = json.getString("key")
 
-            val notifId = notifIdMap.remove(key) ?: return
-            notifTextMap.remove(key)
+            val ids = notifIdsMap.remove(key)
+            if (ids == null || ids.isEmpty()) return
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(notifId)
+            // Cancel all stacked notifications for this conversation
+            for (id in ids) {
+                nm.cancel(id)
+            }
+            // Cancel the summary notification too
+            nm.cancel(key.hashCode() + SUMMARY_ID_OFFSET)
 
             val packageName = json.optString("package", "")
             if (packageName.isNotEmpty()) {
                 NotificationTileService.decrementCount(context, packageName)
             }
 
-            Log.d(TAG, "Dismissed notification: $key")
+            Log.d(TAG, "Dismissed ${ids.size} notifications for key: $key")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle dismissal", e)
         }
@@ -203,7 +201,7 @@ object NotificationHandler {
             .setPriority(if (isSilent) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(autoCancel)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setGroup(groupId)
+            .setGroup(notifKey)
 
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
@@ -310,6 +308,20 @@ object NotificationHandler {
         }
 
         nm.notify(notifId, builder.build())
+
+        // Create/update summary notification for the conversation group
+        val summaryId = notifKey.hashCode() + SUMMARY_ID_OFFSET
+        val summaryBuilder = NotificationCompat.Builder(context, effectiveChannelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(appLabel)
+            .setContentText(title)
+            .setSubText(appLabel)
+            .setGroup(notifKey)
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .setStyle(NotificationCompat.InboxStyle()
+                .setSummaryText(appLabel))
+        nm.notify(summaryId, summaryBuilder.build())
     }
 
     private fun getVibrationPattern(

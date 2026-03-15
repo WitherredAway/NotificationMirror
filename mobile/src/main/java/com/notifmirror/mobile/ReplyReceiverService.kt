@@ -5,7 +5,12 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
 class ReplyReceiverService : WearableListenerService() {
@@ -34,12 +39,14 @@ class ReplyReceiverService : WearableListenerService() {
             val action = NotificationListener.pendingActions[actionKey]
             if (action == null) {
                 Log.w(TAG, "No pending action found for key: $actionKey")
+                sendActionResult(false, "Notification was dismissed — action no longer available")
                 return
             }
 
             val remoteInputs = action.remoteInputs
             if (remoteInputs == null || remoteInputs.isEmpty()) {
                 Log.w(TAG, "No remote inputs found for action")
+                sendActionResult(false, "Reply input not available")
                 return
             }
 
@@ -52,9 +59,11 @@ class ReplyReceiverService : WearableListenerService() {
             action.actionIntent.send(this, 0, intent)
 
             Log.d(TAG, "Reply sent successfully for $actionKey")
+            sendActionResult(true, "Reply sent")
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle reply", e)
+            sendActionResult(false, "Failed: ${e.message}")
         }
     }
 
@@ -70,15 +79,38 @@ class ReplyReceiverService : WearableListenerService() {
             val action = NotificationListener.pendingActions[actionKey]
             if (action == null) {
                 Log.w(TAG, "No pending action found for key: $actionKey")
+                sendActionResult(false, "Notification was dismissed — action no longer available")
                 return
             }
 
             action.actionIntent.send()
 
             Log.d(TAG, "Action executed successfully for $actionKey")
+            sendActionResult(true, "Action executed")
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle action", e)
+            sendActionResult(false, "Failed: ${e.message}")
+        }
+    }
+
+    private fun sendActionResult(success: Boolean, message: String) {
+        val json = JSONObject().apply {
+            put("success", success)
+            put("message", message)
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val nodeClient = Wearable.getNodeClient(this@ReplyReceiverService)
+                val nodes = nodeClient.connectedNodes.await()
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@ReplyReceiverService)
+                        .sendMessage(node.id, "/action_result", json.toString().toByteArray())
+                        .await()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send action result to watch", e)
+            }
         }
     }
 }
