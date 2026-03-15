@@ -211,6 +211,12 @@ class NotificationListener : NotificationListenerService() {
             if (customSound.isNotEmpty()) {
                 put("soundUri", customSound)
             }
+            // Send complication settings so watch can filter by app
+            put("complicationSource", settings.getComplicationSource())
+            val complicationApp = settings.getComplicationApp()
+            if (complicationApp.isNotEmpty()) {
+                put("complicationApp", complicationApp)
+            }
         }
 
         Log.d(TAG, "Forwarding notification: $title from $appPackageName (${actionsJson.length()} actions)")

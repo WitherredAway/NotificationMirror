@@ -56,7 +56,7 @@ class NotificationComplicationService : ComplicationDataSourceService() {
         fun getLatestNotification(context: Context): ComplicationInfo {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-            // Check complication source setting from phone settings synced via DataClient
+            // Check complication source setting (synced from phone via notification JSON)
             val settingsPrefs = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
             val source = settingsPrefs.getString("complication_source", "most_recent") ?: "most_recent"
             val filterApp = settingsPrefs.getString("complication_app", "") ?: ""
