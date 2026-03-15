@@ -36,6 +36,8 @@ class FilterSettingsActivity : AppCompatActivity() {
     private var allEntries: List<NotificationLog.LogEntry> = emptyList()
     private var evaluatedEntries: List<PreviewEntry> = emptyList()
     private var displayedCount = 0
+    private val displayedItems = mutableListOf<PreviewEntry>()
+    private var previewAdapter: PreviewAdapter? = null
 
     data class PreviewEntry(
         val entry: NotificationLog.LogEntry,
@@ -165,17 +167,27 @@ class FilterSettingsActivity : AppCompatActivity() {
         previewHeader.text = "$matchCount would pass, $filterCount would be blocked (${allEntries.size} notifications)"
 
         displayedCount = minOf(PAGE_SIZE, evaluatedEntries.size)
-        recyclerView.adapter = PreviewAdapter(evaluatedEntries.subList(0, displayedCount))
-        loadMoreButton.visibility = if (displayedCount < evaluatedEntries.size) View.VISIBLE else View.GONE
-        if (displayedCount < evaluatedEntries.size) {
-            loadMoreButton.text = "Load More (${evaluatedEntries.size - displayedCount} remaining)"
+        displayedItems.clear()
+        displayedItems.addAll(evaluatedEntries.subList(0, displayedCount))
+        if (previewAdapter == null) {
+            previewAdapter = PreviewAdapter(displayedItems)
+            recyclerView.adapter = previewAdapter
+        } else {
+            previewAdapter!!.notifyDataSetChanged()
         }
+        updateLoadMoreButton()
     }
 
     private fun loadMorePreview() {
+        val oldCount = displayedCount
         val newCount = minOf(displayedCount + PAGE_SIZE, evaluatedEntries.size)
         displayedCount = newCount
-        recyclerView.adapter = PreviewAdapter(evaluatedEntries.subList(0, displayedCount))
+        displayedItems.addAll(evaluatedEntries.subList(oldCount, newCount))
+        previewAdapter?.notifyItemRangeInserted(oldCount, newCount - oldCount)
+        updateLoadMoreButton()
+    }
+
+    private fun updateLoadMoreButton() {
         loadMoreButton.visibility = if (displayedCount < evaluatedEntries.size) View.VISIBLE else View.GONE
         if (displayedCount < evaluatedEntries.size) {
             loadMoreButton.text = "Load More (${evaluatedEntries.size - displayedCount} remaining)"

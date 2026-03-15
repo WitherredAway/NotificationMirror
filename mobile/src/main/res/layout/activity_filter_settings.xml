@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="?android:colorBackground">
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
@@ -132,7 +132,7 @@
                 style="@style/Widget.Material3.Button.TonalButton" />
 
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/saveButton"

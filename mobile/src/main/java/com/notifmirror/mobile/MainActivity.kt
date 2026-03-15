@@ -234,46 +234,51 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .create()
 
-        Thread {
-            val pm = packageManager
-            val allApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 || pm.getLaunchIntentForPackage(it.packageName) != null }
-                .map { appInfo ->
-                    AppPickerActivity.AppInfo(
-                        packageName = appInfo.packageName,
-                        label = pm.getApplicationLabel(appInfo).toString(),
-                        icon = try { pm.getApplicationIcon(appInfo.packageName) } catch (_: Exception) { null }
-                    )
+        // Show cached apps instantly
+        val cached = AppListCache.getCachedApps(this)
+        var allApps = if (cached.isNotEmpty()) {
+            cached.map { AppPickerActivity.AppInfo(it.packageName, it.label, null) }
+                .sortedBy { it.label.lowercase() }
+        } else {
+            emptyList()
+        }
+
+        val adapter = SimpleAppAdapter(allApps) { app ->
+            onSelected(app.packageName, app.label, app.icon)
+            dialog.dismiss()
+        }
+        recyclerView.adapter = adapter
+
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val query = s?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
+                    }
                 }
+                adapter.updateList(filtered)
+            }
+        })
+
+        dialog.show()
+
+        // Refresh in background with icons
+        Thread {
+            val freshCached = AppListCache.refreshCache(this)
+            val freshApps = AppListCache.toAppInfoList(this, freshCached)
                 .sortedBy { it.label.lowercase() }
 
             runOnUiThread {
-                val adapter = SimpleAppAdapter(allApps) { app ->
-                    onSelected(app.packageName, app.label, app.icon)
-                    dialog.dismiss()
-                }
-                recyclerView.adapter = adapter
-
-                searchInput.addTextChangedListener(object : TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                    override fun afterTextChanged(s: Editable?) {
-                        val query = s?.toString()?.trim()?.lowercase() ?: ""
-                        val filtered = if (query.isEmpty()) {
-                            allApps
-                        } else {
-                            allApps.filter {
-                                it.label.lowercase().contains(query) ||
-                                    it.packageName.lowercase().contains(query)
-                            }
-                        }
-                        adapter.updateList(filtered)
-                    }
-                })
+                allApps = freshApps
+                adapter.updateList(allApps)
             }
         }.start()
-
-        dialog.show()
     }
 
     private fun sendTestNotification(packageName: String, title: String, text: String) {
