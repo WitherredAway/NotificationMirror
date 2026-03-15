@@ -32,6 +32,9 @@ class NotificationListener : NotificationListenerService() {
         private const val PATH_DISMISS = "/notification_dismiss"
 
         val pendingActions = mutableMapOf<String, Notification.Action>()
+        // Track notification keys that were actually sent/queued to the watch
+        // so we only send dismiss events for notifications the watch knows about
+        private val sentNotificationKeys = mutableSetOf<String>()
         var instance: NotificationListener? = null
             private set
     }
@@ -243,6 +246,7 @@ class NotificationListener : NotificationListenerService() {
                     Log.w(TAG, "No connected watch nodes found")
                     // Queue for offline delivery
                     offlineQueue.enqueue(json)
+                    sentNotificationKeys.add(notifKey)
                     if (settings.isKeepNotificationHistoryEnabled()) {
                         notifLog.addEntry(
                             appPackageName, title, displayText, "QUEUED",
@@ -265,6 +269,7 @@ class NotificationListener : NotificationListenerService() {
                         .await()
                     Log.d(TAG, "Sent to node: ${node.displayName}")
                 }
+                sentNotificationKeys.add(notifKey)
 
                 // Also flush any queued notifications
                 if (!offlineQueue.isEmpty()) {
@@ -289,6 +294,8 @@ class NotificationListener : NotificationListenerService() {
         val keysToRemove = pendingActions.keys.filter { it.startsWith(sbn.key + ":") }
         keysToRemove.forEach { pendingActions.remove(it) }
 
+        // Only send dismiss events for notifications we actually sent to the watch
+        if (!sentNotificationKeys.remove(sbn.key)) return
         if (!settings.getEffectiveAutoDismissSync(sbn.packageName)) return
 
         val json = JSONObject().apply {
