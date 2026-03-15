@@ -96,12 +96,6 @@ class AppPickerActivity : AppCompatActivity() {
             }
         }.start()
 
-        // Pre-warm the cache in case it's empty (first run)
-        if (cached.isEmpty()) {
-            Thread {
-                AppListCache.refreshCache(this)
-            }.start()
-        }
     }
 
     override fun onPause() {

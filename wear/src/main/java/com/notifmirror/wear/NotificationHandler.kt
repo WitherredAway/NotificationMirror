@@ -187,7 +187,7 @@ object NotificationHandler {
             // Cancel the per-app summary if no more notifications for this package
             if (packageName.isNotEmpty()) {
                 val hasOtherNotifs = notifIdMap.keys.any { k ->
-                    k.contains(packageName)
+                    k == packageName || k.startsWith("$packageName:")
                 }
                 if (!hasOtherNotifs) {
                     nm.cancel(packageName.hashCode() + SUMMARY_ID_OFFSET)

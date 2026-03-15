@@ -18,6 +18,8 @@ class MuteManager(context: Context) {
     }
 
     fun isAppMuted(packageName: String): Boolean {
+        // Check global mute first
+        if (isAllMuted()) return true
         val unmuteTime = prefs.getLong("mute_$packageName", 0)
         if (unmuteTime == 0L) return false
         if (System.currentTimeMillis() >= unmuteTime) {
@@ -30,6 +32,25 @@ class MuteManager(context: Context) {
 
     fun unmuteApp(packageName: String) {
         prefs.edit().remove("mute_$packageName").apply()
+    }
+
+    fun muteAll(durationMinutes: Int) {
+        val unmuteTime = System.currentTimeMillis() + (durationMinutes * 60 * 1000L)
+        prefs.edit().putLong("mute___all__", unmuteTime).apply()
+    }
+
+    fun isAllMuted(): Boolean {
+        val unmuteTime = prefs.getLong("mute___all__", 0)
+        if (unmuteTime == 0L) return false
+        if (System.currentTimeMillis() >= unmuteTime) {
+            prefs.edit().remove("mute___all__").apply()
+            return false
+        }
+        return true
+    }
+
+    fun unmuteAll() {
+        prefs.edit().remove("mute___all__").apply()
     }
 
     fun getMutedApps(): Map<String, Long> {

@@ -29,6 +29,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -58,6 +59,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statFiltersCount: TextView
     private lateinit var statLogCount: TextView
     private lateinit var settingsManager: SettingsManager
+    private lateinit var mirroringSwitch: SwitchCompat
+    private lateinit var watchConnectionCard: LinearLayout
+    private lateinit var watchStatusIcon: ImageView
+    private lateinit var watchStatusText: TextView
     private lateinit var updateBanner: LinearLayout
     private lateinit var updateTitle: TextView
     private lateinit var updateSubtitle: TextView
@@ -83,6 +88,22 @@ class MainActivity : AppCompatActivity() {
         statAppsCount = findViewById(R.id.statAppsCount)
         statFiltersCount = findViewById(R.id.statFiltersCount)
         statLogCount = findViewById(R.id.statLogCount)
+
+        // Mirroring toggle
+        mirroringSwitch = findViewById(R.id.mirroringSwitch)
+        mirroringSwitch.isChecked = settingsManager.isMirroringEnabled()
+        mirroringSwitch.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager.setMirroringEnabled(isChecked)
+            updateStatus()
+            // Sync to watch via DataClient
+            syncMirroringToWatch(isChecked)
+        }
+
+        // Watch connection status card
+        watchConnectionCard = findViewById(R.id.watchConnectionCard)
+        watchStatusIcon = findViewById(R.id.watchStatusIcon)
+        watchStatusText = findViewById(R.id.watchStatusText)
+        checkWatchConnection()
 
         findViewById<LinearLayout>(R.id.enableButton).setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -142,6 +163,39 @@ class MainActivity : AppCompatActivity() {
         syncEncryptionKeyFromMainActivity()
     }
 
+    private fun checkWatchConnection() {
+        Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
+            if (nodes.isNotEmpty()) {
+                val nodeName = nodes.first().displayName
+                watchStatusIcon.setImageResource(R.drawable.ic_check_circle)
+                watchStatusText.text = "Watch connected: $nodeName"
+            } else {
+                watchStatusIcon.setImageResource(R.drawable.ic_error_circle)
+                watchStatusText.text = "No watch connected"
+            }
+        }.addOnFailureListener {
+            watchStatusIcon.setImageResource(R.drawable.ic_error_circle)
+            watchStatusText.text = "Connection check failed"
+        }
+    }
+
+    private fun syncMirroringToWatch(enabled: Boolean) {
+        scope.launch {
+            try {
+                val putReq = com.google.android.gms.wearable.PutDataMapRequest.create("/mirroring_state").apply {
+                    dataMap.putBoolean("enabled", enabled)
+                    dataMap.putLong("timestamp", System.currentTimeMillis())
+                }
+                Wearable.getDataClient(this@MainActivity)
+                    .putDataItem(putReq.asPutDataRequest().setUrgent())
+                    .await()
+                Log.d(TAG, "Mirroring state synced to watch: enabled=$enabled")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to sync mirroring state to watch", e)
+            }
+        }
+    }
+
     private fun syncEncryptionKeyFromMainActivity() {
         scope.launch {
             try {
@@ -164,6 +218,8 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updateStatus()
         checkForUpdates()
+        checkWatchConnection()
+        mirroringSwitch.isChecked = settingsManager.isMirroringEnabled()
         // Re-check battery optimization every time the app is opened
         if (isNotificationListenerEnabled() && !isBatteryOptimizationExempt()) {
             AlertDialog.Builder(this)
@@ -466,7 +522,8 @@ class MainActivity : AppCompatActivity() {
         val blacklistKeywords = settings.getKeywordBlacklist()
 
         // Update status card
-        if (enabled) {
+        val mirroringEnabled = settingsManager.isMirroringEnabled()
+        if (enabled && mirroringEnabled) {
             statusCard.setBackgroundResource(R.drawable.bg_status_active)
             statusIcon.setImageResource(R.drawable.ic_check_circle)
             statusTitle.text = "Mirroring Active"
@@ -475,6 +532,11 @@ class MainActivity : AppCompatActivity() {
             } else {
                 statusSubtitle.text = "Battery restricted \u2014 may stop in background"
             }
+        } else if (enabled && !mirroringEnabled) {
+            statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
+            statusIcon.setImageResource(R.drawable.ic_error_circle)
+            statusTitle.text = "Mirroring Paused"
+            statusSubtitle.text = "Toggle switch to resume"
         } else {
             statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
             statusIcon.setImageResource(R.drawable.ic_error_circle)

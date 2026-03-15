@@ -35,6 +35,7 @@ class SettingsManager(context: Context) {
         private const val KEY_BATTERY_SAVER_THRESHOLD = "battery_saver_threshold"
         private const val KEY_COMPLICATION_SOURCE = "complication_source"
         private const val KEY_COMPLICATION_APP = "complication_app"
+        private const val KEY_MIRRORING_ENABLED = "mirroring_enabled"
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
@@ -236,6 +237,14 @@ class SettingsManager(context: Context) {
 
     fun setBatterySaverThreshold(threshold: Int) {
         prefs.edit().putInt(KEY_BATTERY_SAVER_THRESHOLD, threshold).apply()
+    }
+
+    // --- Mirroring Toggle ---
+
+    fun isMirroringEnabled(): Boolean = prefs.getBoolean(KEY_MIRRORING_ENABLED, true)
+
+    fun setMirroringEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MIRRORING_ENABLED, enabled).apply()
     }
 
     // --- Complication Settings ---

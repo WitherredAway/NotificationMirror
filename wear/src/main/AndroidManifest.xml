@@ -83,19 +83,6 @@
         </service>
 
         <service
-            android:name=".NotificationTileService"
-            android:exported="true"
-            android:label="Notification Counts"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
-            <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
-            </intent-filter>
-            <meta-data
-                android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@mipmap/ic_launcher" />
-        </service>
-
-        <service
             android:name=".NotificationComplicationService"
             android:exported="true"
             android:label="Latest Notification"

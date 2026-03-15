@@ -26,6 +26,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/open_settings" -> handleOpenSettings()
             "/snooze" -> handleSnooze(messageEvent)
             "/request_key" -> handleKeyRequest()
+            "/mirroring_toggle" -> handleMirroringToggle(messageEvent)
         }
     }
 
@@ -126,6 +127,18 @@ class ReplyReceiverService : WearableListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle snooze", e)
             sendActionResult(false, "Snooze failed: ${e.message}")
+        }
+    }
+
+    private fun handleMirroringToggle(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val enabled = json.getBoolean("enabled")
+            Log.d(TAG, "Received mirroring toggle from watch: enabled=$enabled")
+            val settings = SettingsManager(this)
+            settings.setMirroringEnabled(enabled)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle mirroring toggle", e)
         }
     }
 

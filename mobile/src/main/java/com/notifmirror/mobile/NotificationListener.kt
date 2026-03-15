@@ -34,7 +34,7 @@ class NotificationListener : NotificationListenerService() {
         val pendingActions = mutableMapOf<String, Notification.Action>()
         // Track notification keys that were actually sent/queued to the watch
         // so we only send dismiss events for notifications the watch knows about
-        private val sentNotificationKeys = mutableSetOf<String>()
+        private val sentNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
         var instance: NotificationListener? = null
             private set
     }
@@ -70,6 +70,12 @@ class NotificationListener : NotificationListenerService() {
                 .putDataItem(putReq.asPutDataRequest().setUrgent())
                 .await()
             Log.d(TAG, "Encryption key synced to watch")
+            if (settings.isKeepNotificationHistoryEnabled()) {
+                notifLog.addEntry(
+                    "system", "Key Sync", "Encryption key synced to watch",
+                    "KEY_SYNC", "Attempt ${retryCount + 1}"
+                )
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to sync encryption key (attempt ${retryCount + 1})", e)
             if (retryCount < 3) {
@@ -86,6 +92,8 @@ class NotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
+        // Master mirroring toggle
+        if (!settings.isMirroringEnabled()) return
         // Separate ongoing (music, timers) from persistent (foreground services)
         if (sbn.isOngoing) {
             val notification = sbn.notification ?: return
@@ -304,9 +312,21 @@ class NotificationListener : NotificationListenerService() {
             put("package", sbn.packageName)
         }
 
+        Log.d(TAG, "Sending dismiss event for ${sbn.packageName}")
+
         scope.launch {
             try {
                 sendToWatch(json.toString().toByteArray(), PATH_DISMISS)
+                if (settings.isKeepNotificationHistoryEnabled()) {
+                    val appLabel = try {
+                        val ai = packageManager.getApplicationInfo(sbn.packageName, 0)
+                        packageManager.getApplicationLabel(ai).toString()
+                    } catch (_: Exception) { sbn.packageName }
+                    notifLog.addEntry(
+                        sbn.packageName, "Dismissed", appLabel, "DISMISS",
+                        "Auto-dismiss synced to watch"
+                    )
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send dismissal to watch", e)
             }
@@ -340,6 +360,12 @@ class NotificationListener : NotificationListenerService() {
         try {
             val queued = offlineQueue.dequeueAll()
             Log.d(TAG, "Flushing ${queued.size} queued notifications")
+            if (settings.isKeepNotificationHistoryEnabled()) {
+                notifLog.addEntry(
+                    "system", "Queue Flush", "${queued.size} queued notifications",
+                    "QUEUE_FLUSH", "Flushing to ${nodes.size} node(s)"
+                )
+            }
             val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
             for (queuedJson in queued) {
                 try {

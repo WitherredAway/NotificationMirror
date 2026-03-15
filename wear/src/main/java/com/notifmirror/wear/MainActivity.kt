@@ -28,6 +28,7 @@ import kotlinx.coroutines.tasks.await
 class MainActivity : AppCompatActivity() {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var connectedNodeName: String? = null
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -56,13 +57,36 @@ class MainActivity : AppCompatActivity() {
         val statusCard = findViewById<LinearLayout>(R.id.statusCard)
         val statusIcon = findViewById<ImageView>(R.id.statusIcon)
         val statusText = findViewById<TextView>(R.id.statusText)
+        val mirroringSwitch = findViewById<SwitchCompat>(R.id.mirroringSwitch)
+
+        // Mirroring toggle — synced to phone via MessageClient
+        val prefs = getSharedPreferences("notif_mirror_settings", MODE_PRIVATE)
+        mirroringSwitch.isChecked = prefs.getBoolean("mirroring_enabled", true)
+        mirroringSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("mirroring_enabled", isChecked).apply()
+            // Update status text
+            if (isChecked) {
+                statusText.text = if (connectedNodeName != null) "Connected · Mirroring" else "Not connected"
+                statusCard.setBackgroundResource(if (connectedNodeName != null) R.drawable.bg_status_active else R.drawable.bg_status_inactive)
+                statusIcon.setImageResource(if (connectedNodeName != null) R.drawable.ic_check_circle else R.drawable.ic_error_circle)
+            } else {
+                statusText.text = "Mirroring paused"
+                statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
+                statusIcon.setImageResource(R.drawable.ic_error_circle)
+            }
+            // Sync to phone
+            syncMirroringToPhone(isChecked)
+        }
 
         Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
             if (nodes.isNotEmpty()) {
-                statusCard.setBackgroundResource(R.drawable.bg_status_active)
-                statusIcon.setImageResource(R.drawable.ic_check_circle)
-                statusText.text = "Connected to phone"
+                connectedNodeName = nodes.first().displayName
+                val mirroringEnabled = mirroringSwitch.isChecked
+                statusCard.setBackgroundResource(if (mirroringEnabled) R.drawable.bg_status_active else R.drawable.bg_status_inactive)
+                statusIcon.setImageResource(if (mirroringEnabled) R.drawable.ic_check_circle else R.drawable.ic_error_circle)
+                statusText.text = if (mirroringEnabled) "Connected · Mirroring" else "Mirroring paused"
             } else {
+                connectedNodeName = null
                 statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
                 statusIcon.setImageResource(R.drawable.ic_error_circle)
                 statusText.text = "Not connected to phone"
@@ -71,6 +95,16 @@ class MainActivity : AppCompatActivity() {
             statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
             statusIcon.setImageResource(R.drawable.ic_error_circle)
             statusText.text = "Connection check failed"
+        }
+
+        // Quick action: Mute All
+        findViewById<LinearLayout>(R.id.muteAllButton).setOnClickListener {
+            showMuteAllDialog()
+        }
+
+        // Quick action: Connection Details
+        findViewById<LinearLayout>(R.id.connectionDetailsButton).setOnClickListener {
+            showConnectionDetails()
         }
 
         findViewById<LinearLayout>(R.id.notifSettingsButton).setOnClickListener {
@@ -169,6 +203,69 @@ class MainActivity : AppCompatActivity() {
 
         // Proactively pull encryption key from DataClient on app launch
         pullEncryptionKeyFromDataClient()
+    }
+
+    private fun syncMirroringToPhone(enabled: Boolean) {
+        scope.launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
+                val json = org.json.JSONObject().apply { put("enabled", enabled) }
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@MainActivity)
+                        .sendMessage(node.id, "/mirroring_toggle", json.toString().toByteArray())
+                        .await()
+                }
+                Log.d("NotifMirrorWear", "Mirroring toggle synced to phone: enabled=$enabled")
+            } catch (e: Exception) {
+                Log.e("NotifMirrorWear", "Failed to sync mirroring toggle to phone", e)
+            }
+        }
+    }
+
+    private fun showMuteAllDialog() {
+        val options = arrayOf("15 minutes", "30 minutes", "1 hour", "2 hours")
+        val durations = intArrayOf(15, 30, 60, 120)
+        AlertDialog.Builder(this)
+            .setTitle("Mute all notifications")
+            .setItems(options) { _, which ->
+                val muteManager = MuteManager(this)
+                muteManager.muteAll(durations[which])
+                Toast.makeText(this, "All notifications muted for ${options[which]}", Toast.LENGTH_SHORT).show()
+                // Update button label
+                findViewById<TextView>(R.id.muteAllLabel).text = "Muted ${options[which]}"
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showConnectionDetails() {
+        scope.launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
+                val details = if (nodes.isNotEmpty()) {
+                    nodes.joinToString("\n") { node ->
+                        "Name: ${node.displayName}\nID: ${node.id}\nNearby: ${node.isNearby}"
+                    }
+                } else {
+                    "No phone connected"
+                }
+                runOnUiThread {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Connection Details")
+                        .setMessage(details)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Connection Details")
+                        .setMessage("Failed to check connection: ${e.message}")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
     }
 
     private fun pullEncryptionKeyFromDataClient() {
