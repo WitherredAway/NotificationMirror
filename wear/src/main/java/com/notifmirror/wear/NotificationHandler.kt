@@ -254,12 +254,10 @@ object NotificationHandler {
         val effectiveChannelId = channelId + settingsSuffix
 
         // Delete any old channels for this app so settings always take effect
-        // Preserve the _silent channel used for mute-continuation updates
-        val silentChannelId = channelId + "_silent"
         val existingChannels = nm.notificationChannels
         for (ch in existingChannels) {
             val isThisAppChannel = ch.id == channelId || ch.id.startsWith(channelId + "_")
-            if (isThisAppChannel && ch.id != effectiveChannelId && ch.id != silentChannelId) {
+            if (isThisAppChannel && ch.id != effectiveChannelId) {
                 nm.deleteNotificationChannel(ch.id)
             }
         }
@@ -298,36 +296,18 @@ object NotificationHandler {
         val displayTitle = if (hideContent) appLabel else "$appLabel: $title"
         val displayText = if (hideContent) "Notification content hidden (phone locked)" else text
 
-        // Use silent channel for continuation updates to suppress sound/vibration
-        val effectiveIsSilent = isSilent || silentUpdate
-        val actualChannelId = if (silentUpdate && !isSilent) {
-            // Create a separate silent channel for continuation updates
-            val silentChannelId = channelId + "_silent"
-            val silentChannel = NotificationChannel(
-                silentChannelId,
-                "$appLabel (Silent Updates)",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Silent updates for $appLabel conversations"
-                enableVibration(false)
-                setSound(null, null)
-                this.group = groupId
-            }
-            nm.createNotificationChannel(silentChannel)
-            silentChannelId
-        } else {
-            effectiveChannelId
-        }
-
-        val builder = NotificationCompat.Builder(context, actualChannelId)
+        // For mute-continuation: keep the SAME channel but suppress alerts via
+        // setOnlyAlertOnce + setSilent so WearOS doesn't re-vibrate/sound
+        val builder = NotificationCompat.Builder(context, effectiveChannelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(displayTitle)
             .setContentText(displayText)
-            .setPriority(if (effectiveIsSilent) NotificationCompat.PRIORITY_LOW else compatPriority)
+            .setPriority(if (isSilent || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(autoCancel)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
+            .setSilent(silentUpdate)
 
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
@@ -466,7 +446,7 @@ object NotificationHandler {
 
         // Create/update summary notification for the per-app group
         val summaryId = packageName.hashCode() + SUMMARY_ID_OFFSET
-        val summaryBuilder = NotificationCompat.Builder(context, actualChannelId)
+        val summaryBuilder = NotificationCompat.Builder(context, effectiveChannelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(appLabel)
             .setContentText(title)
@@ -474,6 +454,7 @@ object NotificationHandler {
             .setGroup(groupId)
             .setGroupSummary(true)
             .setAutoCancel(true)
+            .setSilent(silentUpdate)
             .setStyle(NotificationCompat.InboxStyle()
                 .setSummaryText(appLabel))
         nm.notify(summaryId, summaryBuilder.build())
