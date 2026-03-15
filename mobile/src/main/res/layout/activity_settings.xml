@@ -32,6 +32,20 @@
 </LinearLayout>
 <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/autoDismissSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hide Content When Locked" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Hide notification text on watch when phone is locked" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/hideWhenLockedSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mute Continuation Alerts" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Silence follow-up messages in an active conversation" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/muteContinuationSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:text="Screen-Off Mirroring" android:textSize="16sp" android:textColor="?colorOnSurface" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Control mirroring behavior based on phone screen state" android:textSize="12sp" android:textColor="?colorOutline" />
 <RadioGroup android:id="@+id/screenModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical">

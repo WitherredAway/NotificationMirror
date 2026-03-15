@@ -81,10 +81,13 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val overrideShowMute = findViewById<CheckBox>(R.id.overrideShowMute)
         val overrideBigText = findViewById<CheckBox>(R.id.overrideBigText)
         val overrideMuteDuration = findViewById<CheckBox>(R.id.overrideMuteDuration)
+        val overrideScreenOffMode = findViewById<CheckBox>(R.id.overrideScreenOffMode)
+        val overrideMuteContinuation = findViewById<CheckBox>(R.id.overrideMuteContinuation)
 
         // Value controls
         val mirrorOngoingSwitch = findViewById<SwitchMaterial>(R.id.perAppMirrorOngoing)
         val mirrorPersistentSwitch = findViewById<SwitchMaterial>(R.id.perAppMirrorPersistent)
+        val muteContinuationSwitch = findViewById<SwitchMaterial>(R.id.perAppMuteContinuation)
         val autoDismissSwitch = findViewById<SwitchMaterial>(R.id.perAppAutoDismiss)
         val priorityGroup = findViewById<RadioGroup>(R.id.perAppPriorityGroup)
         val autoCancelSwitch = findViewById<SwitchMaterial>(R.id.perAppAutoCancel)
@@ -103,6 +106,10 @@ class PerAppSettingsActivity : AppCompatActivity() {
         overrideMirrorPersistent.isChecked = settings.isPerAppBooleanCustomized("mirror_persistent", packageName)
         mirrorPersistentSwitch.isChecked = settings.getEffectiveMirrorPersistent(packageName)
         mirrorPersistentSwitch.isEnabled = overrideMirrorPersistent.isChecked
+
+        overrideMuteContinuation.isChecked = settings.isPerAppBooleanCustomized("mute_continuation", packageName)
+        muteContinuationSwitch.isChecked = settings.getEffectiveMuteContinuation(packageName)
+        muteContinuationSwitch.isEnabled = overrideMuteContinuation.isChecked
 
         overrideAutoDismiss.isChecked = settings.isPerAppBooleanCustomized("auto_dismiss", packageName)
         autoDismissSwitch.isChecked = settings.getEffectiveAutoDismissSync(packageName)
@@ -137,6 +144,16 @@ class PerAppSettingsActivity : AppCompatActivity() {
         muteDurationInput.setText(settings.getEffectiveMuteDuration(packageName).toString())
         muteDurationInput.isEnabled = overrideMuteDuration.isChecked
 
+        val perAppScreenModeGroup = findViewById<RadioGroup>(R.id.perAppScreenModeGroup)
+        overrideScreenOffMode.isChecked = settings.isPerAppIntCustomized("screen_off_mode", packageName)
+        val effectiveScreenMode = settings.getEffectiveScreenOffMode(packageName)
+        when (effectiveScreenMode) {
+            SettingsManager.SCREEN_MODE_ALWAYS -> perAppScreenModeGroup.check(R.id.perAppRadioAlways)
+            SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY -> perAppScreenModeGroup.check(R.id.perAppRadioScreenOff)
+            SettingsManager.SCREEN_MODE_SILENT_WHEN_ON -> perAppScreenModeGroup.check(R.id.perAppRadioSilent)
+        }
+        setRadioGroupEnabled(perAppScreenModeGroup, overrideScreenOffMode.isChecked)
+
         // Load vibration
         val customVib = settings.getVibrationPattern(packageName)
         if (customVib.isNotEmpty()) {
@@ -155,6 +172,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         // Wire up override checkboxes to enable/disable controls
         overrideMirrorOngoing.setOnCheckedChangeListener { _, checked -> mirrorOngoingSwitch.isEnabled = checked }
         overrideMirrorPersistent.setOnCheckedChangeListener { _, checked -> mirrorPersistentSwitch.isEnabled = checked }
+        overrideMuteContinuation.setOnCheckedChangeListener { _, checked -> muteContinuationSwitch.isEnabled = checked }
         overrideAutoDismiss.setOnCheckedChangeListener { _, checked -> autoDismissSwitch.isEnabled = checked }
         overridePriority.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(priorityGroup, checked) }
         overrideAutoCancel.setOnCheckedChangeListener { _, checked -> autoCancelSwitch.isEnabled = checked }
@@ -162,6 +180,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         overrideShowMute.setOnCheckedChangeListener { _, checked -> showMuteSwitch.isEnabled = checked }
         overrideBigText.setOnCheckedChangeListener { _, checked -> bigTextInput.isEnabled = checked }
         overrideMuteDuration.setOnCheckedChangeListener { _, checked -> muteDurationInput.isEnabled = checked }
+        overrideScreenOffMode.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(perAppScreenModeGroup, checked) }
 
         // Sound buttons
         findViewById<MaterialButton>(R.id.perAppPickSound).setOnClickListener {
@@ -196,6 +215,12 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 settings.setPerAppBoolean("mirror_persistent", packageName, mirrorPersistentSwitch.isChecked)
             } else {
                 settings.clearPerAppBoolean("mirror_persistent", packageName)
+            }
+
+            if (overrideMuteContinuation.isChecked) {
+                settings.setPerAppBoolean("mute_continuation", packageName, muteContinuationSwitch.isChecked)
+            } else {
+                settings.clearPerAppBoolean("mute_continuation", packageName)
             }
 
             if (overrideAutoDismiss.isChecked) {
@@ -253,6 +278,17 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 settings.setPerAppInt("mute_duration", packageName, duration)
             } else {
                 settings.clearPerAppInt("mute_duration", packageName)
+            }
+
+            if (overrideScreenOffMode.isChecked) {
+                val mode = when (perAppScreenModeGroup.checkedRadioButtonId) {
+                    R.id.perAppRadioScreenOff -> SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY
+                    R.id.perAppRadioSilent -> SettingsManager.SCREEN_MODE_SILENT_WHEN_ON
+                    else -> SettingsManager.SCREEN_MODE_ALWAYS
+                }
+                settings.setPerAppInt("screen_off_mode", packageName, mode)
+            } else {
+                settings.clearPerAppInt("screen_off_mode", packageName)
             }
 
             // Save vibration

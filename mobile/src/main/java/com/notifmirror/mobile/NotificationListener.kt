@@ -1,5 +1,6 @@
 package com.notifmirror.mobile
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
@@ -11,6 +12,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import android.util.Log
+import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +42,25 @@ class NotificationListener : NotificationListenerService() {
         super.onCreate()
         settings = SettingsManager(this)
         notifLog = NotificationLog(this)
+        syncEncryptionKey()
+    }
+
+    private fun syncEncryptionKey() {
+        scope.launch {
+            try {
+                val keyBytes = CryptoHelper.getKeyBytes(this@NotificationListener)
+                val putReq = PutDataMapRequest.create("/crypto_key").apply {
+                    dataMap.putByteArray("aes_key", keyBytes)
+                    dataMap.putLong("timestamp", System.currentTimeMillis())
+                }
+                Wearable.getDataClient(this@NotificationListener)
+                    .putDataItem(putReq.asPutDataRequest().setUrgent())
+                    .await()
+                Log.d(TAG, "Encryption key synced to watch")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to sync encryption key", e)
+            }
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -65,8 +86,8 @@ class NotificationListener : NotificationListenerService() {
             }
         }
 
-        // Check screen-off mode
-        val screenMode = settings.getScreenOffMode()
+        // Check screen-off mode (per-app with global fallback)
+        val screenMode = settings.getEffectiveScreenOffMode(sbn.packageName)
         if (screenMode == SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY) {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             if (pm.isInteractive) {
@@ -157,6 +178,13 @@ class NotificationListener : NotificationListenerService() {
             if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
                 put("silent", true)
             }
+            // Hide notification content if phone is locked and setting is enabled
+            val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            if (settings.isHideWhenLockedEnabled() && km.isKeyguardLocked) {
+                put("hideContent", true)
+            }
+            // Send mute continuation setting (per-app with global fallback)
+            put("muteContinuation", settings.getEffectiveMuteContinuation(appPackageName))
             // Send effective vibration pattern (per-app or default)
             val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
             if (effectiveVib.isNotEmpty()) {
@@ -181,11 +209,16 @@ class NotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
+                // Encrypt notification data before sending
+                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+                val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
+
                 for (node in nodes) {
                     Wearable.getMessageClient(this@NotificationListener)
-                        .sendMessage(node.id, PATH_NOTIFICATION, json.toString().toByteArray())
+                        .sendMessage(node.id, PATH_NOTIFICATION, encryptedBytes)
                         .await()
-                    Log.d(TAG, "Sent to node: ${node.displayName}")
+                    Log.d(TAG, "Sent encrypted to node: ${node.displayName}")
                 }
 
                 if (settings.isKeepNotificationHistoryEnabled()) {

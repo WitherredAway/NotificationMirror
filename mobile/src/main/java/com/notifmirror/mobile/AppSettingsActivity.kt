@@ -87,6 +87,14 @@ class AppSettingsActivity : AppCompatActivity() {
         // Load current values - Vibration
         defaultVibrationInput.setText(settings.getDefaultVibrationPattern())
 
+        // Hide when locked
+        val hideWhenLockedSwitch = findViewById<SwitchMaterial>(R.id.hideWhenLockedSwitch)
+        hideWhenLockedSwitch.isChecked = settings.isHideWhenLockedEnabled()
+
+        // Mute continuation
+        val muteContinuationSwitch = findViewById<SwitchMaterial>(R.id.muteContinuationSwitch)
+        muteContinuationSwitch.isChecked = settings.isMuteContinuationEnabled()
+
         // History section
         val keepHistorySwitch = findViewById<SwitchMaterial>(R.id.keepHistorySwitch)
         keepHistorySwitch.isChecked = settings.isKeepNotificationHistoryEnabled()
@@ -135,7 +143,8 @@ class AppSettingsActivity : AppCompatActivity() {
         val showSave = { saveButton.visibility = View.VISIBLE }
 
         val switches = listOf(dndSwitch, mirrorOngoingSwitch, mirrorPersistentSwitch,
-            autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch, keepHistorySwitch)
+            autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch,
+            hideWhenLockedSwitch, muteContinuationSwitch, keepHistorySwitch)
         for (sw in switches) {
             sw.setOnCheckedChangeListener { _, _ -> showSave() }
         }
@@ -196,6 +205,8 @@ class AppSettingsActivity : AppCompatActivity() {
             settings.setShowOpenButtonEnabled(showOpenButtonSwitch.isChecked)
             settings.setShowMuteButtonEnabled(showMuteButtonSwitch.isChecked)
             settings.setKeepNotificationHistoryEnabled(keepHistorySwitch.isChecked)
+            settings.setHideWhenLockedEnabled(hideWhenLockedSwitch.isChecked)
+            settings.setMuteContinuationEnabled(muteContinuationSwitch.isChecked)
             settings.setBigTextThreshold(bigTextThreshold)
             settings.setMuteDurationMinutes(duration)
 

@@ -82,6 +82,27 @@
 <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppMirrorPersistent" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
 
+<!-- Screen-Off Mode -->
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
+<CheckBox android:id="@+id/overrideScreenOffMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen-Off Mirroring" android:textSize="15sp" android:textColor="?colorOnSurface" android:layout_marginStart="8dp" />
+</LinearLayout>
+<RadioGroup android:id="@+id/perAppScreenModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:layout_marginStart="40dp" android:orientation="vertical">
+<RadioButton android:id="@+id/perAppRadioAlways" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Always mirror" android:textSize="14sp" android:textColor="?colorOnSurface" />
+<RadioButton android:id="@+id/perAppRadioScreenOff" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Only when screen off" android:textSize="14sp" android:textColor="?colorOnSurface" />
+<RadioButton android:id="@+id/perAppRadioSilent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Silent when screen on" android:textSize="14sp" android:textColor="?colorOnSurface" />
+</RadioGroup>
+
+<!-- Mute Continuation -->
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
+<CheckBox android:id="@+id/overrideMuteContinuation" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mute Continuation" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Silence follow-up messages in active conversation" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppMuteContinuation" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+
 <!-- Auto-Dismiss -->
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:gravity="center_vertical">
 <CheckBox android:id="@+id/overrideAutoDismiss" android:layout_width="wrap_content" android:layout_height="wrap_content" />

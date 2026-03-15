@@ -27,6 +27,8 @@ class SettingsManager(context: Context) {
         private const val KEY_SHOW_MUTE_BUTTON = "show_mute_button"
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
         private const val KEY_KEEP_NOTIFICATION_HISTORY = "keep_notification_history"
+        private const val KEY_HIDE_WHEN_LOCKED = "hide_content_when_locked"
+        private const val KEY_MUTE_CONTINUATION = "mute_continuation_alerts"
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
@@ -182,6 +184,22 @@ class SettingsManager(context: Context) {
 
     fun setKeepNotificationHistoryEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_KEEP_NOTIFICATION_HISTORY, enabled).apply()
+    }
+
+    // --- Hide Content When Locked ---
+
+    fun isHideWhenLockedEnabled(): Boolean = prefs.getBoolean(KEY_HIDE_WHEN_LOCKED, false)
+
+    fun setHideWhenLockedEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_HIDE_WHEN_LOCKED, enabled).apply()
+    }
+
+    // --- Mute Continuation Alerts ---
+
+    fun isMuteContinuationEnabled(): Boolean = prefs.getBoolean(KEY_MUTE_CONTINUATION, false)
+
+    fun setMuteContinuationEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MUTE_CONTINUATION, enabled).apply()
     }
 
     // --- Default Vibration Pattern ---
@@ -355,6 +373,14 @@ class SettingsManager(context: Context) {
         return getPerAppInt("mute_duration", packageName, getMuteDurationMinutes())
     }
 
+    fun getEffectiveScreenOffMode(packageName: String): Int {
+        return getPerAppInt("screen_off_mode", packageName, getScreenOffMode())
+    }
+
+    fun getEffectiveMuteContinuation(packageName: String): Boolean {
+        return getPerAppBoolean("mute_continuation", packageName, isMuteContinuationEnabled())
+    }
+
     fun getEffectiveBigTextThreshold(packageName: String): Int {
         return getPerAppInt("big_text_threshold", packageName, getBigTextThreshold())
     }
@@ -371,7 +397,8 @@ class SettingsManager(context: Context) {
     // Check if any per-app setting is customized
     fun hasAnyPerAppCustomization(packageName: String): Boolean {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
-            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold")
+            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
+            "screen_off_mode", "mute_continuation")
         for (s in settings) {
             if (prefs.getBoolean(perAppEnabledKey(s, packageName), false)) return true
         }
@@ -383,7 +410,8 @@ class SettingsManager(context: Context) {
     // Clear all per-app settings
     fun clearAllPerAppSettings(packageName: String) {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
-            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold")
+            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
+            "screen_off_mode", "mute_continuation")
         val editor = prefs.edit()
         for (s in settings) {
             editor.remove(perAppEnabledKey(s, packageName))

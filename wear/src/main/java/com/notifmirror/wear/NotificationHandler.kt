@@ -26,8 +26,10 @@ object NotificationHandler {
     const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
     const val EXTRA_ACTION_INDEX = "extra_action_index"
 
-    // Track ALL notification IDs per key so we can dismiss them all
-    private val notifIdsMap = mutableMapOf<String, MutableList<Int>>()
+    // Track notification ID per conversation key (reuse for stacking)
+    private val notifIdMap = mutableMapOf<String, Int>()
+    // Track message history per conversation key for stacking
+    private val conversationMessages = mutableMapOf<String, MutableList<Pair<String, String>>>()
     private var nextId = 1000
     private const val SUMMARY_ID_OFFSET = 500000
 
@@ -56,6 +58,8 @@ object NotificationHandler {
             val customVibrationPattern = json.optString("vibrationPattern", "")
             val customSoundUri = json.optString("soundUri", "")
             val isSilent = json.optBoolean("silent", false)
+            val hideContent = json.optBoolean("hideContent", false)
+            val muteContinuation = json.optBoolean("muteContinuation", false)
             // Respect both phone-side and watch-side history settings
             val phoneKeepHistory = json.optBoolean("keepHistory", true)
             val watchKeepHistory = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
@@ -74,10 +78,12 @@ object NotificationHandler {
                 return
             }
 
-            // Always assign a new unique notification ID for every message
-            // so even identical messages show separately
-            val notifId = nextId++
-            notifIdsMap.getOrPut(key) { mutableListOf() }.add(notifId)
+            // Reuse notification ID for same conversation key to stack messages
+            val isUpdate = notifIdMap.containsKey(key)
+            val notifId = notifIdMap.getOrPut(key) { nextId++ }
+
+            // Track conversation messages for stacking
+            conversationMessages.getOrPut(key) { mutableListOf() }.add(Pair(title, text))
 
             val actionCount = actionsArray?.length() ?: 0
             if (keepHistory) {
@@ -101,10 +107,13 @@ object NotificationHandler {
             // Use phone-provided app label, fallback to local resolution
             val resolvedAppLabel = if (appLabel.isNotEmpty()) appLabel else getAppLabel(packageName)
 
+            val messages = conversationMessages[key] ?: mutableListOf(Pair(title, text))
+
             showNotification(
                 context, notifId, key, packageName, resolvedAppLabel, title, text, subText, actionsArray, iconBitmap,
                 notifPriority, bigTextThreshold, autoCancel, showOpenButton, showMuteButton,
-                muteDuration, defaultVibration, customVibrationPattern, customSoundUri, isSilent
+                muteDuration, defaultVibration, customVibrationPattern, customSoundUri, isSilent,
+                hideContent, isUpdate && muteContinuation, messages
             )
 
             NotificationTileService.incrementCount(context, packageName)
@@ -120,18 +129,15 @@ object NotificationHandler {
             val json = JSONObject(String(messageEvent.data))
             val key = json.getString("key")
 
-            val ids = notifIdsMap.remove(key)
-            if (ids == null || ids.isEmpty()) return
+            val notifId = notifIdMap.remove(key) ?: return
+            conversationMessages.remove(key)
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            // Cancel all stacked notifications for this conversation
-            for (id in ids) {
-                nm.cancel(id)
-            }
+            nm.cancel(notifId)
 
             val packageName = json.optString("package", "")
             // Cancel the per-app summary if no more notifications for this package
             if (packageName.isNotEmpty()) {
-                val hasOtherNotifs = notifIdsMap.keys.any { k ->
+                val hasOtherNotifs = notifIdMap.keys.any { k ->
                     k.contains(packageName)
                 }
                 if (!hasOtherNotifs) {
@@ -142,7 +148,7 @@ object NotificationHandler {
                 NotificationTileService.decrementCount(context, packageName)
             }
 
-            Log.d(TAG, "Dismissed ${ids.size} notifications for key: $key")
+            Log.d(TAG, "Dismissed notification $notifId for key: $key")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle dismissal", e)
         }
@@ -168,7 +174,10 @@ object NotificationHandler {
         defaultVibration: String = "0,200,100,200",
         customVibrationPattern: String = "",
         customSoundUri: String = "",
-        isSilent: Boolean = false
+        isSilent: Boolean = false,
+        hideContent: Boolean = false,
+        silentUpdate: Boolean = false,
+        conversationHistory: List<Pair<String, String>> = emptyList()
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -195,7 +204,8 @@ object NotificationHandler {
         // Delete any old channels for this app so settings always take effect
         val existingChannels = nm.notificationChannels
         for (ch in existingChannels) {
-            if (ch.id.startsWith(channelId) && ch.id != effectiveChannelId) {
+            val isThisAppChannel = ch.id == channelId || ch.id.startsWith(channelId + "_")
+            if (isThisAppChannel && ch.id != effectiveChannelId) {
                 nm.deleteNotificationChannel(ch.id)
             }
         }
@@ -227,26 +237,64 @@ object NotificationHandler {
             else -> NotificationCompat.PRIORITY_HIGH
         }
 
-        val builder = NotificationCompat.Builder(context, effectiveChannelId)
+        val displayTitle = if (hideContent) appLabel else "$appLabel: $title"
+        val displayText = if (hideContent) "Notification content hidden (phone locked)" else text
+
+        // Use silent channel for continuation updates to suppress sound/vibration
+        val effectiveIsSilent = isSilent || silentUpdate
+        val actualChannelId = if (silentUpdate && !isSilent) {
+            // Create a separate silent channel for continuation updates
+            val silentChannelId = channelId + "_silent"
+            val silentChannel = NotificationChannel(
+                silentChannelId,
+                "$appLabel (Silent Updates)",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Silent updates for $appLabel conversations"
+                enableVibration(false)
+                setSound(null, null)
+                this.group = groupId
+            }
+            nm.createNotificationChannel(silentChannel)
+            silentChannelId
+        } else {
+            effectiveChannelId
+        }
+
+        val builder = NotificationCompat.Builder(context, actualChannelId)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("$appLabel: $title")
-            .setContentText(text)
-            .setPriority(if (isSilent) NotificationCompat.PRIORITY_LOW else compatPriority)
+            .setContentTitle(displayTitle)
+            .setContentText(displayText)
+            .setPriority(if (effectiveIsSilent) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(autoCancel)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
+            .setOnlyAlertOnce(silentUpdate)
 
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
         }
 
-        if (subText.isNotEmpty()) {
+        if (hideContent) {
+            builder.setSubText(appLabel)
+        } else if (subText.isNotEmpty()) {
             builder.setSubText(subText)
         } else {
             builder.setSubText(appLabel)
         }
 
-        if (text.length > bigTextThreshold) {
+        // Stack conversation messages if multiple exist
+        if (!hideContent && conversationHistory.size > 1) {
+            val inboxStyle = NotificationCompat.InboxStyle()
+            // Show last 7 messages
+            val recent = conversationHistory.takeLast(7)
+            for ((_, msg) in recent) {
+                inboxStyle.addLine(msg)
+            }
+            inboxStyle.setSummaryText("${conversationHistory.size} messages")
+            builder.setStyle(inboxStyle)
+            builder.setNumber(conversationHistory.size)
+        } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
         }
 
