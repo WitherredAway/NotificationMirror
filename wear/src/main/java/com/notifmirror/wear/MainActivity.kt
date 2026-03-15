@@ -166,6 +166,33 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkAndRequestPermissions()
+
+        // Proactively pull encryption key from DataClient on app launch
+        pullEncryptionKeyFromDataClient()
+    }
+
+    private fun pullEncryptionKeyFromDataClient() {
+        scope.launch {
+            try {
+                val dataItems = Wearable.getDataClient(this@MainActivity)
+                    .getDataItems(android.net.Uri.parse("wear://*/crypto_key"))
+                    .await()
+                for (item in dataItems) {
+                    val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
+                    val keyBytes = dataMap.getByteArray("aes_key")
+                    if (keyBytes != null) {
+                        CryptoHelper.importKey(this@MainActivity, keyBytes)
+                        Log.d("NotifMirrorWear", "Encryption key pulled from DataClient on launch")
+                        // Retry any queued notifications
+                        PendingNotificationQueue.retryAll(this@MainActivity)
+                        break
+                    }
+                }
+                dataItems.release()
+            } catch (e: Exception) {
+                Log.w("NotifMirrorWear", "Failed to pull encryption key from DataClient", e)
+            }
+        }
     }
 
     private fun dpToPx(dp: Int): Int {
