@@ -1,79 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="?android:colorBackground">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="6dp"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Log"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="?colorOnSurface" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/clearLogButton"
-            android:layout_width="wrap_content"
-            android:layout_height="24dp"
-            android:text="Clear"
-            android:textSize="9sp"
-            android:textAllCaps="false"
-            android:minWidth="0dp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            style="@style/Widget.NotifMirror.Button.Passive" />
-    </LinearLayout>
-
-    <EditText
-        android:id="@+id/searchInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:hint="Search (regex)"
-        android:inputType="text"
-        android:textSize="11sp"
-        android:textColor="?colorOnSurface"
-        android:textColorHint="?colorOutline"
-        android:padding="6dp"
-        android:backgroundTint="?colorSurfaceContainerHigh" />
-
-    <Spinner
-        android:id="@+id/appFilter"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:layout_marginTop="4dp" />
-
-    <TextView
-        android:id="@+id/countText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="2dp"
-        android:textSize="9sp"
-        android:textColor="?colorOutline" />
 
     <TextView
         android:id="@+id/emptyText"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:padding="12dp"
-        android:textSize="11sp"
+        android:layout_gravity="center"
+        android:padding="32dp"
+        android:textSize="13sp"
         android:textColor="?colorOnSurfaceVariant"
         android:gravity="center"
         android:visibility="gone" />
@@ -81,9 +19,67 @@
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/logRecyclerView"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:padding="4dp" />
+        android:paddingTop="46dp"
+        android:paddingBottom="24dp"
+        android:paddingStart="2dp"
+        android:paddingEnd="2dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
 
-</LinearLayout>
+    <!-- Floating toolbar at top center -->
+    <LinearLayout
+        android:id="@+id/toolbarRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:orientation="horizontal"
+        android:paddingTop="4dp"
+        android:gravity="center_vertical">
+
+        <ImageButton
+            android:id="@+id/searchButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_search"
+            android:background="@drawable/bg_circle_button"
+            android:scaleType="centerInside"
+            android:padding="8dp"
+            android:contentDescription="Search"
+            android:layout_marginEnd="6dp" />
+
+        <ImageButton
+            android:id="@+id/filterButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_grid"
+            android:background="@drawable/bg_circle_button"
+            android:scaleType="centerInside"
+            android:padding="8dp"
+            android:contentDescription="Filter by app"
+            android:layout_marginEnd="6dp" />
+
+        <ImageButton
+            android:id="@+id/clearLogButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_close"
+            android:background="@drawable/bg_circle_button"
+            android:scaleType="centerInside"
+            android:padding="8dp"
+            android:contentDescription="Clear log" />
+
+    </LinearLayout>
+
+    <!-- Count text at bottom center -->
+    <TextView
+        android:id="@+id/countText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:paddingBottom="6dp"
+        android:textSize="9sp"
+        android:textColor="?colorOutline" />
+
+</FrameLayout>

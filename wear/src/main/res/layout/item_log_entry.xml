@@ -4,11 +4,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="6dp"
-    android:layout_marginEnd="6dp"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
     android:layout_marginBottom="6dp"
     app:cardBackgroundColor="?colorSurfaceContainerHigh"
-    app:cardCornerRadius="10dp"
+    app:cardCornerRadius="16dp"
     app:cardElevation="0dp"
     app:strokeWidth="0dp">
 
@@ -16,7 +16,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -49,28 +52,24 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textSize="12sp"
-            android:textColor="?colorOnSurface"
-            android:maxLines="2"
-            android:ellipsize="end" />
+            android:textSize="13sp"
+            android:textColor="?colorOnSurface" />
 
         <TextView
             android:id="@+id/logText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="1dp"
-            android:textSize="11sp"
-            android:textColor="?colorOnSurfaceVariant"
-            android:maxLines="3"
-            android:ellipsize="end" />
+            android:textSize="12sp"
+            android:textColor="?colorOnSurfaceVariant" />
 
-        <LinearLayout
+        <com.google.android.material.chip.ChipGroup
             android:id="@+id/logActionsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal"
-            android:gravity="start"
+            android:layout_marginTop="6dp"
+            app:chipSpacingHorizontal="4dp"
+            app:chipSpacingVertical="2dp"
             android:visibility="gone" />
 
     </LinearLayout>
