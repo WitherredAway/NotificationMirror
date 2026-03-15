@@ -49,9 +49,9 @@ class NotificationListener : NotificationListenerService() {
             val notification = sbn.notification ?: return
             val isForegroundService = notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
             if (isForegroundService) {
-                if (!settings.isMirrorPersistentEnabled()) return
+                if (!settings.getEffectiveMirrorPersistent(sbn.packageName)) return
             } else {
-                if (!settings.isMirrorOngoingEnabled()) return
+                if (!settings.getEffectiveMirrorOngoing(sbn.packageName)) return
             }
         }
 
@@ -142,27 +142,27 @@ class NotificationListener : NotificationListenerService() {
             if (iconBase64 != null) {
                 put("icon", iconBase64)
             }
-            put("muteDuration", settings.getMuteDurationMinutes())
-            // Send all configurable values to watch
-            put("notifPriority", settings.getNotificationPriority())
-            put("bigTextThreshold", settings.getBigTextThreshold())
-            put("autoCancel", settings.isAutoCancelEnabled())
-            put("autoDismissSync", settings.isAutoDismissSyncEnabled())
-            put("showOpenButton", settings.isShowOpenButtonEnabled())
-            put("showMuteButton", settings.isShowMuteButtonEnabled())
+            put("muteDuration", settings.getEffectiveMuteDuration(appPackageName))
+            // Send all configurable values to watch (per-app with fallback to global)
+            put("notifPriority", settings.getEffectivePriority(appPackageName))
+            put("bigTextThreshold", settings.getEffectiveBigTextThreshold(appPackageName))
+            put("autoCancel", settings.getEffectiveAutoCancel(appPackageName))
+            put("autoDismissSync", settings.getEffectiveAutoDismissSync(appPackageName))
+            put("showOpenButton", settings.getEffectiveShowOpenButton(appPackageName))
+            put("showMuteButton", settings.getEffectiveShowMuteButton(appPackageName))
             put("defaultVibration", settings.getDefaultVibrationPattern())
             // Send screen mode so watch knows whether to be silent
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
                 put("silent", true)
             }
-            // Send custom vibration pattern if set
-            val customVib = settings.getVibrationPattern(sbn.packageName)
-            if (customVib.isNotEmpty()) {
-                put("vibrationPattern", customVib)
+            // Send effective vibration pattern (per-app or default)
+            val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
+            if (effectiveVib.isNotEmpty()) {
+                put("vibrationPattern", effectiveVib)
             }
-            // Send custom sound URI if set
-            val customSound = settings.getSoundUri(sbn.packageName)
+            // Send custom sound URI if set for this app
+            val customSound = settings.getEffectiveSoundUri(appPackageName)
             if (customSound.isNotEmpty()) {
                 put("soundUri", customSound)
             }
@@ -201,7 +201,7 @@ class NotificationListener : NotificationListenerService() {
         val keysToRemove = pendingActions.keys.filter { it.startsWith(sbn.key + ":") }
         keysToRemove.forEach { pendingActions.remove(it) }
 
-        if (!settings.isAutoDismissSyncEnabled()) return
+        if (!settings.getEffectiveAutoDismissSync(sbn.packageName)) return
 
         val json = JSONObject().apply {
             put("action", "dismiss")

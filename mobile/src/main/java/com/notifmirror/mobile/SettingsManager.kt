@@ -236,6 +236,146 @@ class SettingsManager(context: Context) {
         return result
     }
 
+    // --- Per-App Settings (null/empty = use global default) ---
+
+    private fun perAppKey(setting: String, packageName: String): String {
+        return "per_app_${setting}_$packageName"
+    }
+
+    private fun perAppEnabledKey(setting: String, packageName: String): String {
+        return "per_app_${setting}_enabled_$packageName"
+    }
+
+    // Per-app boolean setting with "use default" support
+    fun getPerAppBoolean(setting: String, packageName: String, globalDefault: Boolean): Boolean {
+        val key = perAppKey(setting, packageName)
+        val enabledKey = perAppEnabledKey(setting, packageName)
+        return if (prefs.getBoolean(enabledKey, false)) {
+            prefs.getBoolean(key, globalDefault)
+        } else {
+            globalDefault
+        }
+    }
+
+    fun setPerAppBoolean(setting: String, packageName: String, value: Boolean) {
+        prefs.edit()
+            .putBoolean(perAppEnabledKey(setting, packageName), true)
+            .putBoolean(perAppKey(setting, packageName), value)
+            .apply()
+    }
+
+    fun clearPerAppBoolean(setting: String, packageName: String) {
+        prefs.edit()
+            .remove(perAppEnabledKey(setting, packageName))
+            .remove(perAppKey(setting, packageName))
+            .apply()
+    }
+
+    fun isPerAppBooleanCustomized(setting: String, packageName: String): Boolean {
+        return prefs.getBoolean(perAppEnabledKey(setting, packageName), false)
+    }
+
+    // Per-app int setting with "use default" support
+    fun getPerAppInt(setting: String, packageName: String, globalDefault: Int): Int {
+        val key = perAppKey(setting, packageName)
+        val enabledKey = perAppEnabledKey(setting, packageName)
+        return if (prefs.getBoolean(enabledKey, false)) {
+            prefs.getInt(key, globalDefault)
+        } else {
+            globalDefault
+        }
+    }
+
+    fun setPerAppInt(setting: String, packageName: String, value: Int) {
+        prefs.edit()
+            .putBoolean(perAppEnabledKey(setting, packageName), true)
+            .putInt(perAppKey(setting, packageName), value)
+            .apply()
+    }
+
+    fun clearPerAppInt(setting: String, packageName: String) {
+        prefs.edit()
+            .remove(perAppEnabledKey(setting, packageName))
+            .remove(perAppKey(setting, packageName))
+            .apply()
+    }
+
+    fun isPerAppIntCustomized(setting: String, packageName: String): Boolean {
+        return prefs.getBoolean(perAppEnabledKey(setting, packageName), false)
+    }
+
+    // Effective per-app getters (check per-app first, then global)
+    fun getEffectivePriority(packageName: String): Int {
+        return getPerAppInt("priority", packageName, getNotificationPriority())
+    }
+
+    fun getEffectiveMirrorOngoing(packageName: String): Boolean {
+        return getPerAppBoolean("mirror_ongoing", packageName, isMirrorOngoingEnabled())
+    }
+
+    fun getEffectiveMirrorPersistent(packageName: String): Boolean {
+        return getPerAppBoolean("mirror_persistent", packageName, isMirrorPersistentEnabled())
+    }
+
+    fun getEffectiveAutoCancel(packageName: String): Boolean {
+        return getPerAppBoolean("auto_cancel", packageName, isAutoCancelEnabled())
+    }
+
+    fun getEffectiveAutoDismissSync(packageName: String): Boolean {
+        return getPerAppBoolean("auto_dismiss", packageName, isAutoDismissSyncEnabled())
+    }
+
+    fun getEffectiveShowOpenButton(packageName: String): Boolean {
+        return getPerAppBoolean("show_open", packageName, isShowOpenButtonEnabled())
+    }
+
+    fun getEffectiveShowMuteButton(packageName: String): Boolean {
+        return getPerAppBoolean("show_mute", packageName, isShowMuteButtonEnabled())
+    }
+
+    fun getEffectiveMuteDuration(packageName: String): Int {
+        return getPerAppInt("mute_duration", packageName, getMuteDurationMinutes())
+    }
+
+    fun getEffectiveBigTextThreshold(packageName: String): Int {
+        return getPerAppInt("big_text_threshold", packageName, getBigTextThreshold())
+    }
+
+    fun getEffectiveVibrationPattern(packageName: String): String {
+        val custom = getVibrationPattern(packageName)
+        return if (custom.isNotEmpty()) custom else getDefaultVibrationPattern()
+    }
+
+    fun getEffectiveSoundUri(packageName: String): String {
+        return getSoundUri(packageName)
+    }
+
+    // Check if any per-app setting is customized
+    fun hasAnyPerAppCustomization(packageName: String): Boolean {
+        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
+            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold")
+        for (s in settings) {
+            if (prefs.getBoolean(perAppEnabledKey(s, packageName), false)) return true
+        }
+        if (getVibrationPattern(packageName).isNotEmpty()) return true
+        if (getSoundUri(packageName).isNotEmpty()) return true
+        return false
+    }
+
+    // Clear all per-app settings
+    fun clearAllPerAppSettings(packageName: String) {
+        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
+            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold")
+        val editor = prefs.edit()
+        for (s in settings) {
+            editor.remove(perAppEnabledKey(s, packageName))
+            editor.remove(perAppKey(s, packageName))
+        }
+        editor.apply()
+        removeVibrationPattern(packageName)
+        removeSoundUri(packageName)
+    }
+
     /**
      * Check if a notification's content passes the keyword filters.
      */

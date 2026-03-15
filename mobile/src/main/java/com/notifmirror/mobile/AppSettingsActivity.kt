@@ -1,25 +1,10 @@
 package com.notifmirror.mobile
 
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.RadioGroup
-import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -27,26 +12,6 @@ import com.google.android.material.switchmaterial.SwitchMaterial
 class AppSettingsActivity : AppCompatActivity() {
 
     private lateinit var settings: SettingsManager
-    private var selectedSoundPackage = ""
-    private var selectedSoundUri: Uri? = null
-    private var selectedSoundName = ""
-
-    private val ringtonePicker = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            if (uri != null) {
-                selectedSoundUri = uri
-                val ringtone = RingtoneManager.getRingtone(this, uri)
-                selectedSoundName = ringtone?.getTitle(this) ?: uri.toString()
-                findViewById<TextView>(R.id.soundNameDisplay).apply {
-                    text = "Sound: $selectedSoundName"
-                    visibility = View.VISIBLE
-                }
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,15 +39,7 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Vibration section
         val defaultVibrationInput = findViewById<EditText>(R.id.defaultVibrationInput)
-        val selectVibAppButton = findViewById<MaterialButton>(R.id.selectVibAppButton)
-        val vibPatternInput = findViewById<EditText>(R.id.vibPatternInput)
-        val addVibButton = findViewById<MaterialButton>(R.id.addVibButton)
-        val customVibrationsText = findViewById<TextView>(R.id.customVibrationsText)
         val saveButton = findViewById<MaterialButton>(R.id.saveSettingsButton)
-
-        // Hidden field to store selected package
-        var selectedVibPackage = ""
-        val vibAppDisplay = findViewById<TextView>(R.id.vibAppDisplay)
 
         // Load current values - Behavior
         dndSwitch.isChecked = settings.isDndSyncEnabled()
@@ -113,124 +70,6 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Load current values - Vibration
         defaultVibrationInput.setText(settings.getDefaultVibrationPattern())
-
-        // Show custom vibrations
-        updateCustomVibrationsDisplay(customVibrationsText)
-
-        selectVibAppButton.setOnClickListener {
-            showAppPickerDialog { pkg, label ->
-                selectedVibPackage = pkg
-                vibAppDisplay.text = label
-                vibAppDisplay.visibility = View.VISIBLE
-            }
-        }
-
-        addVibButton.setOnClickListener {
-            val pkg = selectedVibPackage
-            val pattern = vibPatternInput.text.toString().trim()
-
-            if (pkg.isEmpty()) {
-                Toast.makeText(this, "Select an app first", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            if (pattern.isEmpty()) {
-                settings.removeVibrationPattern(pkg)
-                Toast.makeText(this, "Removed custom pattern", Toast.LENGTH_SHORT).show()
-            } else {
-                if (!isValidVibrationPattern(pattern)) {
-                    Toast.makeText(this, "Invalid pattern. Use comma-separated numbers (e.g. 0,200,100,200)", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-
-                settings.setVibrationPattern(pkg, pattern)
-                Toast.makeText(this, "Vibration pattern set", Toast.LENGTH_SHORT).show()
-            }
-
-            selectedVibPackage = ""
-            vibAppDisplay.visibility = View.GONE
-            vibPatternInput.text.clear()
-            updateCustomVibrationsDisplay(customVibrationsText)
-        }
-
-        // Sound section
-        val selectSoundAppButton = findViewById<MaterialButton>(R.id.selectSoundAppButton)
-        val soundAppDisplay = findViewById<TextView>(R.id.soundAppDisplay)
-        val pickSoundButton = findViewById<MaterialButton>(R.id.pickSoundButton)
-        val setSoundButton = findViewById<MaterialButton>(R.id.setSoundButton)
-        val clearSoundButton = findViewById<MaterialButton>(R.id.clearSoundButton)
-        val customSoundsText = findViewById<TextView>(R.id.customSoundsText)
-
-        updateCustomSoundsDisplay(customSoundsText)
-
-        selectSoundAppButton.setOnClickListener {
-            showAppPickerDialog { pkg, label ->
-                selectedSoundPackage = pkg
-                soundAppDisplay.text = label
-                soundAppDisplay.visibility = View.VISIBLE
-                // Load existing sound if set
-                val existingUri = settings.getSoundUri(pkg)
-                if (existingUri.isNotEmpty()) {
-                    selectedSoundUri = Uri.parse(existingUri)
-                    selectedSoundName = settings.getSoundDisplayName(pkg)
-                    findViewById<TextView>(R.id.soundNameDisplay).apply {
-                        text = "Sound: $selectedSoundName"
-                        visibility = View.VISIBLE
-                    }
-                } else {
-                    selectedSoundUri = null
-                    selectedSoundName = ""
-                    findViewById<TextView>(R.id.soundNameDisplay).visibility = View.GONE
-                }
-            }
-        }
-
-        pickSoundButton.setOnClickListener {
-            val intent = android.content.Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
-                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Notification Sound")
-                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                if (selectedSoundUri != null) {
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedSoundUri)
-                }
-            }
-            ringtonePicker.launch(intent)
-        }
-
-        setSoundButton.setOnClickListener {
-            if (selectedSoundPackage.isEmpty()) {
-                Toast.makeText(this, "Select an app first", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (selectedSoundUri == null) {
-                Toast.makeText(this, "Pick a sound first", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            settings.setSoundUri(selectedSoundPackage, selectedSoundUri.toString(), selectedSoundName)
-            Toast.makeText(this, "Sound set for ${soundAppDisplay.text}", Toast.LENGTH_SHORT).show()
-            selectedSoundPackage = ""
-            selectedSoundUri = null
-            selectedSoundName = ""
-            soundAppDisplay.visibility = View.GONE
-            findViewById<TextView>(R.id.soundNameDisplay).visibility = View.GONE
-            updateCustomSoundsDisplay(customSoundsText)
-        }
-
-        clearSoundButton.setOnClickListener {
-            if (selectedSoundPackage.isEmpty()) {
-                Toast.makeText(this, "Select an app first", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            settings.removeSoundUri(selectedSoundPackage)
-            Toast.makeText(this, "Sound cleared", Toast.LENGTH_SHORT).show()
-            selectedSoundPackage = ""
-            selectedSoundUri = null
-            selectedSoundName = ""
-            soundAppDisplay.visibility = View.GONE
-            findViewById<TextView>(R.id.soundNameDisplay).visibility = View.GONE
-            updateCustomSoundsDisplay(customSoundsText)
-        }
 
         saveButton.setOnClickListener {
             val durationStr = muteDurationInput.text.toString().trim()
@@ -287,60 +126,6 @@ class AppSettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun showAppPickerDialog(onSelected: (String, String) -> Unit) {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_select, null)
-        val recyclerView = dialogView.findViewById<RecyclerView>(R.id.appSelectList)
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        val searchInput = dialogView.findViewById<EditText>(R.id.dialogSearchInput)
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Select App")
-            .setView(dialogView)
-            .setNegativeButton("Cancel", null)
-            .create()
-
-        Thread {
-            val pm = packageManager
-            val allApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 || pm.getLaunchIntentForPackage(it.packageName) != null }
-                .map { appInfo ->
-                    AppPickerActivity.AppInfo(
-                        packageName = appInfo.packageName,
-                        label = pm.getApplicationLabel(appInfo).toString(),
-                        icon = try { pm.getApplicationIcon(appInfo.packageName) } catch (_: Exception) { null }
-                    )
-                }
-                .sortedBy { it.label.lowercase() }
-
-            runOnUiThread {
-                val adapter = SimpleAppSelectAdapter(allApps) { app ->
-                    onSelected(app.packageName, app.label)
-                    dialog.dismiss()
-                }
-                recyclerView.adapter = adapter
-
-                searchInput.addTextChangedListener(object : TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                    override fun afterTextChanged(s: Editable?) {
-                        val query = s?.toString()?.trim()?.lowercase() ?: ""
-                        val filtered = if (query.isEmpty()) {
-                            allApps
-                        } else {
-                            allApps.filter {
-                                it.label.lowercase().contains(query) ||
-                                    it.packageName.lowercase().contains(query)
-                            }
-                        }
-                        adapter.updateList(filtered)
-                    }
-                })
-            }
-        }.start()
-
-        dialog.show()
-    }
-
     private fun isValidVibrationPattern(pattern: String): Boolean {
         val parts = pattern.split(",").map { it.trim() }
         if (parts.size < 2) return false
@@ -352,77 +137,5 @@ class AppSettingsActivity : AppCompatActivity() {
                 false
             }
         }
-    }
-
-    private fun updateCustomVibrationsDisplay(textView: TextView) {
-        val custom = settings.getAllCustomVibrations()
-        if (custom.isEmpty()) {
-            textView.text = "No custom vibration patterns set."
-        } else {
-            val sb = StringBuilder()
-            for ((pkg, pattern) in custom.entries.sortedBy { it.key }) {
-                val label = getAppDisplayName(pkg)
-                sb.appendLine("$label: $pattern")
-            }
-            textView.text = sb.toString().trimEnd()
-        }
-    }
-
-    private fun updateCustomSoundsDisplay(textView: TextView) {
-        val custom = settings.getAllCustomSounds()
-        if (custom.isEmpty()) {
-            textView.text = "No custom notification sounds set."
-        } else {
-            val sb = StringBuilder()
-            for ((pkg, name) in custom.entries.sortedBy { it.key }) {
-                val label = getAppDisplayName(pkg)
-                sb.appendLine("$label: $name")
-            }
-            textView.text = sb.toString().trimEnd()
-        }
-    }
-
-    private fun getAppDisplayName(packageName: String): String {
-        return try {
-            val ai = this.packageManager.getApplicationInfo(packageName, 0)
-            this.packageManager.getApplicationLabel(ai).toString()
-        } catch (_: Exception) {
-            packageName.split(".").lastOrNull()?.replaceFirstChar { it.uppercase() } ?: packageName
-        }
-    }
-
-    inner class SimpleAppSelectAdapter(
-        private var apps: List<AppPickerActivity.AppInfo>,
-        private val onClick: (AppPickerActivity.AppInfo) -> Unit
-    ) : RecyclerView.Adapter<SimpleAppSelectAdapter.ViewHolder>() {
-
-        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val icon: ImageView = view.findViewById(R.id.appIcon)
-            val name: TextView = view.findViewById(R.id.appName)
-            val pkg: TextView = view.findViewById(R.id.appPackage)
-        }
-
-        fun updateList(newApps: List<AppPickerActivity.AppInfo>) {
-            apps = newApps
-            notifyDataSetChanged()
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_app_simple, parent, false)
-            return ViewHolder(view)
-        }
-
-        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val app = apps[position]
-            holder.name.text = app.label
-            holder.pkg.text = app.packageName
-            if (app.icon != null) {
-                holder.icon.setImageDrawable(app.icon)
-            }
-            holder.itemView.setOnClickListener { onClick(app) }
-        }
-
-        override fun getItemCount() = apps.size
     }
 }

@@ -38,6 +38,10 @@
             android:name=".AppSettingsActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".PerAppSettingsActivity"
+            android:exported="false" />
+
         <service
             android:name=".NotificationListener"
             android:exported="true"
