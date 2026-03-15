@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -54,11 +55,17 @@ class FilterSettingsActivity : AppCompatActivity() {
             blacklistInput.setText(blacklistPatterns.joinToString("\n"))
         }
 
+        val initialWhitelist = whitelistInput.text.toString()
+        val initialBlacklist = blacklistInput.text.toString()
+
         val textWatcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 updatePreview()
+                val changed = whitelistInput.text.toString() != initialWhitelist ||
+                    blacklistInput.text.toString() != initialBlacklist
+                saveButton.visibility = if (changed) View.VISIBLE else View.GONE
             }
         }
         whitelistInput.addTextChangedListener(textWatcher)

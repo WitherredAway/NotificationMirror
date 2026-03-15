@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#FFD0BCFF</color>
-    <color name="on_primary">#FF381E72</color>
-    <color name="primary_container">#FF4F378B</color>
-    <color name="on_primary_container">#FFEADDFF</color>
-    <color name="secondary">#FFCCC2DC</color>
-    <color name="on_secondary">#FF332D41</color>
-    <color name="surface">#FF1C1B1F</color>
-    <color name="on_surface">#FFE6E1E5</color>
-    <color name="background">#FF1C1B1F</color>
-    <color name="text_primary">#FFE6E1E5</color>
-    <color name="text_secondary">#FFCAC4D0</color>
-    <color name="text_hint">#FF938F99</color>
+    <color name="primary">#FF6750A4</color>
+    <color name="on_primary">#FFFFFFFF</color>
+    <color name="primary_container">#FFEADDFF</color>
+    <color name="on_primary_container">#FF21005D</color>
+    <color name="secondary">#FF625B71</color>
+    <color name="on_secondary">#FFFFFFFF</color>
+    <color name="secondary_container">#FFE8DEF8</color>
+    <color name="on_secondary_container">#FF1D192B</color>
+    <color name="surface">#FFFFFBFE</color>
+    <color name="on_surface">#FF1C1B1F</color>
+    <color name="background">#FFFFFBFE</color>
+    <color name="text_primary">#FF1C1B1F</color>
+    <color name="text_secondary">#FF49454F</color>
+    <color name="text_hint">#FF79747E</color>
 </resources>

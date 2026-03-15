@@ -23,7 +23,16 @@ class ReplyReceiverService : WearableListenerService() {
         when (messageEvent.path) {
             "/reply" -> handleReply(messageEvent)
             "/action" -> handleAction(messageEvent)
+            "/open_settings" -> handleOpenSettings()
         }
+    }
+
+    private fun handleOpenSettings() {
+        Log.d(TAG, "Received request to open settings from watch")
+        val intent = Intent(this, AppSettingsActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
     }
 
     private fun handleReply(messageEvent: MessageEvent) {
