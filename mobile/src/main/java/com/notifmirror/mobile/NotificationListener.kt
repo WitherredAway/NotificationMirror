@@ -117,9 +117,15 @@ class NotificationListener : NotificationListenerService() {
             return
         }
 
-        // Check keyword filters
+        // Check global keyword filters
         if (!settings.passesKeywordFilter(title, displayText)) {
-            Log.d(TAG, "Notification filtered out by keyword rules: $title")
+            Log.d(TAG, "Notification filtered out by global keyword rules: $title")
+            return
+        }
+
+        // Check per-app keyword filters
+        if (!settings.passesPerAppKeywordFilter(sbn.packageName, title, displayText)) {
+            Log.d(TAG, "Notification filtered out by per-app keyword rules: $title (${sbn.packageName})")
             return
         }
 

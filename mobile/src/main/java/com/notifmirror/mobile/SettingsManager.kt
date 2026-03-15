@@ -452,16 +452,76 @@ class SettingsManager(context: Context) {
         return getSoundUri(packageName)
     }
 
+    // --- Per-App Keyword Filters ---
+
+    fun getPerAppKeywordWhitelist(packageName: String): List<String> {
+        val raw = prefs.getString("per_app_keyword_whitelist_$packageName", "") ?: ""
+        return if (raw.isEmpty()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
+    }
+
+    fun setPerAppKeywordWhitelist(packageName: String, patterns: List<String>) {
+        prefs.edit().putString("per_app_keyword_whitelist_$packageName", patterns.joinToString("\n")).apply()
+    }
+
+    fun getPerAppKeywordBlacklist(packageName: String): List<String> {
+        val raw = prefs.getString("per_app_keyword_blacklist_$packageName", "") ?: ""
+        return if (raw.isEmpty()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
+    }
+
+    fun setPerAppKeywordBlacklist(packageName: String, patterns: List<String>) {
+        prefs.edit().putString("per_app_keyword_blacklist_$packageName", patterns.joinToString("\n")).apply()
+    }
+
+    fun clearPerAppKeywordFilters(packageName: String) {
+        prefs.edit()
+            .remove("per_app_keyword_whitelist_$packageName")
+            .remove("per_app_keyword_blacklist_$packageName")
+            .apply()
+    }
+
+    /**
+     * Check if a notification passes per-app keyword filters.
+     * Per-app filters are checked AFTER global filters.
+     * Returns true if notification should be mirrored.
+     */
+    fun passesPerAppKeywordFilter(packageName: String, title: String, text: String): Boolean {
+        val combined = "$title $text"
+
+        val blacklist = getPerAppKeywordBlacklist(packageName)
+        for (pattern in blacklist) {
+            try {
+                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
+                    return false
+                }
+            } catch (_: Exception) { }
+        }
+
+        val whitelist = getPerAppKeywordWhitelist(packageName)
+        if (whitelist.isEmpty()) return true
+
+        for (pattern in whitelist) {
+            try {
+                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
+                    return true
+                }
+            } catch (_: Exception) { }
+        }
+
+        return false
+    }
+
     // Check if any per-app setting is customized
     fun hasAnyPerAppCustomization(packageName: String): Boolean {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
-            "screen_off_mode", "mute_continuation")
+            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
         for (s in settings) {
             if (prefs.getBoolean(perAppEnabledKey(s, packageName), false)) return true
         }
         if (getVibrationPattern(packageName).isNotEmpty()) return true
         if (getSoundUri(packageName).isNotEmpty()) return true
+        if (getPerAppKeywordWhitelist(packageName).isNotEmpty()) return true
+        if (getPerAppKeywordBlacklist(packageName).isNotEmpty()) return true
         return false
     }
 
@@ -469,7 +529,7 @@ class SettingsManager(context: Context) {
     fun clearAllPerAppSettings(packageName: String) {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
-            "screen_off_mode", "mute_continuation")
+            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
         val editor = prefs.edit()
         for (s in settings) {
             editor.remove(perAppEnabledKey(s, packageName))
@@ -478,6 +538,7 @@ class SettingsManager(context: Context) {
         editor.apply()
         removeVibrationPattern(packageName)
         removeSoundUri(packageName)
+        clearPerAppKeywordFilters(packageName)
     }
 
     /**

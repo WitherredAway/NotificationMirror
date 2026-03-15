@@ -36,6 +36,7 @@ class LogActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "NotifMirrorWearLog"
+        private const val PAGE_SIZE = 50
     }
 
     private lateinit var notifLog: NotificationLog
@@ -44,6 +45,8 @@ class LogActivity : AppCompatActivity() {
     private lateinit var emptyText: TextView
     private lateinit var filterButton: ImageButton
     private var allEntries: List<NotificationLog.LogEntry> = emptyList()
+    private var filteredEntries: List<NotificationLog.LogEntry> = emptyList()
+    private var displayedCount = 0
     private var appList: List<String> = emptyList()
     private var selectedApp: String = "All Apps"
     private var searchQuery: String = ""
@@ -62,7 +65,22 @@ class LogActivity : AppCompatActivity() {
         filterButton = findViewById(R.id.filterButton)
         val clearButton = findViewById<ImageButton>(R.id.clearLogButton)
 
-        recyclerView.layoutManager = LinearLayoutManager(this)
+        val layoutManager = LinearLayoutManager(this)
+        recyclerView.layoutManager = layoutManager
+
+        // Auto-load more when scrolling to bottom
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(rv, dx, dy)
+                if (dy > 0) {
+                    val totalItemCount = layoutManager.itemCount
+                    val lastVisible = layoutManager.findLastVisibleItemPosition()
+                    if (lastVisible >= totalItemCount - 5) {
+                        loadMore()
+                    }
+                }
+            }
+        })
 
         notifLog = NotificationLog(this)
 
@@ -247,7 +265,16 @@ class LogActivity : AppCompatActivity() {
 
         emptyText.visibility = View.GONE
         recyclerView.visibility = View.VISIBLE
-        recyclerView.adapter = LogEntryAdapter(filtered)
+        filteredEntries = filtered
+        displayedCount = minOf(PAGE_SIZE, filtered.size)
+        recyclerView.adapter = LogEntryAdapter(filtered.subList(0, displayedCount))
+    }
+
+    private fun loadMore() {
+        if (displayedCount >= filteredEntries.size) return
+        val newCount = minOf(displayedCount + PAGE_SIZE, filteredEntries.size)
+        displayedCount = newCount
+        recyclerView.adapter = LogEntryAdapter(filteredEntries.subList(0, displayedCount))
     }
 
     private fun triggerAction(notifKey: String, actionIndex: Int) {

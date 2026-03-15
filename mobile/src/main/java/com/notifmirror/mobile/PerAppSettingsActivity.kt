@@ -101,6 +101,8 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val soundNameDisplay = findViewById<TextView>(R.id.perAppSoundName)
         val showSnoozeSwitch = findViewById<SwitchMaterial>(R.id.perAppShowSnooze)
         val snoozeDurationInput = findViewById<EditText>(R.id.perAppSnoozeDuration)
+        val keywordWhitelistInput = findViewById<EditText>(R.id.perAppKeywordWhitelist)
+        val keywordBlacklistInput = findViewById<EditText>(R.id.perAppKeywordBlacklist)
 
         // Load existing per-app settings
         overrideMirrorOngoing.isChecked = settings.isPerAppBooleanCustomized("mirror_ongoing", packageName)
@@ -165,6 +167,16 @@ class PerAppSettingsActivity : AppCompatActivity() {
             SettingsManager.SCREEN_MODE_SILENT_WHEN_ON -> perAppScreenModeGroup.check(R.id.perAppRadioSilent)
         }
         setRadioGroupEnabled(perAppScreenModeGroup, overrideScreenOffMode.isChecked)
+
+        // Load keyword filters
+        val perAppWhitelist = settings.getPerAppKeywordWhitelist(packageName)
+        if (perAppWhitelist.isNotEmpty()) {
+            keywordWhitelistInput.setText(perAppWhitelist.joinToString("\n"))
+        }
+        val perAppBlacklist = settings.getPerAppKeywordBlacklist(packageName)
+        if (perAppBlacklist.isNotEmpty()) {
+            keywordBlacklistInput.setText(perAppBlacklist.joinToString("\n"))
+        }
 
         // Load vibration
         val customVib = settings.getVibrationPattern(packageName)
@@ -320,6 +332,33 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 settings.setPerAppInt("screen_off_mode", packageName, mode)
             } else {
                 settings.clearPerAppInt("screen_off_mode", packageName)
+            }
+
+            // Save keyword filters
+            val whitelistLines = keywordWhitelistInput.text.toString().trim()
+                .split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+            val blacklistLines = keywordBlacklistInput.text.toString().trim()
+                .split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+
+            // Validate regex patterns
+            for (pattern in whitelistLines + blacklistLines) {
+                try {
+                    Regex(pattern)
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Invalid regex: $pattern", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+            }
+
+            if (whitelistLines.isNotEmpty()) {
+                settings.setPerAppKeywordWhitelist(packageName, whitelistLines)
+            } else {
+                settings.setPerAppKeywordWhitelist(packageName, emptyList())
+            }
+            if (blacklistLines.isNotEmpty()) {
+                settings.setPerAppKeywordBlacklist(packageName, blacklistLines)
+            } else {
+                settings.setPerAppKeywordBlacklist(packageName, emptyList())
             }
 
             // Save vibration
