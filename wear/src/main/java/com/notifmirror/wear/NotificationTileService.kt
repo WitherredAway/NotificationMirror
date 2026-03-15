@@ -191,7 +191,7 @@ class NotificationTileService : TileService() {
                                 ActionBuilders.LaunchAction.Builder()
                                     .setAndroidActivity(
                                         ActionBuilders.AndroidActivity.Builder()
-                                            .setPackageName("com.notifmirror.wear")
+                                            .setPackageName("com.notifmirror.mobile")
                                             .setClassName("com.notifmirror.wear.MainActivity")
                                             .build()
                                     )
