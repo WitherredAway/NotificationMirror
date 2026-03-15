@@ -245,16 +245,21 @@ class NotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
-                // Encrypt notification data before sending
+                // Encrypt notification data before sending (fallback to plaintext if encryption fails)
                 val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
-                val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
-                val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
+                val messageBytes = try {
+                    val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+                    CryptoHelper.encrypt(plainBytes, key)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Encryption failed, sending plaintext", e)
+                    plainBytes
+                }
 
                 for (node in nodes) {
                     Wearable.getMessageClient(this@NotificationListener)
-                        .sendMessage(node.id, PATH_NOTIFICATION, encryptedBytes)
+                        .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
                         .await()
-                    Log.d(TAG, "Sent encrypted to node: ${node.displayName}")
+                    Log.d(TAG, "Sent to node: ${node.displayName}")
                 }
 
                 // Also flush any queued notifications
@@ -324,14 +329,19 @@ class NotificationListener : NotificationListenerService() {
         try {
             val queued = offlineQueue.dequeueAll()
             Log.d(TAG, "Flushing ${queued.size} queued notifications")
-            val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
             for (queuedJson in queued) {
                 try {
                     val plainBytes = queuedJson.toString().toByteArray(Charsets.UTF_8)
-                    val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
+                    val messageBytes = try {
+                        val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+                        CryptoHelper.encrypt(plainBytes, key)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Encryption failed for queued notification, sending plaintext", e)
+                        plainBytes
+                    }
                     for (node in nodes) {
                         Wearable.getMessageClient(this@NotificationListener)
-                            .sendMessage(node.id, PATH_NOTIFICATION, encryptedBytes)
+                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
                             .await()
                     }
                     val pkg = queuedJson.optString("package", "unknown")

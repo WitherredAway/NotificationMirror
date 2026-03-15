@@ -341,13 +341,18 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // Encrypt test notification data just like real notifications
-                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
-                val key = CryptoHelper.getOrCreateKey(this@MainActivity)
-                val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
+                val messageBytes = try {
+                    val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                    val key = CryptoHelper.getOrCreateKey(this@MainActivity)
+                    CryptoHelper.encrypt(plainBytes, key)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Encryption failed for test notification, sending plaintext", e)
+                    json.toString().toByteArray(Charsets.UTF_8)
+                }
 
                 for (node in nodes) {
                     Wearable.getMessageClient(this@MainActivity)
-                        .sendMessage(node.id, PATH_NOTIFICATION, encryptedBytes)
+                        .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
                         .await()
                 }
 
