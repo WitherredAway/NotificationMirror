@@ -56,13 +56,20 @@ object NotificationHandler {
             val customVibrationPattern = json.optString("vibrationPattern", "")
             val customSoundUri = json.optString("soundUri", "")
             val isSilent = json.optBoolean("silent", false)
+            // Respect both phone-side and watch-side history settings
+            val phoneKeepHistory = json.optBoolean("keepHistory", true)
+            val watchKeepHistory = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+                .getBoolean("keep_notification_history", true)
+            val keepHistory = phoneKeepHistory && watchKeepHistory
 
             Log.d(TAG, "Received notification: $title - $text")
 
             val muteManager = MuteManager(context)
             if (muteManager.isAppMuted(packageName)) {
                 val shortPkg = packageName.split(".").lastOrNull() ?: packageName
-                notifLog.addEntry(packageName, title, text, "MUTED", "App $shortPkg is temporarily muted")
+                if (keepHistory) {
+                    notifLog.addEntry(packageName, title, text, "MUTED", "App $shortPkg is temporarily muted")
+                }
                 Log.d(TAG, "Skipping muted app: $packageName")
                 return
             }
@@ -73,11 +80,13 @@ object NotificationHandler {
             notifIdsMap.getOrPut(key) { mutableListOf() }.add(notifId)
 
             val actionCount = actionsArray?.length() ?: 0
-            notifLog.addEntry(
-                packageName, title, text, "RECEIVED", "$actionCount actions",
-                notifKey = key,
-                actionsJson = actionsArray?.toString() ?: ""
-            )
+            if (keepHistory) {
+                notifLog.addEntry(
+                    packageName, title, text, "RECEIVED", "$actionCount actions",
+                    notifKey = key,
+                    actionsJson = actionsArray?.toString() ?: ""
+                )
+            }
 
             val iconBitmap = if (iconBase64.isNotEmpty()) {
                 try {
@@ -175,9 +184,22 @@ object NotificationHandler {
             -1 -> NotificationManager.IMPORTANCE_LOW
             else -> NotificationManager.IMPORTANCE_HIGH
         }
-        // Use a unique channel ID when custom sound is set so the sound setting takes effect
-        val soundSuffix = if (customSoundUri.isNotEmpty()) "_sound_${customSoundUri.hashCode()}" else ""
-        val effectiveChannelId = channelId + soundSuffix
+        // Include hashes of vibration, sound, importance, and silent flag in channel ID
+        // so that any settings change creates a fresh channel (Android caches channel settings)
+        val vibHash = vibrationPattern.contentHashCode()
+        val soundHash = if (customSoundUri.isNotEmpty()) customSoundUri.hashCode() else 0
+        val importanceHash = if (isSilent) -1 else importance
+        val settingsSuffix = "_v${vibHash}_s${soundHash}_i${importanceHash}"
+        val effectiveChannelId = channelId + settingsSuffix
+
+        // Delete any old channels for this app so settings always take effect
+        val existingChannels = nm.notificationChannels
+        for (ch in existingChannels) {
+            if (ch.id.startsWith(channelId) && ch.id != effectiveChannelId) {
+                nm.deleteNotificationChannel(ch.id)
+            }
+        }
+
         val channel = NotificationChannel(
             effectiveChannelId,
             "$appLabel Notifications",

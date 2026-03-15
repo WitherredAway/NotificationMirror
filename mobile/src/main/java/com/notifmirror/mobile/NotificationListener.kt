@@ -151,6 +151,7 @@ class NotificationListener : NotificationListenerService() {
             put("showOpenButton", settings.getEffectiveShowOpenButton(appPackageName))
             put("showMuteButton", settings.getEffectiveShowMuteButton(appPackageName))
             put("defaultVibration", settings.getDefaultVibrationPattern())
+            put("keepHistory", settings.isKeepNotificationHistoryEnabled())
             // Send screen mode so watch knows whether to be silent
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
@@ -187,10 +188,12 @@ class NotificationListener : NotificationListenerService() {
                     Log.d(TAG, "Sent to node: ${node.displayName}")
                 }
 
-                notifLog.addEntry(
-                    appPackageName, title, displayText, "SENT",
-                    "${actionsJson.length()} actions, sent to ${nodes.size} node(s)"
-                )
+                if (settings.isKeepNotificationHistoryEnabled()) {
+                    notifLog.addEntry(
+                        appPackageName, title, displayText, "SENT",
+                        "${actionsJson.length()} actions, sent to ${nodes.size} node(s)"
+                    )
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send notification to watch", e)
             }

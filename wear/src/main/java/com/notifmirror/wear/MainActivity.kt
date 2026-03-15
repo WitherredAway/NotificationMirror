@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.widget.SwitchCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -125,6 +126,14 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.githubLink).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
+        }
+
+        // Keep History toggle
+        val historyPrefs = getSharedPreferences("notif_mirror_settings", MODE_PRIVATE)
+        val keepHistorySwitch = findViewById<SwitchCompat>(R.id.keepHistorySwitch)
+        keepHistorySwitch.isChecked = historyPrefs.getBoolean("keep_notification_history", true)
+        keepHistorySwitch.setOnCheckedChangeListener { _, isChecked ->
+            historyPrefs.edit().putBoolean("keep_notification_history", isChecked).apply()
         }
 
         checkAndRequestPermissions()

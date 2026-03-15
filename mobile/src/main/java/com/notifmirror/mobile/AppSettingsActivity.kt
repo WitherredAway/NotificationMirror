@@ -87,6 +87,10 @@ class AppSettingsActivity : AppCompatActivity() {
         // Load current values - Vibration
         defaultVibrationInput.setText(settings.getDefaultVibrationPattern())
 
+        // History section
+        val keepHistorySwitch = findViewById<SwitchMaterial>(R.id.keepHistorySwitch)
+        keepHistorySwitch.isChecked = settings.isKeepNotificationHistoryEnabled()
+
         // Auto-update section
         val autoUpdateSwitch = findViewById<SwitchMaterial>(R.id.autoUpdateSwitch)
         val updateProgressBar = findViewById<ProgressBar>(R.id.updateProgressBar)
@@ -131,7 +135,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val showSave = { saveButton.visibility = View.VISIBLE }
 
         val switches = listOf(dndSwitch, mirrorOngoingSwitch, mirrorPersistentSwitch,
-            autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch)
+            autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch, keepHistorySwitch)
         for (sw in switches) {
             sw.setOnCheckedChangeListener { _, _ -> showSave() }
         }
@@ -191,6 +195,7 @@ class AppSettingsActivity : AppCompatActivity() {
             settings.setAutoCancelEnabled(autoCancelSwitch.isChecked)
             settings.setShowOpenButtonEnabled(showOpenButtonSwitch.isChecked)
             settings.setShowMuteButtonEnabled(showMuteButtonSwitch.isChecked)
+            settings.setKeepNotificationHistoryEnabled(keepHistorySwitch.isChecked)
             settings.setBigTextThreshold(bigTextThreshold)
             settings.setMuteDurationMinutes(duration)
 
