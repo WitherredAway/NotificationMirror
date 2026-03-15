@@ -12,7 +12,14 @@
 </LinearLayout>
 </LinearLayout>
 </LinearLayout>
-<LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:background="@drawable/bg_status_active">
+<LinearLayout android:id="@+id/updateBanner" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="14dp" android:background="@drawable/bg_card" android:visibility="gone">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+<TextView android:id="@+id/updateTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Update available" android:textSize="14sp" android:textStyle="bold" android:textColor="?colorPrimary" />
+<TextView android:id="@+id/updateSubtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="12sp" android:textColor="?colorOnSurfaceVariant" />
+</LinearLayout>
+<com.google.android.material.button.MaterialButton android:id="@+id/updateButton" android:layout_width="wrap_content" android:layout_height="36dp" android:text="Update" android:textAllCaps="false" android:textSize="12sp" android:minWidth="0dp" android:paddingHorizontal="16dp" />
+</LinearLayout>
+<LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:background="@drawable/bg_status_active">
 <ImageView android:id="@+id/statusIcon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_check_circle" android:contentDescription="Status" />
 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="12dp">
 <TextView android:id="@+id/statusTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mirroring Active" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />

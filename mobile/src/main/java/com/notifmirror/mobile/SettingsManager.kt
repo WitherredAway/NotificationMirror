@@ -25,6 +25,7 @@ class SettingsManager(context: Context) {
         private const val KEY_AUTO_DISMISS_SYNC = "auto_dismiss_sync"
         private const val KEY_SHOW_OPEN_BUTTON = "show_open_on_watch"
         private const val KEY_SHOW_MUTE_BUTTON = "show_mute_button"
+        private const val KEY_AUTO_UPDATE = "auto_update_enabled"
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
@@ -164,6 +165,14 @@ class SettingsManager(context: Context) {
 
     fun setShowMuteButtonEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_SHOW_MUTE_BUTTON, enabled).apply()
+    }
+
+    // --- Auto Update ---
+
+    fun isAutoUpdateEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_UPDATE, false)
+
+    fun setAutoUpdateEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_UPDATE, enabled).apply()
     }
 
     // --- Default Vibration Pattern ---

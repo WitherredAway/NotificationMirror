@@ -58,6 +58,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statFiltersCount: TextView
     private lateinit var statLogCount: TextView
     private lateinit var settingsManager: SettingsManager
+    private lateinit var updateBanner: LinearLayout
+    private lateinit var updateTitle: TextView
+    private lateinit var updateSubtitle: TextView
+    private lateinit var updateButton: com.google.android.material.button.MaterialButton
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -114,12 +118,20 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
         }
 
+        // Update banner
+        updateBanner = findViewById(R.id.updateBanner)
+        updateTitle = findViewById(R.id.updateTitle)
+        updateSubtitle = findViewById(R.id.updateSubtitle)
+        updateButton = findViewById(R.id.updateButton)
+
+        checkForUpdates()
         checkAndRequestPermissions()
     }
 
     override fun onResume() {
         super.onResume()
         updateStatus()
+        checkForUpdates()
         // Re-check battery optimization every time the app is opened
         if (isNotificationListenerEnabled() && !isBatteryOptimizationExempt()) {
             AlertDialog.Builder(this)
@@ -133,6 +145,35 @@ class MainActivity : AppCompatActivity() {
                 }
                 .setNegativeButton("Later", null)
                 .show()
+        }
+    }
+
+    private fun checkForUpdates() {
+        val checker = UpdateChecker(this)
+        checker.checkForUpdate { info ->
+            runOnUiThread {
+                if (info != null && info.isUpdateAvailable) {
+                    updateBanner.visibility = View.VISIBLE
+                    updateTitle.text = "Update available"
+                    updateSubtitle.text = "v${info.currentVersion} → v${info.latestVersion}"
+                    updateButton.setOnClickListener {
+                        if (info.downloadUrl.isNotEmpty()) {
+                            checker.downloadAndInstall(info.downloadUrl)
+                            updateButton.isEnabled = false
+                            updateButton.text = "Downloading..."
+                        }
+                    }
+
+                    // Auto-update if enabled
+                    if (settingsManager.isAutoUpdateEnabled() && info.downloadUrl.isNotEmpty()) {
+                        checker.downloadAndInstall(info.downloadUrl)
+                        updateButton.isEnabled = false
+                        updateButton.text = "Downloading..."
+                    }
+                } else {
+                    updateBanner.visibility = View.GONE
+                }
+            }
         }
     }
 
