@@ -20,7 +20,9 @@ class NotificationLog(context: Context) {
         title: String,
         text: String,
         status: String,
-        detail: String = ""
+        detail: String = "",
+        notifKey: String = "",
+        actionsJson: String = ""
     ) {
         val entries = getEntriesRaw()
         val entry = JSONObject().apply {
@@ -30,6 +32,8 @@ class NotificationLog(context: Context) {
             put("text", text)
             put("status", status)
             put("detail", detail)
+            if (notifKey.isNotEmpty()) put("notifKey", notifKey)
+            if (actionsJson.isNotEmpty()) put("actions", actionsJson)
         }
         entries.put(entry)
         prefs.edit().putString(KEY_LOG, entries.toString()).apply()
@@ -47,7 +51,9 @@ class NotificationLog(context: Context) {
                     title = obj.getString("title"),
                     text = obj.getString("text"),
                     status = obj.getString("status"),
-                    detail = obj.optString("detail", "")
+                    detail = obj.optString("detail", ""),
+                    notifKey = obj.optString("notifKey", ""),
+                    actionsJson = obj.optString("actions", "")
                 )
             )
         }
@@ -73,6 +79,8 @@ class NotificationLog(context: Context) {
         val title: String,
         val text: String,
         val status: String,
-        val detail: String
+        val detail: String,
+        val notifKey: String = "",
+        val actionsJson: String = ""
     )
 }

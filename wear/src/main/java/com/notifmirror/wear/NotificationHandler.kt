@@ -27,6 +27,7 @@ object NotificationHandler {
     const val EXTRA_ACTION_INDEX = "extra_action_index"
 
     private val notifIdMap = mutableMapOf<String, Int>()
+    private val notifTextMap = mutableMapOf<String, String>()
     private var nextId = 1000
 
     private val DEFAULT_VIBRATION = longArrayOf(0, 200, 100, 200)
@@ -64,10 +65,25 @@ object NotificationHandler {
                 return
             }
 
-            val notifId = notifIdMap.getOrPut(key) { nextId++ }
+            // Generate unique notification IDs for different messages with the same key
+            // (e.g. WhatsApp updates the same notification with each new message)
+            val previousText = notifTextMap[key]
+            val notifId = if (previousText != null && previousText != text) {
+                // Text changed — new message arrived, assign a new ID so both show
+                val newId = nextId++
+                notifIdMap[key] = newId
+                newId
+            } else {
+                notifIdMap.getOrPut(key) { nextId++ }
+            }
+            notifTextMap[key] = text
 
             val actionCount = actionsArray?.length() ?: 0
-            notifLog.addEntry(packageName, title, text, "RECEIVED", "$actionCount actions")
+            notifLog.addEntry(
+                packageName, title, text, "RECEIVED", "$actionCount actions",
+                notifKey = key,
+                actionsJson = actionsArray?.toString() ?: ""
+            )
 
             val iconBitmap = if (iconBase64.isNotEmpty()) {
                 try {
@@ -99,6 +115,7 @@ object NotificationHandler {
             val key = json.getString("key")
 
             val notifId = notifIdMap.remove(key) ?: return
+            notifTextMap.remove(key)
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(notifId)
 
