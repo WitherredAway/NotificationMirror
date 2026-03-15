@@ -112,8 +112,10 @@ object NotificationHandler {
             val isUpdate = notifIdMap.containsKey(conversationKey)
             val notifId = notifIdMap.getOrPut(conversationKey) { nextId++ }
 
-            // Track conversation messages for stacking
-            conversationMessages.getOrPut(conversationKey) { mutableListOf() }.add(Pair(title, text))
+            // Track conversation messages for stacking (cap at 20 to avoid unbounded memory growth)
+            val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
+            msgList.add(Pair(title, text))
+            while (msgList.size > 20) { msgList.removeAt(0) }
 
             val actionCount = actionsArray?.length() ?: 0
             if (keepHistory) {
@@ -252,10 +254,12 @@ object NotificationHandler {
         val effectiveChannelId = channelId + settingsSuffix
 
         // Delete any old channels for this app so settings always take effect
+        // Preserve the _silent channel used for mute-continuation updates
+        val silentChannelId = channelId + "_silent"
         val existingChannels = nm.notificationChannels
         for (ch in existingChannels) {
             val isThisAppChannel = ch.id == channelId || ch.id.startsWith(channelId + "_")
-            if (isThisAppChannel && ch.id != effectiveChannelId) {
+            if (isThisAppChannel && ch.id != effectiveChannelId && ch.id != silentChannelId) {
                 nm.deleteNotificationChannel(ch.id)
             }
         }

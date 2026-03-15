@@ -50,7 +50,7 @@ class NotificationListener : NotificationListenerService() {
         syncEncryptionKey()
     }
 
-    private fun syncEncryptionKey() {
+    private fun syncEncryptionKey(retryCount: Int = 0) {
         scope.launch {
             try {
                 val keyBytes = CryptoHelper.getKeyBytes(this@NotificationListener)
@@ -63,7 +63,11 @@ class NotificationListener : NotificationListenerService() {
                     .await()
                 Log.d(TAG, "Encryption key synced to watch")
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to sync encryption key", e)
+                Log.w(TAG, "Failed to sync encryption key (attempt ${retryCount + 1})", e)
+                if (retryCount < 3) {
+                    kotlinx.coroutines.delay(2000L * (retryCount + 1))
+                    syncEncryptionKey(retryCount + 1)
+                }
             }
         }
     }

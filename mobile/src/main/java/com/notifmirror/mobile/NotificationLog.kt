@@ -72,9 +72,9 @@ class NotificationLog(private val context: Context) {
         val json = entries.toString()
         try {
             val encrypted = CryptoHelper.encryptString(json, context)
+            // Keep plaintext alongside encrypted during migration for safety
             prefs.edit()
                 .putString(KEY_LOG_ENCRYPTED, encrypted)
-                .remove(KEY_LOG)
                 .apply()
         } catch (_: Exception) {
             // Fallback to plaintext if encryption fails
@@ -97,8 +97,19 @@ class NotificationLog(private val context: Context) {
         val raw = prefs.getString(KEY_LOG, "[]") ?: "[]"
         return try {
             val arr = JSONArray(raw)
-            // Migrate plaintext to encrypted
-            if (arr.length() > 0) saveEntries(arr)
+            // Migrate plaintext to encrypted (plaintext kept as fallback)
+            if (arr.length() > 0) {
+                saveEntries(arr)
+                // Verify round-trip before removing plaintext
+                val verifyEncrypted = prefs.getString(KEY_LOG_ENCRYPTED, null)
+                if (verifyEncrypted != null) {
+                    try {
+                        val verifyDecrypted = CryptoHelper.decryptString(verifyEncrypted, context)
+                        JSONArray(verifyDecrypted) // verify it parses
+                        prefs.edit().remove(KEY_LOG).apply()
+                    } catch (_: Exception) { /* keep plaintext */ }
+                }
+            }
             arr
         } catch (_: Exception) {
             JSONArray()

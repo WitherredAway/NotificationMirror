@@ -311,6 +311,12 @@ class MainActivity : AppCompatActivity() {
             put("autoDismissSync", settingsManager.isAutoDismissSyncEnabled())
             put("showOpenButton", settingsManager.isShowOpenButtonEnabled())
             put("showMuteButton", settingsManager.isShowMuteButtonEnabled())
+            put("showSnoozeButton", settingsManager.isShowSnoozeButtonEnabled())
+            put("snoozeDuration", settingsManager.getSnoozeDurationMinutes())
+            put("keepHistory", settingsManager.isKeepNotificationHistoryEnabled())
+            put("muteContinuation", settingsManager.isMuteContinuationEnabled())
+            put("batterySaverEnabled", settingsManager.isBatterySaverEnabled())
+            put("batterySaverThreshold", settingsManager.getBatterySaverThreshold())
             put("defaultVibration", settingsManager.getDefaultVibrationPattern())
             val customVib = settingsManager.getVibrationPattern(packageName)
             if (customVib.isNotEmpty()) {
@@ -334,9 +340,14 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                // Encrypt test notification data just like real notifications
+                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                val key = CryptoHelper.getOrCreateKey(this@MainActivity)
+                val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
+
                 for (node in nodes) {
                     Wearable.getMessageClient(this@MainActivity)
-                        .sendMessage(node.id, PATH_NOTIFICATION, json.toString().toByteArray())
+                        .sendMessage(node.id, PATH_NOTIFICATION, encryptedBytes)
                         .await()
                 }
 
