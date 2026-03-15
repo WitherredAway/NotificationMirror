@@ -274,8 +274,12 @@ object NotificationHandler {
             this.vibrationPattern = vibrationPattern
             this.group = groupId
             if (customSoundUri.isNotEmpty()) {
+                // Phone content:// URIs won't resolve on the watch.
+                // Use the system default notification sound as the channel sound
+                // so Android treats this as a distinct sound channel vs the silent/default ones.
+                val watchSoundUri = android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
                 setSound(
-                    Uri.parse(customSoundUri),
+                    watchSoundUri,
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -339,14 +343,12 @@ object NotificationHandler {
 
         // Stack conversation messages if multiple exist
         if (!hideContent && conversationHistory.size > 1) {
-            val inboxStyle = NotificationCompat.InboxStyle()
-            // Show last 7 messages
-            val recent = conversationHistory.takeLast(7)
-            for ((_, msg) in recent) {
-                inboxStyle.addLine(msg)
-            }
-            inboxStyle.setSummaryText("${conversationHistory.size} messages")
-            builder.setStyle(inboxStyle)
+            // Show all stacked messages separated by newlines using BigTextStyle
+            val recent = conversationHistory.takeLast(20)
+            val stackedText = recent.joinToString("\n") { (_, msg) -> msg }
+            builder.setContentText("${conversationHistory.size} messages")
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(stackedText)
+                .setSummaryText("${conversationHistory.size} messages"))
             builder.setNumber(conversationHistory.size)
         } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))

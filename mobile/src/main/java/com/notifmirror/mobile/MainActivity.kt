@@ -255,11 +255,13 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .create()
 
-        // Show cached apps instantly
+        // Show cached apps instantly with placeholder icons, whitelisted apps pinned at top
         val cached = AppListCache.getCachedApps(this)
+        val whitelistedApps = settingsManager.getWhitelistedApps()
         var allApps = if (cached.isNotEmpty()) {
             cached.map { AppPickerActivity.AppInfo(it.packageName, it.label, null) }
-                .sortedBy { it.label.lowercase() }
+                .sortedWith(compareByDescending<AppPickerActivity.AppInfo> { whitelistedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
         } else {
             emptyList()
         }
@@ -289,11 +291,12 @@ class MainActivity : AppCompatActivity() {
 
         dialog.show()
 
-        // Refresh in background with icons
+        // Refresh in background with icons, whitelisted apps pinned at top
         Thread {
             val freshCached = AppListCache.refreshCache(this)
             val freshApps = AppListCache.toAppInfoList(this, freshCached)
-                .sortedBy { it.label.lowercase() }
+                .sortedWith(compareByDescending<AppPickerActivity.AppInfo> { whitelistedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
 
             runOnUiThread {
                 allApps = freshApps
@@ -325,28 +328,35 @@ class MainActivity : AppCompatActivity() {
             if (iconBase64 != null) {
                 put("icon", iconBase64)
             }
-            put("muteDuration", settingsManager.getMuteDurationMinutes())
-            put("notifPriority", settingsManager.getNotificationPriority())
-            put("bigTextThreshold", settingsManager.getBigTextThreshold())
-            put("autoCancel", settingsManager.isAutoCancelEnabled())
-            put("autoDismissSync", settingsManager.isAutoDismissSyncEnabled())
-            put("showOpenButton", settingsManager.isShowOpenButtonEnabled())
-            put("showMuteButton", settingsManager.isShowMuteButtonEnabled())
-            put("showSnoozeButton", settingsManager.isShowSnoozeButtonEnabled())
-            put("snoozeDuration", settingsManager.getSnoozeDurationMinutes())
+            // Use per-app effective settings so test notifications respect the selected app's config
+            put("muteDuration", settingsManager.getEffectiveMuteDuration(packageName))
+            put("notifPriority", settingsManager.getEffectivePriority(packageName))
+            put("bigTextThreshold", settingsManager.getEffectiveBigTextThreshold(packageName))
+            put("autoCancel", settingsManager.getEffectiveAutoCancel(packageName))
+            put("autoDismissSync", settingsManager.getEffectiveAutoDismissSync(packageName))
+            put("showOpenButton", settingsManager.getEffectiveShowOpenButton(packageName))
+            put("showMuteButton", settingsManager.getEffectiveShowMuteButton(packageName))
+            put("showSnoozeButton", settingsManager.getEffectiveShowSnoozeButton(packageName))
+            put("snoozeDuration", settingsManager.getEffectiveSnoozeDuration(packageName))
             put("keepHistory", settingsManager.isKeepNotificationHistoryEnabled())
-            put("muteContinuation", settingsManager.isMuteContinuationEnabled())
+            put("muteContinuation", settingsManager.getEffectiveMuteContinuation(packageName))
             put("batterySaverEnabled", settingsManager.isBatterySaverEnabled())
             put("batterySaverThreshold", settingsManager.getBatterySaverThreshold())
             put("defaultVibration", settingsManager.getDefaultVibrationPattern())
-            val customVib = settingsManager.getVibrationPattern(packageName)
-            if (customVib.isNotEmpty()) {
-                put("vibrationPattern", customVib)
+            val effectiveVib = settingsManager.getEffectiveVibrationPattern(packageName)
+            if (effectiveVib.isNotEmpty()) {
+                put("vibrationPattern", effectiveVib)
             }
-            val customSound = settingsManager.getSoundUri(packageName)
-            if (customSound.isNotEmpty()) {
-                put("soundUri", customSound)
+            val effectiveSound = settingsManager.getEffectiveSoundUri(packageName)
+            if (effectiveSound.isNotEmpty()) {
+                put("soundUri", effectiveSound)
             }
+            // Resolve app label for the selected package
+            val appLabel = try {
+                val ai = this@MainActivity.packageManager.getApplicationInfo(packageName, 0)
+                this@MainActivity.packageManager.getApplicationLabel(ai).toString()
+            } catch (_: Exception) { packageName }
+            put("appLabel", appLabel)
         }
 
         scope.launch {
@@ -529,6 +539,8 @@ class MainActivity : AppCompatActivity() {
             holder.pkg.text = app.packageName
             if (app.icon != null) {
                 holder.icon.setImageDrawable(app.icon)
+            } else {
+                holder.icon.setImageResource(R.drawable.ic_app_placeholder)
             }
             holder.itemView.setOnClickListener { onClick(app) }
         }

@@ -13,14 +13,19 @@ import android.os.Looper
 import android.content.pm.PackageManager
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -305,25 +310,113 @@ class AppSettingsActivity : AppCompatActivity() {
     }
 
     private fun showComplicationAppPicker(button: MaterialButton) {
-        val pm = packageManager
-        val intent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
-            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
-        }
-        val apps = pm.queryIntentActivities(intent, 0)
-            .sortedBy { it.loadLabel(pm).toString().lowercase() }
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_select, null)
+        val recyclerView = dialogView.findViewById<RecyclerView>(R.id.appSelectList)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        val searchInput = dialogView.findViewById<EditText>(R.id.dialogSearchInput)
 
-        val appNames = apps.map { it.loadLabel(pm).toString() }.toTypedArray()
-        val packageNames = apps.map { it.activityInfo.packageName }
-
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Select App")
-            .setItems(appNames) { _, which ->
-                selectedComplicationPackage = packageNames[which]
-                updateComplicationAppButtonText(button)
-                findViewById<MaterialButton>(R.id.saveSettingsButton).visibility = View.VISIBLE
-            }
+            .setView(dialogView)
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+
+        // Show cached apps instantly with placeholder icons, whitelisted apps pinned at top
+        val cached = AppListCache.getCachedApps(this)
+        val whitelistedApps = settings.getWhitelistedApps()
+        var allApps = if (cached.isNotEmpty()) {
+            cached.map { AppPickerActivity.AppInfo(it.packageName, it.label, null) }
+                .sortedWith(compareByDescending<AppPickerActivity.AppInfo> { whitelistedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
+        } else {
+            emptyList()
+        }
+
+        val adapter = ComplicationAppAdapter(allApps) { app ->
+            selectedComplicationPackage = app.packageName
+            updateComplicationAppButtonText(button)
+            findViewById<MaterialButton>(R.id.saveSettingsButton).visibility = View.VISIBLE
+            dialog.dismiss()
+        }
+        recyclerView.adapter = adapter
+
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val query = s?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
+                    }
+                }
+                adapter.updateList(filtered)
+            }
+        })
+
+        dialog.show()
+
+        // Refresh in background with icons, whitelisted apps pinned at top
+        Thread {
+            val freshCached = AppListCache.refreshCache(this)
+            val freshApps = AppListCache.toAppInfoList(this, freshCached)
+                .sortedWith(compareByDescending<AppPickerActivity.AppInfo> { whitelistedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
+
+            runOnUiThread {
+                allApps = freshApps
+                val query = searchInput.text?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
+                    }
+                }
+                adapter.updateList(filtered)
+            }
+        }.start()
+    }
+
+    private inner class ComplicationAppAdapter(
+        private var apps: List<AppPickerActivity.AppInfo>,
+        private val onClick: (AppPickerActivity.AppInfo) -> Unit
+    ) : RecyclerView.Adapter<ComplicationAppAdapter.ViewHolder>() {
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val icon: ImageView = view.findViewById(R.id.appIcon)
+            val name: TextView = view.findViewById(R.id.appName)
+            val pkg: TextView = view.findViewById(R.id.appPackage)
+        }
+
+        fun updateList(newApps: List<AppPickerActivity.AppInfo>) {
+            apps = newApps
+            notifyDataSetChanged()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_app_simple, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val app = apps[position]
+            holder.name.text = app.label
+            holder.pkg.text = app.packageName
+            if (app.icon != null) {
+                holder.icon.setImageDrawable(app.icon)
+            } else {
+                holder.icon.setImageResource(R.drawable.ic_app_placeholder)
+            }
+            holder.itemView.setOnClickListener { onClick(app) }
+        }
+
+        override fun getItemCount() = apps.size
     }
 
     private fun startDownloadWithProgress(downloadUrl: String, progressBar: ProgressBar, statusText: TextView) {

@@ -45,7 +45,7 @@ class AppPickerActivity : AppCompatActivity() {
             adapter.notifyDataSetChanged()
         }
 
-        // Show cached apps instantly, then refresh in background
+        // Show cached apps instantly with placeholder icons, then refresh in background
         val cached = AppListCache.getCachedApps(this)
         allApps = if (cached.isNotEmpty()) {
             cached.map { AppInfo(it.packageName, it.label, null) }
@@ -95,6 +95,13 @@ class AppPickerActivity : AppCompatActivity() {
                 adapter.updateList(filtered)
             }
         }.start()
+
+        // Pre-warm the cache in case it's empty (first run)
+        if (cached.isEmpty()) {
+            Thread {
+                AppListCache.refreshCache(this)
+            }.start()
+        }
     }
 
     override fun onPause() {
@@ -136,6 +143,8 @@ class AppPickerActivity : AppCompatActivity() {
             holder.pkg.text = app.packageName
             if (app.icon != null) {
                 holder.icon.setImageDrawable(app.icon)
+            } else {
+                holder.icon.setImageResource(R.drawable.ic_app_placeholder)
             }
             val isSelected = selectedApps.contains(app.packageName)
             holder.checkbox.isChecked = isSelected
