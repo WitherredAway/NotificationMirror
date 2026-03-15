@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#FFD0BCFF</color>
+    <color name="primary">#FFD3BBFC</color>
     <color name="on_primary">#FF381E72</color>
     <color name="primary_container">#FF4F378B</color>
     <color name="on_primary_container">#FFEADDFF</color>
@@ -8,9 +8,11 @@
     <color name="on_secondary">#FF332D41</color>
     <color name="secondary_container">#FF4A4458</color>
     <color name="on_secondary_container">#FFE8DEF8</color>
-    <color name="surface">#FF1C1B1F</color>
+    <color name="surface">#FF151218</color>
     <color name="on_surface">#FFE6E1E5</color>
-    <color name="background">#FF1C1B1F</color>
+    <color name="surface_container_high">#FF2C292F</color>
+    <color name="surface_container_highest">#FF37343A</color>
+    <color name="background">#FF151218</color>
     <color name="text_primary">#FFE6E1E5</color>
     <color name="text_secondary">#FFCAC4D0</color>
     <color name="text_hint">#FF938F99</color>
