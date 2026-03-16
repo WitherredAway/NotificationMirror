@@ -591,26 +591,7 @@ class NotificationListener : NotificationListenerService() {
     }
 
     private fun getAppIconBase64(packageName: String): String? {
-        return try {
-            val iconSize = 48
-            val iconQuality = 80
-            val drawable = packageManager.getApplicationIcon(packageName)
-            val bitmap = if (drawable is BitmapDrawable) {
-                Bitmap.createScaledBitmap(drawable.bitmap, iconSize, iconSize, true)
-            } else {
-                val bmp = Bitmap.createBitmap(iconSize, iconSize, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, iconSize, iconSize)
-                drawable.draw(canvas)
-                bmp
-            }
-            val stream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, iconQuality, stream)
-            Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to get icon for $packageName", e)
-            null
-        }
+        return WearSyncHelper.getAppIconBase64(this, packageName)
     }
 
     private suspend fun flushOfflineQueue(nodes: Collection<com.google.android.gms.wearable.Node>) {

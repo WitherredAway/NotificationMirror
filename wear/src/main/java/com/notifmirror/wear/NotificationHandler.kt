@@ -126,39 +126,41 @@ object NotificationHandler {
             notifKeyToConversationKey[key] = conversationKey
 
             // Reuse notification ID for same conversation key to stack messages
-            // Synchronized to avoid race between containsKey and getOrPut
-            val (isUpdate, notifId) = synchronized(idLock) {
+            // Synchronized to avoid race conditions across all shared mutable state
+            val (isUpdate, notifId, messages) = synchronized(idLock) {
                 val existing = notifIdMap.containsKey(conversationKey)
                 val id = notifIdMap.getOrPut(conversationKey) { nextId.getAndIncrement() }
-                Pair(existing, id)
-            }
 
-            // Track conversation messages for stacking (cap at 20 to avoid unbounded memory growth)
-            val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
+                // Track conversation messages for stacking (cap at 20 to avoid unbounded memory growth)
+                val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
 
-            // If the phone sent pre-extracted conversation messages, use them as the
-            // authoritative history (replaces any local state for this conversation).
-            // This avoids duplicating the first message since the phone already includes
-            // ALL messages in the conversation each time.
-            val phoneConversationMsgs = json.optJSONArray("conversationMessages")
-            if (phoneConversationMsgs != null && phoneConversationMsgs.length() > 0) {
-                msgList.clear()
-                for (i in 0 until phoneConversationMsgs.length()) {
-                    val msgObj = phoneConversationMsgs.getJSONObject(i)
-                    val sender = msgObj.optString("sender", title)
-                    val msgText = msgObj.optString("text", "")
-                    if (msgText.isNotEmpty()) {
-                        msgList.add(Pair(sender, msgText))
+                // If the phone sent pre-extracted conversation messages, use them as the
+                // authoritative history (replaces any local state for this conversation).
+                // This avoids duplicating the first message since the phone already includes
+                // ALL messages in the conversation each time.
+                val phoneConversationMsgs = json.optJSONArray("conversationMessages")
+                if (phoneConversationMsgs != null && phoneConversationMsgs.length() > 0) {
+                    msgList.clear()
+                    for (i in 0 until phoneConversationMsgs.length()) {
+                        val msgObj = phoneConversationMsgs.getJSONObject(i)
+                        val sender = msgObj.optString("sender", title)
+                        val msgText = msgObj.optString("text", "")
+                        if (msgText.isNotEmpty()) {
+                            msgList.add(Pair(sender, msgText))
+                        }
+                    }
+                } else {
+                    // Non-messaging app: append current message
+                    val lastMsg = msgList.lastOrNull()
+                    if (lastMsg == null || lastMsg.first != title || lastMsg.second != text) {
+                        msgList.add(Pair(title, text))
                     }
                 }
-            } else {
-                // Non-messaging app: append current message
-                val lastMsg = msgList.lastOrNull()
-                if (lastMsg == null || lastMsg.first != title || lastMsg.second != text) {
-                    msgList.add(Pair(title, text))
-                }
+                while (msgList.size > 20) { msgList.removeAt(0) }
+
+                // Take a snapshot of messages for use outside the lock
+                Triple(existing, id, ArrayList(msgList))
             }
-            while (msgList.size > 20) { msgList.removeAt(0) }
 
             val actionCount = actionsArray?.length() ?: 0
             if (keepHistory) {
@@ -179,10 +181,15 @@ object NotificationHandler {
                 }
             } else null
 
-            // Use phone-provided app label, fallback to local resolution
-            val resolvedAppLabel = if (appLabel.isNotEmpty()) appLabel else getAppLabel(packageName)
-
-            val messages = conversationMessages[conversationKey] ?: mutableListOf(Pair(title, text))
+            // Use phone-provided app label, fallback to cached or local resolution
+            val resolvedAppLabel = if (appLabel.isNotEmpty()) {
+                // Cache the phone-provided label for future use (e.g. when phone is disconnected)
+                context.getSharedPreferences("app_labels", Context.MODE_PRIVATE)
+                    .edit().putString(packageName, appLabel).apply()
+                appLabel
+            } else {
+                getAppLabel(context, packageName)
+            }
 
             showNotification(
                 context, notifId, key, packageName, resolvedAppLabel, title, text, subText, actionsArray, iconBitmap,
@@ -278,8 +285,10 @@ object NotificationHandler {
         val channelId = CHANNEL_PREFIX + packageName
         val groupId = GROUP_PREFIX + packageName
 
-        val group = NotificationChannelGroup(groupId, appLabel)
-        nm.createNotificationChannelGroup(group)
+        // Only create the channel group if it doesn't already exist
+        if (nm.notificationChannelGroups.none { it.id == groupId }) {
+            nm.createNotificationChannelGroup(NotificationChannelGroup(groupId, appLabel))
+        }
 
         val vibrationPattern = getVibrationPattern(customVibrationPattern, defaultVibration)
         val importance = when (notifPriority) {
@@ -384,9 +393,10 @@ object NotificationHandler {
                         putExtra(EXTRA_ACTION_INDEX, actionIndex)
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     }
+                    val replyRequestCode = (notifKey + actionIndex).hashCode() and 0x7FFFFFFF
                     val replyPendingIntent = PendingIntent.getActivity(
                         context,
-                        notifId * 100 + actionIndex,
+                        replyRequestCode,
                         replyIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
                     )
@@ -412,9 +422,10 @@ object NotificationHandler {
                         putExtra(EXTRA_NOTIFICATION_ID, notifId)
                         putExtra(EXTRA_ACTION_INDEX, actionIndex)
                     }
+                    val actionRequestCode = (notifKey + actionIndex).hashCode() and 0x7FFFFFFF
                     val actionPendingIntent = PendingIntent.getBroadcast(
                         context,
-                        notifId * 100 + actionIndex,
+                        actionRequestCode,
                         actionIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
                     )
@@ -433,9 +444,10 @@ object NotificationHandler {
         if (showOpenButton) {
             val launchIntent = getCompanionLaunchIntent(context, packageName)
             if (launchIntent != null) {
+                val openRequestCode = (notifKey + "open").hashCode() and 0x7FFFFFFF
                 val openPendingIntent = PendingIntent.getActivity(
                     context,
-                    notifId * 100 + 99,
+                    openRequestCode,
                     launchIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
@@ -451,9 +463,10 @@ object NotificationHandler {
                 putExtra(SnoozeBroadcastReceiver.EXTRA_SNOOZE_DURATION_MS, snoozeDuration.toLong() * 60000L)
                 putExtra(SnoozeBroadcastReceiver.EXTRA_PACKAGE_NAME, packageName)
             }
+            val snoozeRequestCode = (notifKey + "snooze").hashCode() and 0x7FFFFFFF
             val snoozePendingIntent = PendingIntent.getBroadcast(
                 context,
-                notifId * 100 + 98,
+                snoozeRequestCode,
                 snoozeIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -468,9 +481,10 @@ object NotificationHandler {
                 putExtra(MuteBroadcastReceiver.EXTRA_DURATION, muteDuration)
                 putExtra(MuteBroadcastReceiver.EXTRA_NOTIFICATION_ID, notifId)
             }
+            val muteRequestCode = (notifKey + "mute").hashCode() and 0x7FFFFFFF
             val mutePendingIntent = PendingIntent.getBroadcast(
                 context,
-                notifId * 100 + 97,
+                muteRequestCode,
                 muteIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -495,7 +509,7 @@ object NotificationHandler {
             .setGroup(groupId)
             .setGroupSummary(true)
             .setAutoCancel(true)
-            .setSilent(silentUpdate)
+            .setSilent(true)
             .setStyle(NotificationCompat.InboxStyle()
                 .setSummaryText(appLabel))
         nm.notify(summaryId, summaryBuilder.build())
@@ -557,7 +571,13 @@ object NotificationHandler {
         return null
     }
 
-    private fun getAppLabel(packageName: String): String {
+    private fun getAppLabel(context: Context, packageName: String): String {
+        // Check cached labels from phone first
+        val cached = context.getSharedPreferences("app_labels", Context.MODE_PRIVATE)
+            .getString(packageName, null)
+        if (!cached.isNullOrEmpty()) return cached
+
+        // Fallback to hardcoded mapping for common apps
         return when {
             packageName.contains("whatsapp") -> "WhatsApp"
             packageName.contains("telegram") -> "Telegram"

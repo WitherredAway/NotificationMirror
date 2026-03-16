@@ -146,24 +146,9 @@ class ReplyReceiverService : WearableListenerService() {
         }
     }
 
-    /**
-     * Sync mirroring state to watch via DataClient.
-     * Used after phone-side toggle changes so the watch UI stays in sync.
-     */
     private fun syncMirroringToWatch(enabled: Boolean) {
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val putReq = com.google.android.gms.wearable.PutDataMapRequest.create("/mirroring_state").apply {
-                    dataMap.putBoolean("enabled", enabled)
-                    dataMap.putLong("timestamp", System.currentTimeMillis())
-                }
-                Wearable.getDataClient(this@ReplyReceiverService)
-                    .putDataItem(putReq.asPutDataRequest().setUrgent())
-                    .await()
-                Log.d(TAG, "Mirroring state synced to watch: enabled=$enabled")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to sync mirroring state to watch", e)
-            }
+            WearSyncHelper.syncMirroringToWatch(this@ReplyReceiverService, enabled)
         }
     }
 

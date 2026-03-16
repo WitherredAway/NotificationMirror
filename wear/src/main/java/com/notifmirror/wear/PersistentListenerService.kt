@@ -16,10 +16,6 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 class PersistentListenerService : Service(), MessageClient.OnMessageReceivedListener, DataClient.OnDataChangedListener {
 
@@ -71,55 +67,7 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Log.d(TAG, "PersistentListener received message on path: ${messageEvent.path}")
-        when (messageEvent.path) {
-            "/notification" -> {
-                val decryptedData = decryptMessageData(messageEvent.data)
-                if (decryptedData != null) {
-                    NotificationHandler.handleNotification(this, NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedData))
-                } else {
-                    // Decryption failed — queue for retry and request key re-sync
-                    Log.w(TAG, "Cannot decrypt notification — queuing and requesting key re-sync")
-                    PendingNotificationQueue.enqueue(messageEvent.data)
-                    requestKeyFromPhone()
-                }
-            }
-            "/notification_dismiss" -> {
-                val decryptedDismiss = decryptMessageData(messageEvent.data)
-                if (decryptedDismiss != null) {
-                    NotificationHandler.handleDismissal(this, NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedDismiss))
-                } else {
-                    // Fallback: try as plaintext for backward compatibility
-                    NotificationHandler.handleDismissal(this, messageEvent)
-                }
-            }
-            "/action_result" -> handleActionResult(messageEvent)
-        }
-    }
-
-    private fun decryptMessageData(data: ByteArray): ByteArray? {
-        return try {
-            val key = CryptoHelper.getKey(this) ?: return null
-            CryptoHelper.decrypt(data, key)
-        } catch (e: Exception) {
-            Log.w(TAG, "Decryption failed", e)
-            null
-        }
-    }
-
-    private fun requestKeyFromPhone() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val nodes = Wearable.getNodeClient(this@PersistentListenerService).connectedNodes.await()
-                for (node in nodes) {
-                    Wearable.getMessageClient(this@PersistentListenerService)
-                        .sendMessage(node.id, "/request_key", byteArrayOf())
-                        .await()
-                }
-                Log.d(TAG, "Sent /request_key to phone")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to request key from phone", e)
-            }
-        }
+        MessageHelper.handleMessage(this, messageEvent)
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
@@ -142,23 +90,6 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
                     Log.d(TAG, "Mirroring state synced from phone via PersistentListener: enabled=$enabled")
                 }
             }
-        }
-    }
-
-    private fun handleActionResult(messageEvent: MessageEvent) {
-        try {
-            val json = org.json.JSONObject(String(messageEvent.data))
-            val success = json.getBoolean("success")
-            val message = json.getString("message")
-
-            Log.d(TAG, "Action result: success=$success message=$message")
-            ActionBroadcastReceiver.awaitingResult = false
-
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                android.widget.Toast.makeText(this, message as CharSequence, android.widget.Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to handle action result", e)
         }
     }
 

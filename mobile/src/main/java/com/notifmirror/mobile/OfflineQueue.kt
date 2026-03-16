@@ -9,13 +9,15 @@ import org.json.JSONObject
 /**
  * Queues notification JSON payloads when the watch is disconnected.
  * On reconnect, queued notifications are sent in order.
+ * Data is encrypted at rest using CryptoHelper (consistent with NotificationLog).
  */
-class OfflineQueue(context: Context) {
+class OfflineQueue(private val context: Context) {
 
     companion object {
         private const val TAG = "NotifMirrorQueue"
         private const val PREFS_NAME = "notif_mirror_offline_queue"
         private const val KEY_QUEUE = "queued_notifications"
+        private const val KEY_QUEUE_ENCRYPTED = "queued_notifications_encrypted"
         private const val MAX_QUEUE_SIZE = 50
     }
 
@@ -33,7 +35,7 @@ class OfflineQueue(context: Context) {
             queue.remove(0)
         }
 
-        prefs.edit().putString(KEY_QUEUE, queue.toString()).apply()
+        saveQueue(queue)
         Log.d(TAG, "Enqueued notification, queue size: ${queue.length()}")
     }
 
@@ -53,13 +55,42 @@ class OfflineQueue(context: Context) {
     fun size(): Int = getQueue().length()
 
     fun clear() {
-        prefs.edit().putString(KEY_QUEUE, "[]").apply()
+        prefs.edit()
+            .remove(KEY_QUEUE)
+            .remove(KEY_QUEUE_ENCRYPTED)
+            .apply()
+    }
+
+    private fun saveQueue(queue: JSONArray) {
+        val json = queue.toString()
+        try {
+            val encrypted = CryptoHelper.encryptString(json, context)
+            prefs.edit().putString(KEY_QUEUE_ENCRYPTED, encrypted).apply()
+        } catch (_: Exception) {
+            // Fallback to plaintext if encryption fails
+            prefs.edit().putString(KEY_QUEUE, json).apply()
+        }
     }
 
     private fun getQueue(): JSONArray {
+        // Try encrypted first
+        val encrypted = prefs.getString(KEY_QUEUE_ENCRYPTED, null)
+        if (encrypted != null) {
+            try {
+                val decrypted = CryptoHelper.decryptString(encrypted, context)
+                return JSONArray(decrypted)
+            } catch (_: Exception) { }
+        }
+        // Fallback to plaintext (legacy or encryption failure)
         val raw = prefs.getString(KEY_QUEUE, "[]") ?: "[]"
         return try {
-            JSONArray(raw)
+            val arr = JSONArray(raw)
+            // Migrate plaintext to encrypted
+            if (arr.length() > 0) {
+                saveQueue(arr)
+                prefs.edit().remove(KEY_QUEUE).apply()
+            }
+            arr
         } catch (_: Exception) {
             JSONArray()
         }

@@ -11,6 +11,7 @@ class NotificationLog(private val context: Context) {
         private const val PREFS_NAME = "notif_mirror_log"
         private const val KEY_LOG = "log_entries"
         private const val KEY_LOG_ENCRYPTED = "log_entries_encrypted"
+        private const val KEY_COUNT = "log_entry_count"
         private const val ONE_WEEK_MS = 7L * 24 * 60 * 60 * 1000
     }
 
@@ -40,6 +41,7 @@ class NotificationLog(private val context: Context) {
         entries.put(entry)
         entries = pruneOldEntries(entries)
         saveEntries(entries)
+        prefs.edit().putInt(KEY_COUNT, entries.length()).apply()
     }
 
     fun getEntries(): List<LogEntry> {
@@ -63,10 +65,13 @@ class NotificationLog(private val context: Context) {
         return list
     }
 
+    fun getCount(): Int = prefs.getInt(KEY_COUNT, -1)
+
     fun clear() {
         prefs.edit()
             .remove(KEY_LOG)
             .remove(KEY_LOG_ENCRYPTED)
+            .putInt(KEY_COUNT, 0)
             .apply()
     }
 

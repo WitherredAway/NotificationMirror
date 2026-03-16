@@ -238,25 +238,31 @@ class FilterSettingsActivity : AppCompatActivity() {
 
             if (pe.passes) {
                 holder.statusView.text = "PASS"
-                holder.statusView.setTextColor(getColor(android.R.color.holo_green_dark))
+                holder.statusView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorPrimary))
                 holder.card.alpha = 1.0f
                 holder.reasonView.visibility = View.GONE
             } else {
                 holder.statusView.text = "BLOCK"
-                holder.statusView.setTextColor(getColor(android.R.color.holo_red_light))
+                holder.statusView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorError))
                 holder.card.alpha = 0.6f
                 holder.reasonView.visibility = View.VISIBLE
                 if (pe.reason == "No whitelist match") {
                     holder.reasonView.text = pe.reason
-                    holder.reasonView.setTextColor(getColor(android.R.color.holo_orange_dark))
+                    holder.reasonView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorTertiary))
                 } else {
                     holder.reasonView.text = pe.reason
-                    holder.reasonView.setTextColor(getColor(android.R.color.holo_red_light))
+                    holder.reasonView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorError))
                 }
             }
         }
 
         override fun getItemCount() = entries.size
+    }
+
+    private fun resolveThemeColor(attr: Int): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return getColor(tv.resourceId)
     }
 
     private fun saveFilters(): Boolean {

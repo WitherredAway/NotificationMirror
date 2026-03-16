@@ -14,16 +14,11 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.switchmaterial.SwitchMaterial
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-
 class PerAppSettingsActivity : AppCompatActivity() {
 
     private lateinit var settings: SettingsManager
     private lateinit var packageName: String
     private var currentVibPattern = ""
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     companion object {
         const val EXTRA_PACKAGE_NAME = "extra_package_name"

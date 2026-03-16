@@ -185,18 +185,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun syncMirroringToWatch(enabled: Boolean) {
         scope.launch {
-            try {
-                val putReq = com.google.android.gms.wearable.PutDataMapRequest.create("/mirroring_state").apply {
-                    dataMap.putBoolean("enabled", enabled)
-                    dataMap.putLong("timestamp", System.currentTimeMillis())
-                }
-                Wearable.getDataClient(this@MainActivity)
-                    .putDataItem(putReq.asPutDataRequest().setUrgent())
-                    .await()
-                Log.d(TAG, "Mirroring state synced to watch: enabled=$enabled")
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to sync mirroring state to watch", e)
-            }
+            WearSyncHelper.syncMirroringToWatch(this@MainActivity, enabled)
         }
     }
 
@@ -224,19 +213,26 @@ class MainActivity : AppCompatActivity() {
         checkForUpdates()
         checkWatchConnection()
         mirroringSwitch.isChecked = settingsManager.isMirroringEnabled()
-        // Re-check battery optimization every time the app is opened
+        // Prompt for battery optimization (at most once per day after user dismisses)
         if (isNotificationListenerEnabled() && !isBatteryOptimizationExempt()) {
-            AlertDialog.Builder(this)
-                .setTitle("Unrestricted Battery")
-                .setMessage("To keep notification mirroring running reliably in the background, please allow unrestricted battery usage for this app.")
-                .setPositiveButton("Allow") { _, _ ->
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
+            val batteryPrefs = getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+            val lastDismissed = batteryPrefs.getLong("battery_dialog_dismissed_at", 0)
+            val oneDayMs = 24 * 60 * 60 * 1000L
+            if (System.currentTimeMillis() - lastDismissed > oneDayMs) {
+                AlertDialog.Builder(this)
+                    .setTitle("Unrestricted Battery")
+                    .setMessage("To keep notification mirroring running reliably in the background, please allow unrestricted battery usage for this app.")
+                    .setPositiveButton("Allow") { _, _ ->
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
                     }
-                    startActivity(intent)
-                }
-                .setNegativeButton("Later", null)
-                .show()
+                    .setNegativeButton("Later") { _, _ ->
+                        batteryPrefs.edit().putLong("battery_dialog_dismissed_at", System.currentTimeMillis()).apply()
+                    }
+                    .show()
+            }
         }
     }
 
@@ -465,25 +461,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getAppIconBase64(pkg: String): String? {
-        return try {
-            val iconSize = 48
-            val iconQuality = 80
-            val drawable = packageManager.getApplicationIcon(pkg)
-            val bitmap = if (drawable is BitmapDrawable) {
-                Bitmap.createScaledBitmap(drawable.bitmap, iconSize, iconSize, true)
-            } else {
-                val bmp = Bitmap.createBitmap(iconSize, iconSize, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, iconSize, iconSize)
-                drawable.draw(canvas)
-                bmp
-            }
-            val stream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, iconQuality, stream)
-            Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-        } catch (e: Exception) {
-            null
-        }
+        return WearSyncHelper.getAppIconBase64(this, pkg)
     }
 
     private fun checkAndRequestPermissions() {
@@ -568,8 +546,9 @@ class MainActivity : AppCompatActivity() {
         val totalFilters = whitelistKeywords.size + blacklistKeywords.size
         statFiltersCount.text = totalFilters.toString()
 
-        val logCount = NotificationLog(this).getEntries().size
-        statLogCount.text = logCount.toString()
+        val notifLog = NotificationLog(this)
+        val cachedCount = notifLog.getCount()
+        statLogCount.text = if (cachedCount >= 0) cachedCount.toString() else notifLog.getEntries().size.toString()
     }
 
     private fun isNotificationListenerEnabled(): Boolean {
