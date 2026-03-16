@@ -94,9 +94,11 @@ class NotificationLog(private val context: Context) {
                 return
             }
         } catch (e: Exception) {
-            // Never store plaintext — log the failure and skip saving
-            android.util.Log.w("NotificationLog", "Failed to encrypt log entries, skipping save", e)
+            android.util.Log.w("NotificationLog", "Failed to encrypt log entries", e)
         }
+        // No encryption key available yet (pre-sync) — store plaintext temporarily
+        // This will be migrated to encrypted storage once the key is synced
+        prefs.edit().putString(KEY_LOG, json).apply()
     }
 
     private fun getEntriesRaw(): JSONArray {

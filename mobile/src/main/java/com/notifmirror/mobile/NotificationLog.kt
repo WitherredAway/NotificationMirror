@@ -41,7 +41,9 @@ class NotificationLog(private val context: Context) {
         entries.put(entry)
         entries = pruneOldEntries(entries)
         saveEntries(entries)
-        prefs.edit().putInt(KEY_COUNT, entries.length()).apply()
+        // Update count based on what was actually saved (re-read to verify)
+        val savedEntries = getEntriesRaw()
+        prefs.edit().putInt(KEY_COUNT, savedEntries.length()).apply()
     }
 
     fun getEntries(): List<LogEntry> {
