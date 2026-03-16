@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updateSubtitle: TextView
     private lateinit var updateButton: com.google.android.material.button.MaterialButton
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -165,6 +166,24 @@ class MainActivity : AppCompatActivity() {
 
         // Sync encryption key to watch on app launch
         syncEncryptionKeyFromMainActivity()
+
+        // Listen for mirroring state changes from watch (via ReplyReceiverService → SharedPreferences)
+        prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "mirroring_enabled") {
+                runOnUiThread {
+                    val enabled = settingsManager.isMirroringEnabled()
+                    if (mirroringSwitch.isChecked != enabled) {
+                        mirroringSwitch.isChecked = enabled
+                    }
+                }
+            }
+        }
+        settingsManager.prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        prefsListener?.let { settingsManager.prefs.unregisterOnSharedPreferenceChangeListener(it) }
     }
 
     private fun checkWatchConnection() {

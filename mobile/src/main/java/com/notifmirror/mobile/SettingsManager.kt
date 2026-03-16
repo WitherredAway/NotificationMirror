@@ -50,7 +50,7 @@ class SettingsManager(context: Context) {
         const val PRIORITY_LOW = -1
     }
 
-    private val prefs: SharedPreferences =
+    internal val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     // Cache compiled Regex patterns to avoid re-compiling on every notification
