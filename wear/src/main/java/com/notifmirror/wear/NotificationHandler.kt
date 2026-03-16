@@ -350,8 +350,7 @@ object NotificationHandler {
             .setContentText(displayText)
             .setPriority(if (isSilent || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(if (isOngoing) false else autoCancel)
-            // Don't set ongoing on watch — let users swipe to dismiss.
-            // Phone will re-send the notification when it reappears.
+            .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
