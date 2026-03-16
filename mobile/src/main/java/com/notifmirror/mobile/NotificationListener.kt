@@ -143,6 +143,16 @@ class NotificationListener : NotificationListenerService() {
         }
 
         val notification = sbn.notification ?: return
+
+        // Skip group summary notifications — these are Android's way of bundling
+        // multiple notifications and carry no useful per-conversation info.
+        // Without this, messaging apps like WhatsApp create duplicate notifications:
+        // one from the actual conversation and one from the summary.
+        if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            Log.d(TAG, "Skipping group summary notification from ${sbn.packageName}")
+            return
+        }
+
         val extras = notification.extras ?: return
 
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -402,6 +412,10 @@ class NotificationListener : NotificationListenerService() {
                     }
 
                     val notification = sbn.notification ?: continue
+
+                    // Skip group summary notifications (same as onNotificationPosted)
+                    if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) continue
+
                     val extras = notification.extras ?: continue
 
                     val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
