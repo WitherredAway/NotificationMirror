@@ -9,11 +9,15 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 
-class PersistentListenerService : Service(), MessageClient.OnMessageReceivedListener {
+class PersistentListenerService : Service(), MessageClient.OnMessageReceivedListener, DataClient.OnDataChangedListener {
 
     companion object {
         private const val TAG = "NotifMirrorWear"
@@ -44,13 +48,15 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
 
         messageClient = Wearable.getMessageClient(this)
         messageClient.addListener(this)
-        Log.d(TAG, "MessageClient listener registered")
+        Wearable.getDataClient(this).addListener(this)
+        Log.d(TAG, "MessageClient and DataClient listeners registered")
     }
 
     override fun onDestroy() {
         super.onDestroy()
         messageClient.removeListener(this)
-        Log.d(TAG, "PersistentListenerService destroyed, listener removed")
+        Wearable.getDataClient(this).removeListener(this)
+        Log.d(TAG, "PersistentListenerService destroyed, listeners removed")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -61,9 +67,29 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Log.d(TAG, "PersistentListener received message on path: ${messageEvent.path}")
-        when (messageEvent.path) {
-            "/notification" -> NotificationHandler.handleNotification(this, messageEvent)
-            "/notification_dismiss" -> NotificationHandler.handleDismissal(this, messageEvent)
+        MessageHelper.handleMessage(this, messageEvent)
+    }
+
+    override fun onDataChanged(dataEvents: DataEventBuffer) {
+        for (event in dataEvents) {
+            if (event.type == DataEvent.TYPE_CHANGED) {
+                val path = event.dataItem.uri.path ?: continue
+                if (path == "/crypto_key") {
+                    val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
+                    val keyBytes = dataMap.getByteArray("aes_key")
+                    if (keyBytes != null) {
+                        CryptoHelper.importKey(this, keyBytes)
+                        Log.d(TAG, "Encryption key received via PersistentListener")
+                        PendingNotificationQueue.retryAll(this)
+                    }
+                } else if (path == "/mirroring_state") {
+                    val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
+                    val enabled = dataMap.getBoolean("enabled", true)
+                    val prefs = getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+                    prefs.edit().putBoolean("mirroring_enabled", enabled).apply()
+                    Log.d(TAG, "Mirroring state synced from phone via PersistentListener: enabled=$enabled")
+                }
+            }
         }
     }
 

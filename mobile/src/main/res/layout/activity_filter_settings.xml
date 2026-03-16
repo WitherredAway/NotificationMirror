@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="?android:colorBackground">
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
@@ -112,16 +112,27 @@
                 android:textSize="12sp"
                 android:textColor="?colorOutline" />
 
-            <LinearLayout
-                android:id="@+id/previewContainer"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/previewRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="80dp" />
+                android:nestedScrollingEnabled="false" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/loadMoreButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="80dp"
+                android:text="Load More"
+                android:textAllCaps="false"
+                android:textSize="14sp"
+                android:visibility="gone"
+                style="@style/Widget.Material3.Button.TonalButton" />
 
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/saveButton"

@@ -12,6 +12,9 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -52,7 +55,7 @@ class UpdateChecker(private val context: Context) {
             }
         }
 
-        Thread {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val url = URL(GITHUB_API_URL)
                 val conn = url.openConnection() as HttpURLConnection
@@ -119,7 +122,7 @@ class UpdateChecker(private val context: Context) {
                 Log.e(TAG, "Failed to check for updates", e)
                 callback(null)
             }
-        }.start()
+        }
     }
 
     fun downloadAndInstall(downloadUrl: String) {

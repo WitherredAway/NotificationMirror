@@ -1,0 +1,110 @@
+package com.notifmirror.wear
+
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.widget.Toast
+import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
+
+/**
+ * Shared message handling logic used by both NotificationReceiverService
+ * (WearableListenerService) and PersistentListenerService (foreground service).
+ * Avoids duplicating decryption, routing, and action result handling code.
+ */
+object MessageHelper {
+
+    private const val TAG = "NotifMirrorWear"
+
+    /**
+     * Route an incoming message to the appropriate handler based on its path.
+     */
+    fun handleMessage(context: Context, messageEvent: MessageEvent) {
+        Log.d(TAG, "MessageHelper received message on path: ${messageEvent.path}")
+        when (messageEvent.path) {
+            "/notification" -> {
+                val decryptedData = decryptMessageData(context, messageEvent.data)
+                if (decryptedData != null) {
+                    NotificationHandler.handleNotification(
+                        context,
+                        NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedData)
+                    )
+                } else {
+                    Log.w(TAG, "Cannot decrypt notification — queuing and requesting key re-sync")
+                    PendingNotificationQueue.enqueue(messageEvent.data)
+                    requestKeyFromPhone(context)
+                }
+            }
+            "/notification_dismiss" -> {
+                val decryptedDismiss = decryptMessageData(context, messageEvent.data)
+                if (decryptedDismiss != null) {
+                    NotificationHandler.handleDismissal(
+                        context,
+                        NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedDismiss)
+                    )
+                } else {
+                    Log.w(TAG, "Cannot decrypt dismiss — dropping (key not available)")
+                }
+            }
+            "/action_result" -> handleActionResult(context, messageEvent)
+        }
+    }
+
+    /**
+     * Decrypt message data using the stored encryption key.
+     */
+    fun decryptMessageData(context: Context, data: ByteArray): ByteArray? {
+        return try {
+            val key = CryptoHelper.getKey(context) ?: return null
+            CryptoHelper.decrypt(data, key)
+        } catch (e: Exception) {
+            Log.w(TAG, "Decryption failed", e)
+            null
+        }
+    }
+
+    /**
+     * Send a /request_key message to the phone to re-sync the encryption key.
+     */
+    fun requestKeyFromPhone(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val nodes = Wearable.getNodeClient(context).connectedNodes.await()
+                for (node in nodes) {
+                    Wearable.getMessageClient(context)
+                        .sendMessage(node.id, "/request_key", byteArrayOf())
+                        .await()
+                }
+                Log.d(TAG, "Sent /request_key to phone")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to request key from phone", e)
+            }
+        }
+    }
+
+    /**
+     * Handle an action result message from the phone (reply sent, action executed, etc.).
+     */
+    fun handleActionResult(context: Context, messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val success = json.getBoolean("success")
+            val message = json.getString("message")
+
+            Log.d(TAG, "Action result: success=$success message=$message")
+            ActionBroadcastReceiver.awaitingResult = false
+
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, message as CharSequence, Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle action result", e)
+        }
+    }
+}

@@ -5,12 +5,14 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.DynamicColors
 import java.text.SimpleDateFormat
@@ -19,12 +21,29 @@ import java.util.Locale
 
 class FilterSettingsActivity : AppCompatActivity() {
 
+    companion object {
+        private const val PAGE_SIZE = 50
+    }
+
     private lateinit var settings: SettingsManager
     private lateinit var notifLog: NotificationLog
     private lateinit var whitelistInput: EditText
     private lateinit var blacklistInput: EditText
-    private lateinit var previewContainer: LinearLayout
     private lateinit var previewHeader: TextView
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var loadMoreButton: Button
+
+    private var allEntries: List<NotificationLog.LogEntry> = emptyList()
+    private var evaluatedEntries: List<PreviewEntry> = emptyList()
+    private var displayedCount = 0
+    private val displayedItems = mutableListOf<PreviewEntry>()
+    private var previewAdapter: PreviewAdapter? = null
+
+    data class PreviewEntry(
+        val entry: NotificationLog.LogEntry,
+        val passes: Boolean,
+        val reason: String
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,14 +55,18 @@ class FilterSettingsActivity : AppCompatActivity() {
 
         whitelistInput = findViewById(R.id.whitelistInput)
         blacklistInput = findViewById(R.id.blacklistInput)
-        previewContainer = findViewById(R.id.previewContainer)
         previewHeader = findViewById(R.id.previewHeader)
+        recyclerView = findViewById(R.id.previewRecyclerView)
+        loadMoreButton = findViewById(R.id.loadMoreButton)
         val saveButton = findViewById<Button>(R.id.saveButton)
         val whitelistHelp = findViewById<TextView>(R.id.whitelistHelp)
         val blacklistHelp = findViewById<TextView>(R.id.blacklistHelp)
 
         whitelistHelp.text = "Only mirror notifications matching at least one pattern. Leave empty to allow all."
         blacklistHelp.text = "Never mirror notifications matching any of these patterns."
+
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.isNestedScrollingEnabled = false
 
         val whitelistPatterns = settings.getKeywordWhitelist()
         val blacklistPatterns = settings.getKeywordBlacklist()
@@ -78,6 +101,11 @@ class FilterSettingsActivity : AppCompatActivity() {
             }
         }
 
+        loadMoreButton.setOnClickListener {
+            loadMorePreview()
+        }
+
+        allEntries = notifLog.getEntries()
         updatePreview()
     }
 
@@ -110,21 +138,17 @@ class FilterSettingsActivity : AppCompatActivity() {
             } catch (_: Exception) { }
         }
 
-        val entries = notifLog.getEntries()
-        previewContainer.removeAllViews()
-
-        if (entries.isEmpty()) {
+        if (allEntries.isEmpty()) {
             previewHeader.text = "No recent notifications to preview against."
+            recyclerView.adapter = null
+            loadMoreButton.visibility = View.GONE
             return
         }
 
-        val sdf = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault())
         var matchCount = 0
         var filterCount = 0
-
-        for (entry in entries) {
+        evaluatedEntries = allEntries.map { entry ->
             val content = "${entry.title} ${entry.text}"
-
             val passesWhitelist = if (whitelistRegexes.isEmpty()) true
                 else whitelistRegexes.any { it.containsMatchIn(content) }
             val passesBlacklist = !blacklistRegexes.any { it.containsMatchIn(content) }
@@ -132,55 +156,113 @@ class FilterSettingsActivity : AppCompatActivity() {
 
             if (passes) matchCount++ else filterCount++
 
-            val itemView = LayoutInflater.from(this)
-                .inflate(R.layout.item_filter_preview, previewContainer, false)
+            val reason = when {
+                !passesWhitelist -> "No whitelist match"
+                !passesBlacklist -> "Blacklist match"
+                else -> ""
+            }
+            PreviewEntry(entry, passes, reason)
+        }
 
-            val card = itemView as MaterialCardView
-            val statusView = itemView.findViewById<TextView>(R.id.previewStatus)
-            val appView = itemView.findViewById<TextView>(R.id.previewApp)
-            val timeView = itemView.findViewById<TextView>(R.id.previewTime)
-            val titleView = itemView.findViewById<TextView>(R.id.previewTitle)
-            val textView = itemView.findViewById<TextView>(R.id.previewText)
-            val reasonView = itemView.findViewById<TextView>(R.id.previewReason)
+        previewHeader.text = "$matchCount would pass, $filterCount would be blocked (${allEntries.size} notifications)"
 
-            appView.text = getAppDisplayName(entry.packageName)
-            timeView.text = sdf.format(Date(entry.time))
+        displayedCount = minOf(PAGE_SIZE, evaluatedEntries.size)
+        displayedItems.clear()
+        displayedItems.addAll(evaluatedEntries.subList(0, displayedCount))
+        if (previewAdapter == null) {
+            previewAdapter = PreviewAdapter(displayedItems)
+            recyclerView.adapter = previewAdapter
+        } else {
+            previewAdapter!!.notifyDataSetChanged()
+        }
+        updateLoadMoreButton()
+    }
+
+    private fun loadMorePreview() {
+        val oldCount = displayedCount
+        val newCount = minOf(displayedCount + PAGE_SIZE, evaluatedEntries.size)
+        displayedCount = newCount
+        displayedItems.addAll(evaluatedEntries.subList(oldCount, newCount))
+        previewAdapter?.notifyItemRangeInserted(oldCount, newCount - oldCount)
+        updateLoadMoreButton()
+    }
+
+    private fun updateLoadMoreButton() {
+        loadMoreButton.visibility = if (displayedCount < evaluatedEntries.size) View.VISIBLE else View.GONE
+        if (displayedCount < evaluatedEntries.size) {
+            loadMoreButton.text = "Load More (${evaluatedEntries.size - displayedCount} remaining)"
+        }
+    }
+
+    private inner class PreviewAdapter(private val entries: List<PreviewEntry>) :
+        RecyclerView.Adapter<PreviewAdapter.ViewHolder>() {
+
+        private val sdf = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault())
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val card: MaterialCardView = view as MaterialCardView
+            val statusView: TextView = view.findViewById(R.id.previewStatus)
+            val appView: TextView = view.findViewById(R.id.previewApp)
+            val timeView: TextView = view.findViewById(R.id.previewTime)
+            val titleView: TextView = view.findViewById(R.id.previewTitle)
+            val textView: TextView = view.findViewById(R.id.previewText)
+            val reasonView: TextView = view.findViewById(R.id.previewReason)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_filter_preview, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val pe = entries[position]
+            val entry = pe.entry
+
+            holder.appView.text = getAppDisplayName(entry.packageName)
+            holder.timeView.text = sdf.format(Date(entry.time))
 
             if (entry.title.isNotEmpty()) {
-                titleView.text = entry.title
-                titleView.visibility = android.view.View.VISIBLE
+                holder.titleView.text = entry.title
+                holder.titleView.visibility = View.VISIBLE
             } else {
-                titleView.visibility = android.view.View.GONE
+                holder.titleView.visibility = View.GONE
             }
 
             if (entry.text.isNotEmpty()) {
-                textView.text = entry.text
-                textView.visibility = android.view.View.VISIBLE
+                holder.textView.text = entry.text
+                holder.textView.visibility = View.VISIBLE
             } else {
-                textView.visibility = android.view.View.GONE
+                holder.textView.visibility = View.GONE
             }
 
-            if (passes) {
-                statusView.text = "PASS"
-                statusView.setTextColor(getColor(android.R.color.holo_green_dark))
+            if (pe.passes) {
+                holder.statusView.text = "PASS"
+                holder.statusView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorPrimary))
+                holder.card.alpha = 1.0f
+                holder.reasonView.visibility = View.GONE
             } else {
-                statusView.text = "BLOCK"
-                statusView.setTextColor(getColor(android.R.color.holo_red_light))
-                card.alpha = 0.6f
-                reasonView.visibility = android.view.View.VISIBLE
-                if (!passesWhitelist) {
-                    reasonView.text = "No whitelist match"
-                    reasonView.setTextColor(getColor(android.R.color.holo_orange_dark))
+                holder.statusView.text = "BLOCK"
+                holder.statusView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorError))
+                holder.card.alpha = 0.6f
+                holder.reasonView.visibility = View.VISIBLE
+                if (pe.reason == "No whitelist match") {
+                    holder.reasonView.text = pe.reason
+                    holder.reasonView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorTertiary))
                 } else {
-                    reasonView.text = "Blacklist match"
-                    reasonView.setTextColor(getColor(android.R.color.holo_red_light))
+                    holder.reasonView.text = pe.reason
+                    holder.reasonView.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorError))
                 }
             }
-
-            previewContainer.addView(itemView)
         }
 
-        previewHeader.text = "$matchCount would pass, $filterCount would be blocked (${entries.size} notifications)"
+        override fun getItemCount() = entries.size
+    }
+
+    private fun resolveThemeColor(attr: Int): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return tv.data
     }
 
     private fun saveFilters(): Boolean {

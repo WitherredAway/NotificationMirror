@@ -25,17 +25,22 @@
 <TextView android:id="@+id/statusTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mirroring Active" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
 <TextView android:id="@+id/statusSubtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="All permissions granted" android:textSize="12sp" android:textColor="?colorOnSurfaceVariant" />
 </LinearLayout>
+<androidx.appcompat.widget.SwitchCompat android:id="@+id/mirroringSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+<LinearLayout android:id="@+id/watchConnectionCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="12dp" android:background="@drawable/bg_card">
+<ImageView android:id="@+id/watchStatusIcon" android:layout_width="20dp" android:layout_height="20dp" android:contentDescription="Watch Status" />
+<TextView android:id="@+id/watchStatusText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Checking watch..." android:textSize="13sp" android:textColor="?colorOnSurfaceVariant" />
 </LinearLayout>
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginEnd="6dp" android:background="@drawable/bg_card">
+<LinearLayout android:id="@+id/statAppsCard" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginEnd="6dp" android:background="@drawable/bg_card" android:clickable="true" android:focusable="true" android:foreground="?selectableItemBackground">
 <TextView android:id="@+id/statAppsCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="All" android:textSize="20sp" android:textStyle="bold" android:textColor="?colorPrimary" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Apps" android:textSize="11sp" android:textColor="?colorOnSurfaceVariant" android:layout_marginTop="2dp" />
 </LinearLayout>
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginHorizontal="6dp" android:background="@drawable/bg_card">
+<LinearLayout android:id="@+id/statFiltersCard" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginHorizontal="6dp" android:background="@drawable/bg_card" android:clickable="true" android:focusable="true" android:foreground="?selectableItemBackground">
 <TextView android:id="@+id/statFiltersCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="20sp" android:textStyle="bold" android:textColor="?colorPrimary" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Filters" android:textSize="11sp" android:textColor="?colorOnSurfaceVariant" android:layout_marginTop="2dp" />
 </LinearLayout>
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginStart="6dp" android:background="@drawable/bg_card">
+<LinearLayout android:id="@+id/statLogCard" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:layout_marginStart="6dp" android:background="@drawable/bg_card" android:clickable="true" android:focusable="true" android:foreground="?selectableItemBackground">
 <TextView android:id="@+id/statLogCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="20sp" android:textStyle="bold" android:textColor="?colorPrimary" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Logged" android:textSize="11sp" android:textColor="?colorOnSurfaceVariant" android:layout_marginTop="2dp" />
 </LinearLayout>
@@ -96,6 +101,15 @@
 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Send Test Notification" android:textSize="15sp" android:textColor="?colorOnSurface" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Send a test notification to your watch" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="70dp" android:layout_marginEnd="16dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+<LinearLayout android:id="@+id/syncNotifsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_sync" android:contentDescription="Sync Notifications" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sync Current Notifications" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Re-send active notifications to watch" android:textSize="12sp" android:textColor="?colorOutline" />
 </LinearLayout>
 <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
 </LinearLayout>

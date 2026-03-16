@@ -5,11 +5,13 @@ import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 
-class NotificationLog(context: Context) {
+class NotificationLog(private val context: Context) {
 
     companion object {
         private const val PREFS_NAME = "notif_mirror_log"
         private const val KEY_LOG = "log_entries"
+        private const val KEY_LOG_ENCRYPTED = "log_entries_encrypted"
+        private const val ONE_WEEK_MS = 7L * 24 * 60 * 60 * 1000
     }
 
     private val prefs: SharedPreferences =
@@ -24,7 +26,7 @@ class NotificationLog(context: Context) {
         notifKey: String = "",
         actionsJson: String = ""
     ) {
-        val entries = getEntriesRaw()
+        var entries = getEntriesRaw()
         val entry = JSONObject().apply {
             put("time", System.currentTimeMillis())
             put("package", packageName)
@@ -36,7 +38,8 @@ class NotificationLog(context: Context) {
             if (actionsJson.isNotEmpty()) put("actions", actionsJson)
         }
         entries.put(entry)
-        prefs.edit().putString(KEY_LOG, entries.toString()).apply()
+        entries = pruneOldEntries(entries)
+        saveEntries(entries)
     }
 
     fun getEntries(): List<LogEntry> {
@@ -61,16 +64,76 @@ class NotificationLog(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().putString(KEY_LOG, "[]").apply()
+        prefs.edit()
+            .remove(KEY_LOG)
+            .remove(KEY_LOG_ENCRYPTED)
+            .apply()
+    }
+
+    private fun pruneOldEntries(entries: JSONArray): JSONArray {
+        val cutoff = System.currentTimeMillis() - ONE_WEEK_MS
+        val pruned = JSONArray()
+        for (i in 0 until entries.length()) {
+            val obj = entries.getJSONObject(i)
+            if (obj.optLong("time", 0) >= cutoff) {
+                pruned.put(obj)
+            }
+        }
+        return pruned
+    }
+
+    private fun saveEntries(entries: JSONArray) {
+        val json = entries.toString()
+        try {
+            val encrypted = CryptoHelper.encryptString(json, context)
+            if (encrypted != null) {
+                prefs.edit()
+                    .putString(KEY_LOG_ENCRYPTED, encrypted)
+                    .remove(KEY_LOG)
+                    .apply()
+                return
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NotificationLog", "Failed to encrypt log entries", e)
+        }
+        // No encryption key available yet (pre-sync) — store plaintext temporarily
+        // This will be migrated to encrypted storage once the key is synced
+        prefs.edit().putString(KEY_LOG, json).apply()
     }
 
     private fun getEntriesRaw(): JSONArray {
-        val raw = prefs.getString(KEY_LOG, "[]") ?: "[]"
-        return try {
-            JSONArray(raw)
-        } catch (_: Exception) {
-            JSONArray()
+        // Try encrypted first
+        val encrypted = prefs.getString(KEY_LOG_ENCRYPTED, null)
+        if (encrypted != null) {
+            try {
+                val decrypted = CryptoHelper.decryptString(encrypted, context)
+                if (decrypted != null) return JSONArray(decrypted)
+            } catch (_: Exception) {
+                // Key rotation or corrupted data — start fresh rather than silently losing data
+                android.util.Log.w("NotificationLog", "Failed to decrypt log entries (key rotation?), starting fresh")
+                prefs.edit().remove(KEY_LOG_ENCRYPTED).apply()
+            }
         }
+        // Migrate any legacy plaintext data
+        val raw = prefs.getString(KEY_LOG, null)
+        if (raw != null) {
+            return try {
+                val arr = JSONArray(raw)
+                // Try to migrate to encrypted storage
+                if (arr.length() > 0) {
+                    saveEntries(arr)
+                }
+                // Only remove plaintext if encrypted storage now has the data
+                if (prefs.getString(KEY_LOG_ENCRYPTED, null) != null) {
+                    prefs.edit().remove(KEY_LOG).apply()
+                }
+                arr
+            } catch (_: Exception) {
+                prefs.edit().remove(KEY_LOG).apply()
+                JSONArray()
+            }
+        }
+        return JSONArray()
     }
 
     data class LogEntry(

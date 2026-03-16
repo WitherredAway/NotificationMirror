@@ -17,7 +17,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.color.DynamicColors
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-
 class AppPickerActivity : AppCompatActivity() {
 
     private lateinit var settings: SettingsManager
@@ -45,44 +44,57 @@ class AppPickerActivity : AppCompatActivity() {
             adapter.notifyDataSetChanged()
         }
 
-        // Load installed apps in background
-        Thread {
-            val pm = packageManager
-            val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 || pm.getLaunchIntentForPackage(it.packageName) != null }
-                .filter { it.packageName != packageName }
+        // Show cached apps instantly with placeholder icons, then refresh in background
+        val cached = AppListCache.getCachedApps(this)
+        allApps = if (cached.isNotEmpty()) {
+            cached.map { AppInfo(it.packageName, it.label, null) }
+                .sortedWith(compareByDescending<AppInfo> { selectedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
+        } else {
+            emptyList()
+        }
+        adapter = AppListAdapter(allApps)
+        recyclerView.adapter = adapter
 
-            allApps = apps.map { appInfo ->
-                AppInfo(
-                    packageName = appInfo.packageName,
-                    label = pm.getApplicationLabel(appInfo).toString(),
-                    icon = try { pm.getApplicationIcon(appInfo.packageName) } catch (_: Exception) { null }
-                )
-            }.sortedWith(compareByDescending<AppInfo> { selectedApps.contains(it.packageName) }
-                .thenBy { it.label.lowercase() })
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val query = s?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
+                    }
+                }
+                adapter.updateList(filtered)
+            }
+        })
+
+        // Refresh from PackageManager in background (loads icons + updates cache)
+        Thread {
+            val freshCached = AppListCache.refreshCache(this)
+            val freshApps = AppListCache.toAppInfoList(this, freshCached)
+                .sortedWith(compareByDescending<AppInfo> { selectedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
 
             runOnUiThread {
-                adapter = AppListAdapter(allApps)
-                recyclerView.adapter = adapter
-
-                searchInput.addTextChangedListener(object : TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                    override fun afterTextChanged(s: Editable?) {
-                        val query = s?.toString()?.trim()?.lowercase() ?: ""
-                        val filtered = if (query.isEmpty()) {
-                            allApps
-                        } else {
-                            allApps.filter {
-                                it.label.lowercase().contains(query) ||
-                                    it.packageName.lowercase().contains(query)
-                            }
-                        }
-                        adapter.updateList(filtered)
+                allApps = freshApps
+                val query = searchInput.text?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
                     }
-                })
+                }
+                adapter.updateList(filtered)
             }
         }.start()
+
     }
 
     override fun onPause() {
@@ -124,6 +136,8 @@ class AppPickerActivity : AppCompatActivity() {
             holder.pkg.text = app.packageName
             if (app.icon != null) {
                 holder.icon.setImageDrawable(app.icon)
+            } else {
+                holder.icon.setImageResource(R.drawable.ic_app_placeholder)
             }
             val isSelected = selectedApps.contains(app.packageName)
             holder.checkbox.isChecked = isSelected

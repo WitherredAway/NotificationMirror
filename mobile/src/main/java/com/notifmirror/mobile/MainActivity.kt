@@ -29,6 +29,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -58,11 +59,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statFiltersCount: TextView
     private lateinit var statLogCount: TextView
     private lateinit var settingsManager: SettingsManager
+    private lateinit var mirroringSwitch: SwitchCompat
+    private lateinit var watchConnectionCard: LinearLayout
+    private lateinit var watchStatusIcon: ImageView
+    private lateinit var watchStatusText: TextView
     private lateinit var updateBanner: LinearLayout
     private lateinit var updateTitle: TextView
     private lateinit var updateSubtitle: TextView
     private lateinit var updateButton: com.google.android.material.button.MaterialButton
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -84,6 +90,22 @@ class MainActivity : AppCompatActivity() {
         statFiltersCount = findViewById(R.id.statFiltersCount)
         statLogCount = findViewById(R.id.statLogCount)
 
+        // Mirroring toggle
+        mirroringSwitch = findViewById(R.id.mirroringSwitch)
+        mirroringSwitch.isChecked = settingsManager.isMirroringEnabled()
+        mirroringSwitch.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager.setMirroringEnabled(isChecked)
+            updateStatus()
+            // Sync to watch via DataClient
+            syncMirroringToWatch(isChecked)
+        }
+
+        // Watch connection status card
+        watchConnectionCard = findViewById(R.id.watchConnectionCard)
+        watchStatusIcon = findViewById(R.id.watchStatusIcon)
+        watchStatusText = findViewById(R.id.watchStatusText)
+        checkWatchConnection()
+
         findViewById<LinearLayout>(R.id.enableButton).setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
@@ -100,12 +122,27 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LogActivity::class.java))
         }
 
+        // Stat cards navigate to their respective pages
+        findViewById<LinearLayout>(R.id.statAppsCard).setOnClickListener {
+            startActivity(Intent(this, AppPickerActivity::class.java))
+        }
+        findViewById<LinearLayout>(R.id.statFiltersCard).setOnClickListener {
+            startActivity(Intent(this, FilterSettingsActivity::class.java))
+        }
+        findViewById<LinearLayout>(R.id.statLogCard).setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
+
         findViewById<LinearLayout>(R.id.settingsButton).setOnClickListener {
             startActivity(Intent(this, AppSettingsActivity::class.java))
         }
 
         findViewById<LinearLayout>(R.id.testNotifButton).setOnClickListener {
             showTestNotificationDialog()
+        }
+
+        findViewById<LinearLayout>(R.id.syncNotifsButton).setOnClickListener {
+            syncCurrentNotifications()
         }
 
         val versionText = findViewById<TextView>(R.id.versionText)
@@ -126,25 +163,95 @@ class MainActivity : AppCompatActivity() {
 
         checkForUpdates()
         checkAndRequestPermissions()
+
+        // Sync encryption key to watch on app launch
+        syncEncryptionKeyFromMainActivity()
+
+        // Listen for mirroring state changes from watch (via ReplyReceiverService → SharedPreferences)
+        prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "mirroring_enabled") {
+                runOnUiThread {
+                    val enabled = settingsManager.isMirroringEnabled()
+                    if (mirroringSwitch.isChecked != enabled) {
+                        mirroringSwitch.isChecked = enabled
+                    }
+                }
+            }
+        }
+        settingsManager.prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        prefsListener?.let { settingsManager.prefs.unregisterOnSharedPreferenceChangeListener(it) }
+    }
+
+    private fun checkWatchConnection() {
+        Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
+            if (nodes.isNotEmpty()) {
+                val nodeName = nodes.first().displayName
+                watchStatusIcon.setImageResource(R.drawable.ic_check_circle)
+                watchStatusText.text = "Watch connected: $nodeName"
+            } else {
+                watchStatusIcon.setImageResource(R.drawable.ic_error_circle)
+                watchStatusText.text = "No watch connected"
+            }
+        }.addOnFailureListener {
+            watchStatusIcon.setImageResource(R.drawable.ic_error_circle)
+            watchStatusText.text = "Connection check failed"
+        }
+    }
+
+    private fun syncMirroringToWatch(enabled: Boolean) {
+        scope.launch {
+            WearSyncHelper.syncMirroringToWatch(this@MainActivity, enabled)
+        }
+    }
+
+    private fun syncEncryptionKeyFromMainActivity() {
+        scope.launch {
+            try {
+                val keyBytes = CryptoHelper.getKeyBytes(this@MainActivity)
+                val putReq = com.google.android.gms.wearable.PutDataMapRequest.create("/crypto_key").apply {
+                    dataMap.putByteArray("aes_key", keyBytes)
+                    dataMap.putLong("timestamp", System.currentTimeMillis())
+                }
+                Wearable.getDataClient(this@MainActivity)
+                    .putDataItem(putReq.asPutDataRequest().setUrgent())
+                    .await()
+                Log.d(TAG, "Encryption key synced to watch from MainActivity")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to sync encryption key from MainActivity", e)
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         updateStatus()
         checkForUpdates()
-        // Re-check battery optimization every time the app is opened
+        checkWatchConnection()
+        mirroringSwitch.isChecked = settingsManager.isMirroringEnabled()
+        // Prompt for battery optimization (at most once per day after user dismisses)
         if (isNotificationListenerEnabled() && !isBatteryOptimizationExempt()) {
-            AlertDialog.Builder(this)
-                .setTitle("Unrestricted Battery")
-                .setMessage("To keep notification mirroring running reliably in the background, please allow unrestricted battery usage for this app.")
-                .setPositiveButton("Allow") { _, _ ->
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
+            val batteryPrefs = getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+            val lastDismissed = batteryPrefs.getLong("battery_dialog_dismissed_at", 0)
+            val oneDayMs = 24 * 60 * 60 * 1000L
+            if (System.currentTimeMillis() - lastDismissed > oneDayMs) {
+                AlertDialog.Builder(this)
+                    .setTitle("Unrestricted Battery")
+                    .setMessage("To keep notification mirroring running reliably in the background, please allow unrestricted battery usage for this app.")
+                    .setPositiveButton("Allow") { _, _ ->
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
                     }
-                    startActivity(intent)
-                }
-                .setNegativeButton("Later", null)
-                .show()
+                    .setNegativeButton("Later") { _, _ ->
+                        batteryPrefs.edit().putLong("battery_dialog_dismissed_at", System.currentTimeMillis()).apply()
+                    }
+                    .show()
+            }
         }
     }
 
@@ -173,6 +280,20 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     updateBanner.visibility = View.GONE
                 }
+            }
+        }
+    }
+
+    private fun syncCurrentNotifications() {
+        val listener = NotificationListener.instance
+        if (listener == null) {
+            Toast.makeText(this, "Notification listener not active", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, "Syncing notifications...", Toast.LENGTH_SHORT).show()
+        listener.syncAllActiveNotifications { count ->
+            runOnUiThread {
+                Toast.makeText(this, "Synced $count notification${if (count != 1) "s" else ""} to watch", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -223,46 +344,63 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .create()
 
-        Thread {
-            val pm = packageManager
-            val allApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 || pm.getLaunchIntentForPackage(it.packageName) != null }
-                .map { appInfo ->
-                    AppPickerActivity.AppInfo(
-                        packageName = appInfo.packageName,
-                        label = pm.getApplicationLabel(appInfo).toString(),
-                        icon = try { pm.getApplicationIcon(appInfo.packageName) } catch (_: Exception) { null }
-                    )
-                }
-                .sortedBy { it.label.lowercase() }
+        // Show cached apps instantly with placeholder icons, whitelisted apps pinned at top
+        val cached = AppListCache.getCachedApps(this)
+        val whitelistedApps = settingsManager.getWhitelistedApps()
+        var allApps = if (cached.isNotEmpty()) {
+            cached.map { AppPickerActivity.AppInfo(it.packageName, it.label, null) }
+                .sortedWith(compareByDescending<AppPickerActivity.AppInfo> { whitelistedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
+        } else {
+            emptyList()
+        }
 
-            runOnUiThread {
-                val adapter = SimpleAppAdapter(allApps) { app ->
-                    onSelected(app.packageName, app.label, app.icon)
-                    dialog.dismiss()
-                }
-                recyclerView.adapter = adapter
+        val adapter = SimpleAppAdapter(allApps) { app ->
+            onSelected(app.packageName, app.label, app.icon)
+            dialog.dismiss()
+        }
+        recyclerView.adapter = adapter
 
-                searchInput.addTextChangedListener(object : TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                    override fun afterTextChanged(s: Editable?) {
-                        val query = s?.toString()?.trim()?.lowercase() ?: ""
-                        val filtered = if (query.isEmpty()) {
-                            allApps
-                        } else {
-                            allApps.filter {
-                                it.label.lowercase().contains(query) ||
-                                    it.packageName.lowercase().contains(query)
-                            }
-                        }
-                        adapter.updateList(filtered)
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val query = s?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
                     }
-                })
+                }
+                adapter.updateList(filtered)
             }
-        }.start()
+        })
 
         dialog.show()
+
+        // Refresh in background with icons, whitelisted apps pinned at top
+        Thread {
+            val freshCached = AppListCache.refreshCache(this)
+            val freshApps = AppListCache.toAppInfoList(this, freshCached)
+                .sortedWith(compareByDescending<AppPickerActivity.AppInfo> { whitelistedApps.contains(it.packageName) }
+                    .thenBy { it.label.lowercase() })
+
+            runOnUiThread {
+                allApps = freshApps
+                val query = searchInput.text?.toString()?.trim()?.lowercase() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    allApps
+                } else {
+                    allApps.filter {
+                        it.label.lowercase().contains(query) ||
+                            it.packageName.lowercase().contains(query)
+                    }
+                }
+                adapter.updateList(filtered)
+            }
+        }.start()
     }
 
     private fun sendTestNotification(packageName: String, title: String, text: String) {
@@ -279,22 +417,31 @@ class MainActivity : AppCompatActivity() {
             if (iconBase64 != null) {
                 put("icon", iconBase64)
             }
-            put("muteDuration", settingsManager.getMuteDurationMinutes())
-            put("notifPriority", settingsManager.getNotificationPriority())
-            put("bigTextThreshold", settingsManager.getBigTextThreshold())
-            put("autoCancel", settingsManager.isAutoCancelEnabled())
-            put("autoDismissSync", settingsManager.isAutoDismissSyncEnabled())
-            put("showOpenButton", settingsManager.isShowOpenButtonEnabled())
-            put("showMuteButton", settingsManager.isShowMuteButtonEnabled())
+            // Use per-app effective settings so test notifications respect the selected app's config
+            put("muteDuration", settingsManager.getEffectiveMuteDuration(packageName))
+            put("notifPriority", settingsManager.getEffectivePriority(packageName))
+            put("bigTextThreshold", settingsManager.getEffectiveBigTextThreshold(packageName))
+            put("autoCancel", settingsManager.getEffectiveAutoCancel(packageName))
+            put("autoDismissSync", settingsManager.getEffectiveAutoDismissSync(packageName))
+            put("showOpenButton", settingsManager.getEffectiveShowOpenButton(packageName))
+            put("showMuteButton", settingsManager.getEffectiveShowMuteButton(packageName))
+            put("showSnoozeButton", settingsManager.getEffectiveShowSnoozeButton(packageName))
+            put("snoozeDuration", settingsManager.getEffectiveSnoozeDuration(packageName))
+            put("keepHistory", settingsManager.isKeepNotificationHistoryEnabled())
+            put("muteContinuation", settingsManager.getEffectiveMuteContinuation(packageName))
+            put("batterySaverEnabled", settingsManager.isBatterySaverEnabled())
+            put("batterySaverThreshold", settingsManager.getBatterySaverThreshold())
             put("defaultVibration", settingsManager.getDefaultVibrationPattern())
-            val customVib = settingsManager.getVibrationPattern(packageName)
-            if (customVib.isNotEmpty()) {
-                put("vibrationPattern", customVib)
+            val effectiveVib = settingsManager.getEffectiveVibrationPattern(packageName)
+            if (effectiveVib.isNotEmpty()) {
+                put("vibrationPattern", effectiveVib)
             }
-            val customSound = settingsManager.getSoundUri(packageName)
-            if (customSound.isNotEmpty()) {
-                put("soundUri", customSound)
-            }
+            // Resolve app label for the selected package
+            val appLabel = try {
+                val ai = this@MainActivity.packageManager.getApplicationInfo(packageName, 0)
+                this@MainActivity.packageManager.getApplicationLabel(ai).toString()
+            } catch (_: Exception) { packageName }
+            put("appLabel", appLabel)
         }
 
         scope.launch {
@@ -309,9 +456,14 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                // Encrypt test notification data just like real notifications
+                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                val key = CryptoHelper.getOrCreateKey(this@MainActivity)
+                val messageBytes = CryptoHelper.encrypt(plainBytes, key)
+
                 for (node in nodes) {
                     Wearable.getMessageClient(this@MainActivity)
-                        .sendMessage(node.id, PATH_NOTIFICATION, json.toString().toByteArray())
+                        .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
                         .await()
                 }
 
@@ -328,25 +480,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getAppIconBase64(pkg: String): String? {
-        return try {
-            val iconSize = 48
-            val iconQuality = 80
-            val drawable = packageManager.getApplicationIcon(pkg)
-            val bitmap = if (drawable is BitmapDrawable) {
-                Bitmap.createScaledBitmap(drawable.bitmap, iconSize, iconSize, true)
-            } else {
-                val bmp = Bitmap.createBitmap(iconSize, iconSize, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, iconSize, iconSize)
-                drawable.draw(canvas)
-                bmp
-            }
-            val stream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, iconQuality, stream)
-            Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-        } catch (e: Exception) {
-            null
-        }
+        return WearSyncHelper.getAppIconBase64(this, pkg)
     }
 
     private fun checkAndRequestPermissions() {
@@ -399,7 +533,8 @@ class MainActivity : AppCompatActivity() {
         val blacklistKeywords = settings.getKeywordBlacklist()
 
         // Update status card
-        if (enabled) {
+        val mirroringEnabled = settingsManager.isMirroringEnabled()
+        if (enabled && mirroringEnabled) {
             statusCard.setBackgroundResource(R.drawable.bg_status_active)
             statusIcon.setImageResource(R.drawable.ic_check_circle)
             statusTitle.text = "Mirroring Active"
@@ -408,6 +543,11 @@ class MainActivity : AppCompatActivity() {
             } else {
                 statusSubtitle.text = "Battery restricted \u2014 may stop in background"
             }
+        } else if (enabled && !mirroringEnabled) {
+            statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
+            statusIcon.setImageResource(R.drawable.ic_error_circle)
+            statusTitle.text = "Mirroring Paused"
+            statusSubtitle.text = "Toggle switch to resume"
         } else {
             statusCard.setBackgroundResource(R.drawable.bg_status_inactive)
             statusIcon.setImageResource(R.drawable.ic_error_circle)
@@ -425,8 +565,9 @@ class MainActivity : AppCompatActivity() {
         val totalFilters = whitelistKeywords.size + blacklistKeywords.size
         statFiltersCount.text = totalFilters.toString()
 
-        val logCount = NotificationLog(this).getEntries().size
-        statLogCount.text = logCount.toString()
+        val notifLog = NotificationLog(this)
+        val cachedCount = notifLog.getCount()
+        statLogCount.text = if (cachedCount >= 0) cachedCount.toString() else notifLog.getEntries().size.toString()
     }
 
     private fun isNotificationListenerEnabled(): Boolean {
@@ -472,6 +613,8 @@ class MainActivity : AppCompatActivity() {
             holder.pkg.text = app.packageName
             if (app.icon != null) {
                 holder.icon.setImageDrawable(app.icon)
+            } else {
+                holder.icon.setImageResource(R.drawable.ic_app_placeholder)
             }
             holder.itemView.setOnClickListener { onClick(app) }
         }

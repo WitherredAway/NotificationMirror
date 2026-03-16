@@ -1,6 +1,8 @@
 package com.notifmirror.wear
 
 import android.app.AlertDialog
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -15,6 +17,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.gms.wearable.Wearable
@@ -36,6 +39,7 @@ class LogActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "NotifMirrorWearLog"
+        private const val PAGE_SIZE = 50
     }
 
     private lateinit var notifLog: NotificationLog
@@ -44,6 +48,10 @@ class LogActivity : AppCompatActivity() {
     private lateinit var emptyText: TextView
     private lateinit var filterButton: ImageButton
     private var allEntries: List<NotificationLog.LogEntry> = emptyList()
+    private var filteredEntries: List<NotificationLog.LogEntry> = emptyList()
+    private var displayedCount = 0
+    private val displayedItems = mutableListOf<NotificationLog.LogEntry>()
+    private var logAdapter: LogEntryAdapter? = null
     private var appList: List<String> = emptyList()
     private var selectedApp: String = "All Apps"
     private var searchQuery: String = ""
@@ -62,7 +70,22 @@ class LogActivity : AppCompatActivity() {
         filterButton = findViewById(R.id.filterButton)
         val clearButton = findViewById<ImageButton>(R.id.clearLogButton)
 
-        recyclerView.layoutManager = LinearLayoutManager(this)
+        val layoutManager = LinearLayoutManager(this)
+        recyclerView.layoutManager = layoutManager
+
+        // Auto-load more when scrolling to bottom
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(rv, dx, dy)
+                if (dy > 0) {
+                    val totalItemCount = layoutManager.itemCount
+                    val lastVisible = layoutManager.findLastVisibleItemPosition()
+                    if (lastVisible >= totalItemCount - 5) {
+                        loadMore()
+                    }
+                }
+            }
+        })
 
         notifLog = NotificationLog(this)
 
@@ -247,7 +270,21 @@ class LogActivity : AppCompatActivity() {
 
         emptyText.visibility = View.GONE
         recyclerView.visibility = View.VISIBLE
-        recyclerView.adapter = LogEntryAdapter(filtered)
+        filteredEntries = filtered
+        displayedCount = minOf(PAGE_SIZE, filtered.size)
+        displayedItems.clear()
+        displayedItems.addAll(filtered.subList(0, displayedCount))
+        logAdapter = LogEntryAdapter(displayedItems)
+        recyclerView.adapter = logAdapter
+    }
+
+    private fun loadMore() {
+        if (displayedCount >= filteredEntries.size) return
+        val oldCount = displayedCount
+        val newCount = minOf(displayedCount + PAGE_SIZE, filteredEntries.size)
+        displayedCount = newCount
+        displayedItems.addAll(filteredEntries.subList(oldCount, newCount))
+        logAdapter?.notifyItemRangeInserted(oldCount, newCount - oldCount)
     }
 
     private fun triggerAction(notifKey: String, actionIndex: Int) {
@@ -291,7 +328,7 @@ class LogActivity : AppCompatActivity() {
         ).toInt()
     }
 
-    private inner class LogEntryAdapter(private val entries: List<NotificationLog.LogEntry>) :
+    private inner class LogEntryAdapter(private val entries: MutableList<NotificationLog.LogEntry>) :
         RecyclerView.Adapter<LogEntryAdapter.ViewHolder>() {
 
         private val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -302,6 +339,7 @@ class LogActivity : AppCompatActivity() {
             val title: TextView = view.findViewById(R.id.logTitle)
             val text: TextView = view.findViewById(R.id.logText)
             val actionsContainer: ChipGroup = view.findViewById(R.id.logActionsContainer)
+            val repushButton: ImageButton = view.findViewById(R.id.logRepushButton)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -328,6 +366,11 @@ class LogActivity : AppCompatActivity() {
                 holder.text.visibility = View.VISIBLE
             } else {
                 holder.text.visibility = View.GONE
+            }
+
+            // Re-push button — re-posts notification locally on watch
+            holder.repushButton.setOnClickListener {
+                repushNotification(entry)
             }
 
             // Add action buttons as chips
@@ -377,5 +420,34 @@ class LogActivity : AppCompatActivity() {
         }
 
         override fun getItemCount() = entries.size
+    }
+
+    /**
+     * Re-push a notification from history — re-posts it locally on the watch.
+     */
+    private fun repushNotification(entry: NotificationLog.LogEntry) {
+        val nm = getSystemService(NotificationManager::class.java)
+
+        // Ensure channel exists
+        val channelId = "repush_${entry.packageName}"
+        if (nm.getNotificationChannel(channelId) == null) {
+            val channel = NotificationChannel(
+                channelId,
+                "Re-pushed: ${entry.packageName}",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            nm.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(entry.title)
+            .setContentText(entry.text)
+            .setAutoCancel(true)
+            .build()
+
+        val notifId = (entry.packageName + entry.title + entry.text).hashCode()
+        nm.notify(notifId, notification)
+        Toast.makeText(this, "Notification re-pushed", Toast.LENGTH_SHORT).show()
     }
 }

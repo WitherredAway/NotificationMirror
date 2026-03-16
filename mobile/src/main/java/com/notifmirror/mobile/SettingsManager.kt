@@ -14,11 +14,13 @@ class SettingsManager(context: Context) {
         private const val KEY_SCREEN_OFF_MODE = "screen_off_mode"
         private const val KEY_MUTE_DURATION = "mute_duration_minutes"
         private const val KEY_VIBRATION_PREFIX = "vibration_"
-        private const val KEY_SOUND_PREFIX = "sound_"
-        private const val KEY_SOUND_NAME_PREFIX = "sound_name_"
         private const val KEY_DEFAULT_VIBRATION = "default_vibration_pattern"
-        private const val KEY_MIRROR_ONGOING = "mirror_ongoing"
-        private const val KEY_MIRROR_PERSISTENT = "mirror_persistent"
+        private const val KEY_ONGOING_MODE = "ongoing_mode"
+
+        // Ongoing/persistent notification modes
+        const val ONGOING_NONE = 0
+        const val ONGOING_ONLY = 1
+        const val ONGOING_ALL_PERSISTENT = 2
         private const val KEY_NOTIF_PRIORITY = "notification_priority"
         private const val KEY_BIG_TEXT_THRESHOLD = "big_text_threshold"
         private const val KEY_AUTO_CANCEL = "auto_cancel"
@@ -26,11 +28,22 @@ class SettingsManager(context: Context) {
         private const val KEY_SHOW_OPEN_BUTTON = "show_open_on_watch"
         private const val KEY_SHOW_MUTE_BUTTON = "show_mute_button"
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
+        private const val KEY_KEEP_NOTIFICATION_HISTORY = "keep_notification_history"
+        private const val KEY_HIDE_WHEN_LOCKED = "hide_content_when_locked"
+        private const val KEY_MUTE_CONTINUATION = "mute_continuation_alerts"
+        private const val KEY_SHOW_SNOOZE_BUTTON = "show_snooze_button"
+        private const val KEY_SNOOZE_DURATION = "snooze_duration_minutes"
+        private const val KEY_BATTERY_SAVER_ENABLED = "battery_saver_enabled"
+        private const val KEY_BATTERY_SAVER_THRESHOLD = "battery_saver_threshold"
+        private const val KEY_COMPLICATION_SOURCE = "complication_source"
+        private const val KEY_COMPLICATION_APP = "complication_app"
+        private const val KEY_MIRRORING_ENABLED = "mirroring_enabled"
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
         const val SCREEN_MODE_SCREEN_OFF_ONLY = 1
         const val SCREEN_MODE_SILENT_WHEN_ON = 2
+        const val SCREEN_MODE_VIBRATE_ONLY_WHEN_ON = 3
 
         // Notification priority values
         const val PRIORITY_HIGH = 1
@@ -38,8 +51,27 @@ class SettingsManager(context: Context) {
         const val PRIORITY_LOW = -1
     }
 
-    private val prefs: SharedPreferences =
+    internal val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    // Cache compiled Regex patterns to avoid re-compiling on every notification
+    private val regexCache = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    private val INVALID_REGEX_SENTINEL = Any()
+
+    private fun getCachedRegex(pattern: String): Regex? {
+        val cached = regexCache[pattern]
+        if (cached != null) {
+            return if (cached === INVALID_REGEX_SENTINEL) null else cached as Regex
+        }
+        return try {
+            val regex = Regex(pattern, RegexOption.IGNORE_CASE)
+            regexCache[pattern] = regex
+            regex
+        } catch (_: Exception) {
+            regexCache[pattern] = INVALID_REGEX_SENTINEL
+            null
+        }
+    }
 
     // --- App Whitelist ---
 
@@ -103,20 +135,12 @@ class SettingsManager(context: Context) {
         prefs.edit().putInt(KEY_MUTE_DURATION, minutes).apply()
     }
 
-    // --- Mirror Ongoing Notifications (music, timers, etc.) ---
+    // --- Ongoing/Persistent Mode (unified 3-option selector) ---
 
-    fun isMirrorOngoingEnabled(): Boolean = prefs.getBoolean(KEY_MIRROR_ONGOING, false)
+    fun getOngoingMode(): Int = prefs.getInt(KEY_ONGOING_MODE, ONGOING_NONE)
 
-    fun setMirrorOngoingEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_MIRROR_ONGOING, enabled).apply()
-    }
-
-    // --- Mirror Persistent/Foreground Notifications (foreground services) ---
-
-    fun isMirrorPersistentEnabled(): Boolean = prefs.getBoolean(KEY_MIRROR_PERSISTENT, false)
-
-    fun setMirrorPersistentEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_MIRROR_PERSISTENT, enabled).apply()
+    fun setOngoingMode(mode: Int) {
+        prefs.edit().putInt(KEY_ONGOING_MODE, mode).apply()
     }
 
     // --- Notification Priority ---
@@ -175,6 +199,82 @@ class SettingsManager(context: Context) {
         prefs.edit().putBoolean(KEY_AUTO_UPDATE, enabled).apply()
     }
 
+    // --- Notification History ---
+
+    fun isKeepNotificationHistoryEnabled(): Boolean = prefs.getBoolean(KEY_KEEP_NOTIFICATION_HISTORY, true)
+
+    fun setKeepNotificationHistoryEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_KEEP_NOTIFICATION_HISTORY, enabled).apply()
+    }
+
+    // --- Hide Content When Locked ---
+
+    fun isHideWhenLockedEnabled(): Boolean = prefs.getBoolean(KEY_HIDE_WHEN_LOCKED, false)
+
+    fun setHideWhenLockedEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_HIDE_WHEN_LOCKED, enabled).apply()
+    }
+
+    // --- Mute Continuation Alerts ---
+
+    fun isMuteContinuationEnabled(): Boolean = prefs.getBoolean(KEY_MUTE_CONTINUATION, false)
+
+    fun setMuteContinuationEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MUTE_CONTINUATION, enabled).apply()
+    }
+
+    // --- Snooze Button ---
+
+    fun isShowSnoozeButtonEnabled(): Boolean = prefs.getBoolean(KEY_SHOW_SNOOZE_BUTTON, true)
+
+    fun setShowSnoozeButtonEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_SNOOZE_BUTTON, enabled).apply()
+    }
+
+    // --- Snooze Duration ---
+
+    fun getSnoozeDurationMinutes(): Int = prefs.getInt(KEY_SNOOZE_DURATION, 5)
+
+    fun setSnoozeDurationMinutes(minutes: Int) {
+        prefs.edit().putInt(KEY_SNOOZE_DURATION, minutes).apply()
+    }
+
+    // --- Battery Saver ---
+
+    fun isBatterySaverEnabled(): Boolean = prefs.getBoolean(KEY_BATTERY_SAVER_ENABLED, false)
+
+    fun setBatterySaverEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BATTERY_SAVER_ENABLED, enabled).apply()
+    }
+
+    fun getBatterySaverThreshold(): Int = prefs.getInt(KEY_BATTERY_SAVER_THRESHOLD, 15)
+
+    fun setBatterySaverThreshold(threshold: Int) {
+        prefs.edit().putInt(KEY_BATTERY_SAVER_THRESHOLD, threshold).apply()
+    }
+
+    // --- Mirroring Toggle ---
+
+    fun isMirroringEnabled(): Boolean = prefs.getBoolean(KEY_MIRRORING_ENABLED, true)
+
+    fun setMirroringEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MIRRORING_ENABLED, enabled).apply()
+    }
+
+    // --- Complication Settings ---
+
+    fun getComplicationSource(): String = prefs.getString(KEY_COMPLICATION_SOURCE, "most_recent") ?: "most_recent"
+
+    fun setComplicationSource(source: String) {
+        prefs.edit().putString(KEY_COMPLICATION_SOURCE, source).apply()
+    }
+
+    fun getComplicationApp(): String = prefs.getString(KEY_COMPLICATION_APP, "") ?: ""
+
+    fun setComplicationApp(packageName: String) {
+        prefs.edit().putString(KEY_COMPLICATION_APP, packageName).apply()
+    }
+
     // --- Default Vibration Pattern ---
 
     fun getDefaultVibrationPattern(): String {
@@ -208,41 +308,6 @@ class SettingsManager(context: Context) {
 
     fun removeVibrationPattern(packageName: String) {
         prefs.edit().remove(KEY_VIBRATION_PREFIX + packageName).apply()
-    }
-
-    // --- Per-App Sound ---
-
-    fun getSoundUri(packageName: String): String {
-        return prefs.getString(KEY_SOUND_PREFIX + packageName, "") ?: ""
-    }
-
-    fun getSoundDisplayName(packageName: String): String {
-        return prefs.getString(KEY_SOUND_NAME_PREFIX + packageName, "") ?: ""
-    }
-
-    fun setSoundUri(packageName: String, uri: String, displayName: String) {
-        prefs.edit()
-            .putString(KEY_SOUND_PREFIX + packageName, uri)
-            .putString(KEY_SOUND_NAME_PREFIX + packageName, displayName)
-            .apply()
-    }
-
-    fun removeSoundUri(packageName: String) {
-        prefs.edit()
-            .remove(KEY_SOUND_PREFIX + packageName)
-            .remove(KEY_SOUND_NAME_PREFIX + packageName)
-            .apply()
-    }
-
-    fun getAllCustomSounds(): Map<String, String> {
-        val result = mutableMapOf<String, String>()
-        for ((key, value) in prefs.all) {
-            if (key.startsWith(KEY_SOUND_NAME_PREFIX) && value is String && value.isNotEmpty()) {
-                val pkg = key.removePrefix(KEY_SOUND_NAME_PREFIX)
-                result[pkg] = value
-            }
-        }
-        return result
     }
 
     // --- Per-App Settings (null/empty = use global default) ---
@@ -318,12 +383,8 @@ class SettingsManager(context: Context) {
         return getPerAppInt("priority", packageName, getNotificationPriority())
     }
 
-    fun getEffectiveMirrorOngoing(packageName: String): Boolean {
-        return getPerAppBoolean("mirror_ongoing", packageName, isMirrorOngoingEnabled())
-    }
-
-    fun getEffectiveMirrorPersistent(packageName: String): Boolean {
-        return getPerAppBoolean("mirror_persistent", packageName, isMirrorPersistentEnabled())
+    fun getEffectiveOngoingMode(packageName: String): Int {
+        return getPerAppInt("ongoing_mode", packageName, getOngoingMode())
     }
 
     fun getEffectiveAutoCancel(packageName: String): Boolean {
@@ -346,6 +407,22 @@ class SettingsManager(context: Context) {
         return getPerAppInt("mute_duration", packageName, getMuteDurationMinutes())
     }
 
+    fun getEffectiveScreenOffMode(packageName: String): Int {
+        return getPerAppInt("screen_off_mode", packageName, getScreenOffMode())
+    }
+
+    fun getEffectiveMuteContinuation(packageName: String): Boolean {
+        return getPerAppBoolean("mute_continuation", packageName, isMuteContinuationEnabled())
+    }
+
+    fun getEffectiveShowSnoozeButton(packageName: String): Boolean {
+        return getPerAppBoolean("show_snooze", packageName, isShowSnoozeButtonEnabled())
+    }
+
+    fun getEffectiveSnoozeDuration(packageName: String): Int {
+        return getPerAppInt("snooze_duration", packageName, getSnoozeDurationMinutes())
+    }
+
     fun getEffectiveBigTextThreshold(packageName: String): Int {
         return getPerAppInt("big_text_threshold", packageName, getBigTextThreshold())
     }
@@ -355,26 +432,77 @@ class SettingsManager(context: Context) {
         return if (custom.isNotEmpty()) custom else getDefaultVibrationPattern()
     }
 
-    fun getEffectiveSoundUri(packageName: String): String {
-        return getSoundUri(packageName)
+    // --- Per-App Keyword Filters ---
+
+    fun getPerAppKeywordWhitelist(packageName: String): List<String> {
+        val raw = prefs.getString("per_app_keyword_whitelist_$packageName", "") ?: ""
+        return if (raw.isEmpty()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
+    }
+
+    fun setPerAppKeywordWhitelist(packageName: String, patterns: List<String>) {
+        prefs.edit().putString("per_app_keyword_whitelist_$packageName", patterns.joinToString("\n")).apply()
+    }
+
+    fun getPerAppKeywordBlacklist(packageName: String): List<String> {
+        val raw = prefs.getString("per_app_keyword_blacklist_$packageName", "") ?: ""
+        return if (raw.isEmpty()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
+    }
+
+    fun setPerAppKeywordBlacklist(packageName: String, patterns: List<String>) {
+        prefs.edit().putString("per_app_keyword_blacklist_$packageName", patterns.joinToString("\n")).apply()
+    }
+
+    fun clearPerAppKeywordFilters(packageName: String) {
+        prefs.edit()
+            .remove("per_app_keyword_whitelist_$packageName")
+            .remove("per_app_keyword_blacklist_$packageName")
+            .apply()
+    }
+
+    /**
+     * Check if a notification passes per-app keyword filters.
+     * Per-app filters are checked AFTER global filters.
+     * Returns true if notification should be mirrored.
+     */
+    fun passesPerAppKeywordFilter(packageName: String, title: String, text: String): Boolean {
+        val combined = "$title $text"
+
+        val blacklist = getPerAppKeywordBlacklist(packageName)
+        for (pattern in blacklist) {
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return false
+        }
+
+        val whitelist = getPerAppKeywordWhitelist(packageName)
+        if (whitelist.isEmpty()) return true
+
+        for (pattern in whitelist) {
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return true
+        }
+
+        return false
     }
 
     // Check if any per-app setting is customized
     fun hasAnyPerAppCustomization(packageName: String): Boolean {
-        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
-            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold")
+        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
+            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
+            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
         for (s in settings) {
             if (prefs.getBoolean(perAppEnabledKey(s, packageName), false)) return true
         }
         if (getVibrationPattern(packageName).isNotEmpty()) return true
-        if (getSoundUri(packageName).isNotEmpty()) return true
+        if (getPerAppKeywordWhitelist(packageName).isNotEmpty()) return true
+        if (getPerAppKeywordBlacklist(packageName).isNotEmpty()) return true
         return false
     }
 
     // Clear all per-app settings
     fun clearAllPerAppSettings(packageName: String) {
-        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "auto_cancel",
-            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold")
+        val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
+            "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
+            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
         val editor = prefs.edit()
         for (s in settings) {
             editor.remove(perAppEnabledKey(s, packageName))
@@ -382,7 +510,7 @@ class SettingsManager(context: Context) {
         }
         editor.apply()
         removeVibrationPattern(packageName)
-        removeSoundUri(packageName)
+        clearPerAppKeywordFilters(packageName)
     }
 
     /**
@@ -393,26 +521,16 @@ class SettingsManager(context: Context) {
 
         val blacklist = getKeywordBlacklist()
         for (pattern in blacklist) {
-            try {
-                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
-                    return false
-                }
-            } catch (_: Exception) {
-                // Invalid regex, skip
-            }
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return false
         }
 
         val whitelist = getKeywordWhitelist()
         if (whitelist.isEmpty()) return true
 
         for (pattern in whitelist) {
-            try {
-                if (Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(combined)) {
-                    return true
-                }
-            } catch (_: Exception) {
-                // Invalid regex, skip
-            }
+            val regex = getCachedRegex(pattern) ?: continue
+            if (regex.containsMatchIn(combined)) return true
         }
 
         return false

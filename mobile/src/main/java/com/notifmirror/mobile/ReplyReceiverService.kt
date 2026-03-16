@@ -24,6 +24,10 @@ class ReplyReceiverService : WearableListenerService() {
             "/reply" -> handleReply(messageEvent)
             "/action" -> handleAction(messageEvent)
             "/open_settings" -> handleOpenSettings()
+            "/snooze" -> handleSnooze(messageEvent)
+            "/request_key" -> handleKeyRequest()
+            "/mirroring_toggle" -> handleMirroringToggle(messageEvent)
+            "/request_sync" -> handleRequestSync()
         }
     }
 
@@ -100,6 +104,92 @@ class ReplyReceiverService : WearableListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle action", e)
             sendActionResult(false, "Failed: ${e.message}")
+        }
+    }
+
+    private fun handleSnooze(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val notifKey = json.getString("key")
+            val durationMs = json.optLong("durationMs", 300000L) // default 5 min
+
+            Log.d(TAG, "Received snooze request for $notifKey, duration ${durationMs}ms")
+
+            // Get the NotificationListenerService instance to call snoozeNotification
+            val listener = NotificationListener.instance
+            if (listener != null) {
+                listener.snoozeNotification(notifKey, durationMs)
+                Log.d(TAG, "Snoozed notification $notifKey for ${durationMs}ms")
+                sendActionResult(true, "Snoozed for ${durationMs / 60000} min")
+            } else {
+                Log.w(TAG, "NotificationListener not available for snooze")
+                sendActionResult(false, "Notification listener not active")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle snooze", e)
+            sendActionResult(false, "Snooze failed: ${e.message}")
+        }
+    }
+
+    private fun handleMirroringToggle(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val enabled = json.getBoolean("enabled")
+            Log.d(TAG, "Received mirroring toggle from watch: enabled=$enabled")
+            val settings = SettingsManager(this)
+            settings.setMirroringEnabled(enabled)
+            // Sync the new state back to watch via DataClient so the watch UI updates
+            // (DataClient requires data to actually change, so include a timestamp)
+            syncMirroringToWatch(enabled)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle mirroring toggle", e)
+        }
+    }
+
+    private fun syncMirroringToWatch(enabled: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch {
+            WearSyncHelper.syncMirroringToWatch(this@ReplyReceiverService, enabled)
+        }
+    }
+
+    /**
+     * Handle sync request from watch — re-sends all active notifications.
+     */
+    private fun handleRequestSync() {
+        Log.d(TAG, "Received sync request from watch")
+        val listener = NotificationListener.instance
+        if (listener != null) {
+            listener.syncAllActiveNotifications { count ->
+                Log.d(TAG, "Synced $count notifications to watch (requested by watch)")
+            }
+        } else {
+            Log.w(TAG, "NotificationListener not active — cannot sync")
+        }
+    }
+
+    private fun handleKeyRequest() {
+        Log.d(TAG, "Watch requested encryption key — re-syncing")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Try via NotificationListener instance first (it has the full sync logic)
+                val listener = NotificationListener.instance
+                if (listener != null) {
+                    listener.resyncEncryptionKey()
+                } else {
+                    // Fallback: sync key directly via DataClient
+                    val keyBytes = CryptoHelper.getKeyBytes(this@ReplyReceiverService)
+                    val putReq = com.google.android.gms.wearable.PutDataMapRequest.create("/crypto_key").apply {
+                        dataMap.putByteArray("aes_key", keyBytes)
+                        dataMap.putLong("timestamp", System.currentTimeMillis())
+                    }
+                    Wearable.getDataClient(this@ReplyReceiverService)
+                        .putDataItem(putReq.asPutDataRequest().setUrgent())
+                        .await()
+                    Log.d(TAG, "Encryption key synced to watch (direct)")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to re-sync encryption key", e)
+            }
         }
     }
 
