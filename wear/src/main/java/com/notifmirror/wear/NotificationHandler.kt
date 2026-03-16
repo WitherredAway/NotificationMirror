@@ -389,7 +389,7 @@ object NotificationHandler {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
-            .setSilent(silentUpdate)
+            .setSilent(isSilent || vibrateOnly || silentUpdate)
 
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
