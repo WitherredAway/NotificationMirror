@@ -232,7 +232,8 @@ object NotificationHandler {
                 isSilent = isSilent, isOngoing = isOngoing,
                 hideContent = hideContent, silentUpdate = (isUpdate && muteContinuation) || isReplyUpdate,
                 conversationHistory = messages,
-                vibrateOnly = vibrateOnly
+                vibrateOnly = vibrateOnly,
+                conversationTitle = conversationTitle
             )
 
             if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
@@ -318,7 +319,8 @@ object NotificationHandler {
         hideContent: Boolean = false,
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList(),
-        vibrateOnly: Boolean = false
+        vibrateOnly: Boolean = false,
+        conversationTitle: String = ""
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -409,7 +411,7 @@ object NotificationHandler {
             val isGroupConversation = distinctSenders.size > 1
             val messagingStyle = NotificationCompat.MessagingStyle(selfPerson)
                 .setGroupConversation(isGroupConversation)
-                .setConversationTitle(if (isGroupConversation) title else null)
+                .setConversationTitle(if (isGroupConversation) (conversationTitle.ifEmpty { title }) else null)
             for ((idx, pair) in recent.withIndex()) {
                 val (senderName, msgText) = pair
                 // For self-messages ("You"), pass null as sender so MessagingStyle
@@ -421,9 +423,9 @@ object NotificationHandler {
             }
             builder.setStyle(messagingStyle)
             builder.setNumber(conversationHistory.size)
-            // Override contentTitle for MessagingStyle: use title (chat name) with
+            // Override contentTitle for MessagingStyle: use group name (or title for 1:1) with
             // app label in subText, so WearOS doesn't show "AppLabel: Title" redundantly
-            builder.setContentTitle(title)
+            builder.setContentTitle(if (conversationTitle.isNotEmpty()) conversationTitle else title)
             builder.setSubText(appLabel)
         } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
