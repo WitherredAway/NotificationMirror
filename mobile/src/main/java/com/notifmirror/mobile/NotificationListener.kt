@@ -469,6 +469,7 @@ class NotificationListener : NotificationListenerService() {
                         put("muteContinuation", settings.getEffectiveMuteContinuation(appPackageName))
                         put("batterySaverEnabled", settings.isBatterySaverEnabled())
                         put("batterySaverThreshold", settings.getBatterySaverThreshold())
+                        put("vibrateOnlyWhenUnlocked", settings.getEffectiveVibrateOnlyWhenUnlocked(appPackageName))
                         val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
                         if (effectiveVib.isNotEmpty()) put("vibrationPattern", effectiveVib)
                         put("complicationSource", settings.getComplicationSource())
