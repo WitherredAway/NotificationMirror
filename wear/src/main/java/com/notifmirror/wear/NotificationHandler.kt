@@ -1,6 +1,5 @@
 package com.notifmirror.wear
 
-import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationChannelGroup
 import android.app.NotificationManager
@@ -73,7 +72,7 @@ object NotificationHandler {
             val isOngoing = json.optBoolean("isOngoing", false)
             val hideContent = json.optBoolean("hideContent", false)
             val muteContinuation = json.optBoolean("muteContinuation", false)
-            val vibrateOnlyWhenUnlocked = json.optBoolean("vibrateOnlyWhenUnlocked", false)
+            val vibrateOnly = json.optBoolean("vibrateOnly", false)
             // Respect both phone-side and watch-side history settings
             val phoneKeepHistory = json.optBoolean("keepHistory", true)
             val watchKeepHistory = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
@@ -201,7 +200,7 @@ object NotificationHandler {
                 isSilent = isSilent, isOngoing = isOngoing,
                 hideContent = hideContent, silentUpdate = isUpdate && muteContinuation,
                 conversationHistory = messages,
-                vibrateOnlyWhenUnlocked = vibrateOnlyWhenUnlocked
+                vibrateOnly = vibrateOnly
             )
 
             if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
@@ -243,7 +242,9 @@ object NotificationHandler {
             // Cancel the per-app summary if no more notifications for this package
             if (packageName.isNotEmpty()) {
                 val hasOtherNotifs = synchronized(idLock) {
-                    notifIdMap.keys.any { k -> k.contains(packageName) }
+                    notifIdMap.keys.any { k ->
+                        k == packageName || k.startsWith("$packageName:")
+                    }
                 }
                 if (!hasOtherNotifs) {
                     nm.cancel(packageName.hashCode() + SUMMARY_ID_OFFSET)
@@ -285,7 +286,7 @@ object NotificationHandler {
         hideContent: Boolean = false,
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList(),
-        vibrateOnlyWhenUnlocked: Boolean = false
+        vibrateOnly: Boolean = false
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -348,7 +349,7 @@ object NotificationHandler {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(displayTitle)
             .setContentText(displayText)
-            .setPriority(if (isSilent || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
+            .setPriority(if (isSilent || vibrateOnly || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(if (isOngoing) false else autoCancel)
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
@@ -512,18 +513,11 @@ object NotificationHandler {
         nm.notify(notifId, builder.build())
 
         // Manually vibrate if not a silent update, not isSilent, and not low priority
+        // vibrateOnly mode: suppress sound (via low-priority notification) but still vibrate
         if (!silentUpdate && !isSilent && notifPriority != -1) {
-            // If "vibrate only when unlocked" is enabled, skip vibration when watch is locked
-            if (vibrateOnlyWhenUnlocked) {
-                val km = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                if (km.isKeyguardLocked) {
-                    Log.d(TAG, "Skipping vibration: watch screen is locked (vibrateOnlyWhenUnlocked=true)")
-                } else {
-                    vibrateManually(context, vibrationPattern)
-                }
-            } else {
-                vibrateManually(context, vibrationPattern)
-            }
+            vibrateManually(context, vibrationPattern)
+        } else if (vibrateOnly && !silentUpdate) {
+            vibrateManually(context, vibrationPattern)
         }
 
         // Create/update summary notification for the per-app group

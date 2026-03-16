@@ -38,12 +38,12 @@ class SettingsManager(context: Context) {
         private const val KEY_COMPLICATION_SOURCE = "complication_source"
         private const val KEY_COMPLICATION_APP = "complication_app"
         private const val KEY_MIRRORING_ENABLED = "mirroring_enabled"
-        private const val KEY_VIBRATE_ONLY_UNLOCKED = "vibrate_only_when_unlocked"
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
         const val SCREEN_MODE_SCREEN_OFF_ONLY = 1
         const val SCREEN_MODE_SILENT_WHEN_ON = 2
+        const val SCREEN_MODE_VIBRATE_ONLY_WHEN_ON = 3
 
         // Notification priority values
         const val PRIORITY_HIGH = 1
@@ -217,7 +217,7 @@ class SettingsManager(context: Context) {
 
     // --- Mute Continuation Alerts ---
 
-    fun isMuteContinuationEnabled(): Boolean = prefs.getBoolean(KEY_MUTE_CONTINUATION, false)
+    fun isMuteContinuationEnabled(): Boolean = prefs.getBoolean(KEY_MUTE_CONTINUATION, true)
 
     fun setMuteContinuationEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_MUTE_CONTINUATION, enabled).apply()
@@ -273,14 +273,6 @@ class SettingsManager(context: Context) {
 
     fun setComplicationApp(packageName: String) {
         prefs.edit().putString(KEY_COMPLICATION_APP, packageName).apply()
-    }
-
-    // --- Vibrate Only When Unlocked ---
-
-    fun isVibrateOnlyWhenUnlockedEnabled(): Boolean = prefs.getBoolean(KEY_VIBRATE_ONLY_UNLOCKED, false)
-
-    fun setVibrateOnlyWhenUnlockedEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_VIBRATE_ONLY_UNLOCKED, enabled).apply()
     }
 
     // --- Default Vibration Pattern ---
@@ -433,10 +425,6 @@ class SettingsManager(context: Context) {
 
     fun getEffectiveBigTextThreshold(packageName: String): Int {
         return getPerAppInt("big_text_threshold", packageName, getBigTextThreshold())
-    }
-
-    fun getEffectiveVibrateOnlyWhenUnlocked(packageName: String): Boolean {
-        return getPerAppBoolean("vibrate_only_unlocked", packageName, isVibrateOnlyWhenUnlockedEnabled())
     }
 
     fun getEffectiveVibrationPattern(packageName: String): String {

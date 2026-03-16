@@ -92,6 +92,7 @@
 <RadioButton android:id="@+id/perAppRadioAlways" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Always mirror" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
 <RadioButton android:id="@+id/perAppRadioScreenOff" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Only mirror when screen is off" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
 <RadioButton android:id="@+id/perAppRadioSilent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Mirror always, but silent when screen is on" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+<RadioButton android:id="@+id/perAppRadioVibrateOnlyWhenOn" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Mirror always, vibrate only (no sound) when screen is on" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
 </RadioGroup>
 
 <!-- Mute Continuation -->
@@ -308,16 +309,6 @@
     android:textStyle="bold"
     android:textColor="?colorPrimary"
     android:letterSpacing="0.1" />
-
-<!-- Vibrate Only When Unlocked -->
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<CheckBox android:id="@+id/overrideVibrateOnlyUnlocked" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vibrate Only When Unlocked" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Only vibrate on watch if the watch screen is unlocked" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppVibrateOnlyUnlocked" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
 
 <TextView
     android:layout_width="wrap_content"

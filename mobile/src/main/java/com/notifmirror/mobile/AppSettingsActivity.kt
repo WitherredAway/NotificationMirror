@@ -78,7 +78,6 @@ class AppSettingsActivity : AppCompatActivity() {
         val vibrationPatternLabel = findViewById<TextView>(R.id.vibrationPatternLabel)
         val defaultVibrationInput = findViewById<EditText>(R.id.defaultVibrationInput)
         val saveButton = findViewById<MaterialButton>(R.id.saveSettingsButton)
-        val vibrateOnlyUnlockedSwitch = findViewById<SwitchMaterial>(R.id.vibrateOnlyUnlockedSwitch)
         var currentVibrationPattern = settings.getDefaultVibrationPattern()
 
         // Load current values - Behavior
@@ -94,6 +93,7 @@ class AppSettingsActivity : AppCompatActivity() {
             SettingsManager.SCREEN_MODE_ALWAYS -> screenModeGroup.check(R.id.radioAlways)
             SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY -> screenModeGroup.check(R.id.radioScreenOff)
             SettingsManager.SCREEN_MODE_SILENT_WHEN_ON -> screenModeGroup.check(R.id.radioSilent)
+            SettingsManager.SCREEN_MODE_VIBRATE_ONLY_WHEN_ON -> screenModeGroup.check(R.id.radioVibrateOnlyWhenOn)
         }
 
         // Load current values - Watch notifications
@@ -135,9 +135,6 @@ class AppSettingsActivity : AppCompatActivity() {
         }
 
         // Note: complicationSourceGroup listener is set below with showSave integration
-
-        // Load current values - Vibration
-        vibrateOnlyUnlockedSwitch.isChecked = settings.isVibrateOnlyWhenUnlockedEnabled()
 
         // Hide when locked
         val hideWhenLockedSwitch = findViewById<SwitchMaterial>(R.id.hideWhenLockedSwitch)
@@ -197,7 +194,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val switches = listOf(dndSwitch,
             autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch,
             hideWhenLockedSwitch, muteContinuationSwitch, keepHistorySwitch,
-            showSnoozeButtonSwitch, batterySaverSwitch, vibrateOnlyUnlockedSwitch)
+            showSnoozeButtonSwitch, batterySaverSwitch)
         for (sw in switches) {
             sw.setOnCheckedChangeListener { _, _ -> showSave() }
         }
@@ -278,6 +275,7 @@ class AppSettingsActivity : AppCompatActivity() {
             val mode = when (screenModeGroup.checkedRadioButtonId) {
                 R.id.radioScreenOff -> SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY
                 R.id.radioSilent -> SettingsManager.SCREEN_MODE_SILENT_WHEN_ON
+                R.id.radioVibrateOnlyWhenOn -> SettingsManager.SCREEN_MODE_VIBRATE_ONLY_WHEN_ON
                 else -> SettingsManager.SCREEN_MODE_ALWAYS
             }
             settings.setScreenOffMode(mode)
@@ -296,7 +294,6 @@ class AppSettingsActivity : AppCompatActivity() {
             settings.setHideWhenLockedEnabled(hideWhenLockedSwitch.isChecked)
             settings.setMuteContinuationEnabled(muteContinuationSwitch.isChecked)
             settings.setShowSnoozeButtonEnabled(showSnoozeButtonSwitch.isChecked)
-            settings.setVibrateOnlyWhenUnlockedEnabled(vibrateOnlyUnlockedSwitch.isChecked)
             settings.setBatterySaverEnabled(batterySaverSwitch.isChecked)
             settings.setSnoozeDurationMinutes(snoozeDur)
             settings.setBatterySaverThreshold(batteryThreshold)

@@ -231,6 +231,10 @@ class NotificationListener : NotificationListenerService() {
             if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
                 put("silent", true)
             }
+            // Vibrate only (no sound) when screen is on
+            if (screenMode == SettingsManager.SCREEN_MODE_VIBRATE_ONLY_WHEN_ON && pm.isInteractive) {
+                put("vibrateOnly", true)
+            }
             // Hide notification content if phone is locked and setting is enabled
             val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
             if (settings.isHideWhenLockedEnabled() && km.isKeyguardLocked) {
@@ -241,8 +245,6 @@ class NotificationListener : NotificationListenerService() {
             // Send battery saver settings so watch can check locally
             put("batterySaverEnabled", settings.isBatterySaverEnabled())
             put("batterySaverThreshold", settings.getBatterySaverThreshold())
-            // Send vibrate-only-when-unlocked setting (per-app with global fallback)
-            put("vibrateOnlyWhenUnlocked", settings.getEffectiveVibrateOnlyWhenUnlocked(appPackageName))
             // Send effective vibration pattern (per-app or default)
             val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
             if (effectiveVib.isNotEmpty()) {
@@ -462,6 +464,9 @@ class NotificationListener : NotificationListenerService() {
                         if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
                             put("silent", true)
                         }
+                        if (screenMode == SettingsManager.SCREEN_MODE_VIBRATE_ONLY_WHEN_ON && pm.isInteractive) {
+                            put("vibrateOnly", true)
+                        }
                         val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
                         if (settings.isHideWhenLockedEnabled() && km.isKeyguardLocked) {
                             put("hideContent", true)
@@ -469,7 +474,6 @@ class NotificationListener : NotificationListenerService() {
                         put("muteContinuation", settings.getEffectiveMuteContinuation(appPackageName))
                         put("batterySaverEnabled", settings.isBatterySaverEnabled())
                         put("batterySaverThreshold", settings.getBatterySaverThreshold())
-                        put("vibrateOnlyWhenUnlocked", settings.getEffectiveVibrateOnlyWhenUnlocked(appPackageName))
                         val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
                         if (effectiveVib.isNotEmpty()) put("vibrationPattern", effectiveVib)
                         put("complicationSource", settings.getComplicationSource())
