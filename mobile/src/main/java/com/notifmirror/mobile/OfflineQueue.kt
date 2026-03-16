@@ -88,10 +88,17 @@ class OfflineQueue(private val context: Context) {
         val raw = prefs.getString(KEY_QUEUE, "[]") ?: "[]"
         return try {
             val arr = JSONArray(raw)
-            // Migrate plaintext to encrypted
+            // Migrate plaintext to encrypted — verify round-trip before removing plaintext
             if (arr.length() > 0) {
                 saveQueue(arr)
-                prefs.edit().remove(KEY_QUEUE).apply()
+                val verifyEncrypted = prefs.getString(KEY_QUEUE_ENCRYPTED, null)
+                if (verifyEncrypted != null) {
+                    try {
+                        val verifyDecrypted = CryptoHelper.decryptString(verifyEncrypted, context)
+                        JSONArray(verifyDecrypted) // verify it parses
+                        prefs.edit().remove(KEY_QUEUE).apply()
+                    } catch (_: Exception) { /* keep plaintext */ }
+                }
             }
             arr
         } catch (_: Exception) {

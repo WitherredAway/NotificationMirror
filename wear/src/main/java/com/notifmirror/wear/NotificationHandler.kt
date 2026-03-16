@@ -311,7 +311,7 @@ object NotificationHandler {
             val channel = NotificationChannel(
                 channelId,
                 appLabel,
-                if (isSilent) NotificationManager.IMPORTANCE_LOW else importance
+                importance
             ).apply {
                 description = "Mirrored notifications from $appLabel"
                 // Vibration is handled manually via Vibrator API
