@@ -265,7 +265,6 @@ class NotificationListener : NotificationListenerService() {
                     Log.w(TAG, "No connected watch nodes found")
                     // Queue for offline delivery
                     offlineQueue.enqueue(json)
-                    sentNotificationKeys.add(notifKey)
                     if (settings.isKeepNotificationHistoryEnabled()) {
                         notifLog.addEntry(
                             appPackageName, title, displayText, "QUEUED",
@@ -595,6 +594,8 @@ class NotificationListener : NotificationListenerService() {
                             .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
                             .await()
                     }
+                    val queuedKey = queuedJson.optString("key", "")
+                    if (queuedKey.isNotEmpty()) sentNotificationKeys.add(queuedKey)
                     Log.d(TAG, "Delivered queued notification: ${queuedJson.optString("package", "unknown")}")
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to send queued notification, re-queuing", e)
