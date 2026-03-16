@@ -15,6 +15,7 @@ import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
@@ -67,7 +68,15 @@ class ReplyActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
+    }
+
     private fun sendReply(notifKey: String, replyText: String, notifId: Int, actionIndex: Int) {
+        // Mark this conversation as recently replied so the next update is silent
+        NotificationHandler.markReplied(notifKey)
+
         val json = JSONObject().apply {
             put("key", notifKey)
             put("actionIndex", actionIndex)

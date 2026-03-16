@@ -42,8 +42,25 @@ object NotificationHandler {
     private val nextId = java.util.concurrent.atomic.AtomicInteger(1000)
     private val idLock = Any()
     private const val SUMMARY_ID_OFFSET = 500000
+    private const val MAX_TRACKED_CONVERSATIONS = 200
 
     private val DEFAULT_VIBRATION = longArrayOf(0, 200, 100, 200)
+
+    // Track recently replied conversation keys to suppress re-alert when app updates with your reply
+    private val recentReplies = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private const val REPLY_SILENCE_WINDOW_MS = 15000L // 15 seconds
+
+    /** Called by ReplyActivity after sending a reply to mark the conversation as recently replied */
+    fun markReplied(notifKey: String) {
+        // Map from notification key to conversation key
+        val conversationKey = notifKeyToConversationKey[notifKey] ?: notifKey
+        recentReplies[conversationKey] = System.currentTimeMillis()
+        // Also store by raw notif key in case conversation key lookup fails later
+        recentReplies[notifKey] = System.currentTimeMillis()
+        // Clean up old entries
+        val now = System.currentTimeMillis()
+        recentReplies.entries.removeAll { now - it.value > REPLY_SILENCE_WINDOW_MS * 2 }
+    }
 
     fun handleNotification(context: Context, messageEvent: MessageEvent) {
         val notifLog = NotificationLog(context)
@@ -73,14 +90,15 @@ object NotificationHandler {
             val hideContent = json.optBoolean("hideContent", false)
             val muteContinuation = json.optBoolean("muteContinuation", false)
             val vibrateOnly = json.optBoolean("vibrateOnly", false)
+            // Single SharedPreferences lookup for all watch-side settings
+            val watchSettings = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
+
             // Respect both phone-side and watch-side history settings
             val phoneKeepHistory = json.optBoolean("keepHistory", true)
-            val watchKeepHistory = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
-                .getBoolean("keep_notification_history", true)
+            val watchKeepHistory = watchSettings.getBoolean("keep_notification_history", true)
             val keepHistory = phoneKeepHistory && watchKeepHistory
 
             // Battery saver: check both phone-side and watch-side settings
-            val watchSettings = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
             val phoneBatterySaverEnabled = json.optBoolean("batterySaverEnabled", false)
             val watchBatterySaverEnabled = watchSettings.getBoolean("battery_saver_enabled", false)
             val batterySaverEnabled = phoneBatterySaverEnabled || watchBatterySaverEnabled
@@ -101,8 +119,7 @@ object NotificationHandler {
             Log.d(TAG, "Received notification: $title - $text")
 
             // Respect watch-side mirroring toggle (synced from phone via DataClient)
-            val watchMirroringEnabled = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
-                .getBoolean("mirroring_enabled", true)
+            val watchMirroringEnabled = watchSettings.getBoolean("mirroring_enabled", true)
             if (!watchMirroringEnabled) {
                 Log.d(TAG, "Skipping notification — mirroring disabled on watch")
                 return
@@ -125,9 +142,23 @@ object NotificationHandler {
             val conversationKey = deriveConversationKey(packageName, key, title, isMessagingStyle)
             // Track reverse mapping for dismissals
             notifKeyToConversationKey[key] = conversationKey
+            pruneTrackingMapsIfNeeded()
 
             // Reuse notification ID for same conversation key to stack messages
             // Synchronized to avoid race conditions across all shared mutable state
+            // Check if this is a reply-triggered update (silence it)
+            val isReplyUpdate = recentReplies[conversationKey]?.let {
+                System.currentTimeMillis() - it < REPLY_SILENCE_WINDOW_MS
+            } == true || recentReplies[key]?.let {
+                System.currentTimeMillis() - it < REPLY_SILENCE_WINDOW_MS
+            } == true
+            if (isReplyUpdate) {
+                Log.d(TAG, "Reply-triggered update detected for $conversationKey, will silence")
+                // Clean up the reply marker
+                recentReplies.remove(conversationKey)
+                recentReplies.remove(key)
+            }
+
             val (isUpdate, notifId, messages) = synchronized(idLock) {
                 val existing = notifIdMap.containsKey(conversationKey)
                 val id = notifIdMap.getOrPut(conversationKey) { nextId.getAndIncrement() }
@@ -198,7 +229,7 @@ object NotificationHandler {
                 muteDuration = muteDuration, showSnoozeButton = showSnoozeButton, snoozeDuration = snoozeDuration,
                 defaultVibration = defaultVibration, customVibrationPattern = customVibrationPattern,
                 isSilent = isSilent, isOngoing = isOngoing,
-                hideContent = hideContent, silentUpdate = isUpdate && muteContinuation,
+                hideContent = hideContent, silentUpdate = (isUpdate && muteContinuation) || isReplyUpdate,
                 conversationHistory = messages,
                 vibrateOnly = vibrateOnly
             )
@@ -642,6 +673,15 @@ object NotificationHandler {
 
     // Reverse lookup: find conversation key from notification key
     private val notifKeyToConversationKey = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Prune tracking maps if they grow too large to keep memory bounded */
+    private fun pruneTrackingMapsIfNeeded() {
+        if (notifKeyToConversationKey.size > MAX_TRACKED_CONVERSATIONS * 2) {
+            // Only keep entries that have a corresponding notifIdMap entry
+            val activeConvKeys = synchronized(idLock) { notifIdMap.keys.toSet() }
+            notifKeyToConversationKey.entries.removeAll { it.value !in activeConvKeys }
+        }
+    }
 
     private val KNOWN_WATCH_PACKAGES = mapOf(
         "com.google.android.apps.messaging" to "com.google.android.apps.messaging",

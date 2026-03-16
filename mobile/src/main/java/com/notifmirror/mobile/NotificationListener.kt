@@ -35,8 +35,29 @@ class NotificationListener : NotificationListenerService() {
         // Track notification keys that were actually sent/queued to the watch
         // so we only send dismiss events for notifications the watch knows about
         private val sentNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        private const val MAX_PENDING_ACTIONS = 500
+        private const val MAX_SENT_KEYS = 500
         var instance: NotificationListener? = null
             private set
+
+        /** Prune pendingActions if it grows too large (keeps memory bounded) */
+        private fun pruneActionsIfNeeded() {
+            if (pendingActions.size > MAX_PENDING_ACTIONS) {
+                val keysToRemove = pendingActions.keys.take(pendingActions.size - MAX_PENDING_ACTIONS)
+                keysToRemove.forEach { pendingActions.remove(it) }
+            }
+        }
+
+        /** Prune sentNotificationKeys if it grows too large */
+        private fun pruneSentKeysIfNeeded() {
+            synchronized(sentNotificationKeys) {
+                if (sentNotificationKeys.size > MAX_SENT_KEYS) {
+                    val excess = sentNotificationKeys.size - MAX_SENT_KEYS
+                    val iter = sentNotificationKeys.iterator()
+                    repeat(excess) { if (iter.hasNext()) { iter.next(); iter.remove() } }
+                }
+            }
+        }
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -176,6 +197,7 @@ class NotificationListener : NotificationListenerService() {
                 }
                 actionsJson.put(actionJson)
             }
+            pruneActionsIfNeeded()
         }
 
         // Resolve actual app label from PackageManager
@@ -292,6 +314,7 @@ class NotificationListener : NotificationListenerService() {
                     Log.d(TAG, "Sent to node: ${node.displayName}")
                 }
                 sentNotificationKeys.add(notifKey)
+                pruneSentKeysIfNeeded()
 
                 // Also flush any queued notifications
                 if (!offlineQueue.isEmpty()) {

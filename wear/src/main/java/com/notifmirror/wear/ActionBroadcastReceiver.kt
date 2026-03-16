@@ -42,6 +42,7 @@ class ActionBroadcastReceiver : BroadcastReceiver() {
 
         awaitingResult = true
 
+        val pendingResult = goAsync()
         scope.launch {
             try {
                 val nodeClient = Wearable.getNodeClient(context)
@@ -72,6 +73,8 @@ class ActionBroadcastReceiver : BroadcastReceiver() {
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(context, "Failed to reach phone", Toast.LENGTH_SHORT).show()
                 }
+            } finally {
+                pendingResult.finish()
             }
         }
     }

@@ -43,6 +43,7 @@ class SnoozeBroadcastReceiver : BroadcastReceiver() {
             put("durationMs", durationMs)
         }
 
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val nodeClient = Wearable.getNodeClient(context)
@@ -55,6 +56,8 @@ class SnoozeBroadcastReceiver : BroadcastReceiver() {
                 Log.d(TAG, "Snooze request sent to phone for $notifKey")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send snooze request", e)
+            } finally {
+                pendingResult.finish()
             }
         }
 

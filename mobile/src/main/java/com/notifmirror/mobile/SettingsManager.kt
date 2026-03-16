@@ -217,7 +217,7 @@ class SettingsManager(context: Context) {
 
     // --- Mute Continuation Alerts ---
 
-    fun isMuteContinuationEnabled(): Boolean = prefs.getBoolean(KEY_MUTE_CONTINUATION, true)
+    fun isMuteContinuationEnabled(): Boolean = prefs.getBoolean(KEY_MUTE_CONTINUATION, false)
 
     fun setMuteContinuationEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_MUTE_CONTINUATION, enabled).apply()

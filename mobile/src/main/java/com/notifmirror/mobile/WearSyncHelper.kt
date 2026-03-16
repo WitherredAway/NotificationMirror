@@ -19,6 +19,14 @@ object WearSyncHelper {
 
     private const val TAG = "WearSyncHelper"
 
+    // LRU cache for app icon Base64 strings to avoid re-encoding on every notification
+    private val iconCache = object : LinkedHashMap<String, String>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean {
+            return size > 50
+        }
+    }
+    private val iconCacheLock = Any()
+
     /**
      * Sync the mirroring enabled/disabled state to the watch via DataClient.
      * Must be called from a coroutine (suspend function).
@@ -43,6 +51,10 @@ object WearSyncHelper {
      * Returns null if the icon cannot be loaded.
      */
     fun getAppIconBase64(context: Context, packageName: String): String? {
+        // Check cache first
+        synchronized(iconCacheLock) {
+            iconCache[packageName]?.let { return it }
+        }
         return try {
             val iconSize = 48
             val iconQuality = 80
@@ -58,7 +70,15 @@ object WearSyncHelper {
             }
             val stream = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.PNG, iconQuality, stream)
-            Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+            // Recycle bitmap if we created a new one (not the original drawable bitmap)
+            if (drawable !is BitmapDrawable) {
+                bitmap.recycle()
+            }
+            val encoded = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+            synchronized(iconCacheLock) {
+                iconCache[packageName] = encoded
+            }
+            encoded
         } catch (e: Exception) {
             Log.w(TAG, "Failed to get icon for $packageName", e)
             null
