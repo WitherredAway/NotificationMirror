@@ -153,7 +153,7 @@ class SettingsManager(context: Context) {
 
     // --- BigText Threshold ---
 
-    fun getBigTextThreshold(): Int = prefs.getInt(KEY_BIG_TEXT_THRESHOLD, 40)
+    fun getBigTextThreshold(): Int = prefs.getInt(KEY_BIG_TEXT_THRESHOLD, 1)
 
     fun setBigTextThreshold(threshold: Int) {
         prefs.edit().putInt(KEY_BIG_TEXT_THRESHOLD, threshold).apply()

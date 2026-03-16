@@ -164,7 +164,7 @@ object NotificationHandler {
                 val existing = notifIdMap.containsKey(conversationKey)
                 val id = notifIdMap.getOrPut(conversationKey) { nextId.getAndIncrement() }
 
-                // Track conversation messages for stacking (cap at 20 to avoid unbounded memory growth)
+                // Track conversation messages for stacking (cap at 50 to avoid unbounded memory growth)
                 val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
 
                 // If the phone sent pre-extracted conversation messages, use them as the
@@ -189,7 +189,7 @@ object NotificationHandler {
                         msgList.add(Pair(title, text))
                     }
                 }
-                while (msgList.size > 20) { msgList.removeAt(0) }
+                while (msgList.size > 50) { msgList.removeAt(0) }
 
                 // Take a snapshot of messages for use outside the lock
                 Triple(existing, id, ArrayList(msgList))
@@ -405,7 +405,7 @@ object NotificationHandler {
 
         // Stack conversation messages using MessagingStyle for better WearOS rendering
         if (!hideContent && conversationHistory.size > 1) {
-            val recent = conversationHistory.takeLast(20)
+            val recent = conversationHistory.takeLast(50)
             val selfPerson = Person.Builder().setName("You").build()
             val distinctSenders = recent.map { it.first }.distinct()
             val isGroupConversation = distinctSenders.size > 1
