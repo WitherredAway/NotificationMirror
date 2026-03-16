@@ -70,12 +70,6 @@ class NotificationListener : NotificationListenerService() {
                 .putDataItem(putReq.asPutDataRequest().setUrgent())
                 .await()
             Log.d(TAG, "Encryption key synced to watch")
-            if (settings.isKeepNotificationHistoryEnabled()) {
-                notifLog.addEntry(
-                    "system", "Key Sync", "Encryption key synced to watch",
-                    "KEY_SYNC", "Attempt ${retryCount + 1}"
-                )
-            }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to sync encryption key (attempt ${retryCount + 1})", e)
             if (retryCount < 3) {
@@ -495,12 +489,6 @@ class NotificationListener : NotificationListenerService() {
                 }
 
                 Log.d(TAG, "Sync complete: $syncCount notifications sent")
-                if (settings.isKeepNotificationHistoryEnabled()) {
-                    notifLog.addEntry(
-                        "system", "Sync", "$syncCount notifications synced to watch",
-                        "SYNC", "Manual sync from phone"
-                    )
-                }
                 onComplete?.invoke(syncCount)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to sync notifications", e)
@@ -531,16 +519,7 @@ class NotificationListener : NotificationListenerService() {
                 val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
                 val encryptedBytes = CryptoHelper.encrypt(plainBytes, key)
                 sendToWatch(encryptedBytes, PATH_DISMISS)
-                if (settings.isKeepNotificationHistoryEnabled()) {
-                    val appLabel = try {
-                        val ai = packageManager.getApplicationInfo(sbn.packageName, 0)
-                        packageManager.getApplicationLabel(ai).toString()
-                    } catch (_: Exception) { sbn.packageName }
-                    notifLog.addEntry(
-                        sbn.packageName, "Dismissed", appLabel, "DISMISS",
-                        "Auto-dismiss synced to watch"
-                    )
-                }
+                Log.d(TAG, "Dismiss synced to watch for ${sbn.packageName}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send dismissal to watch", e)
             }
@@ -561,9 +540,10 @@ class NotificationListener : NotificationListenerService() {
         if (msgBundle != null && msgBundle.isNotEmpty()) {
             for (item in msgBundle) {
                 if (item is android.os.Bundle) {
+                    // sender is null for messages sent by the current user (MessagingStyle convention)
                     val sender = item.getCharSequence("sender")?.toString()
                         ?: item.getCharSequence("sender_person")?.toString()
-                        ?: title
+                        ?: "You"
                     val msgText = item.getCharSequence("text")?.toString() ?: continue
                     messages.add(Pair(sender, msgText))
                 }
@@ -598,12 +578,6 @@ class NotificationListener : NotificationListenerService() {
         try {
             val queued = offlineQueue.dequeueAll()
             Log.d(TAG, "Flushing ${queued.size} queued notifications")
-            if (settings.isKeepNotificationHistoryEnabled()) {
-                notifLog.addEntry(
-                    "system", "Queue Flush", "${queued.size} queued notifications",
-                    "QUEUE_FLUSH", "Flushing to ${nodes.size} node(s)"
-                )
-            }
             val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
             for (queuedJson in queued) {
                 try {
@@ -614,11 +588,7 @@ class NotificationListener : NotificationListenerService() {
                             .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
                             .await()
                     }
-                    val pkg = queuedJson.optString("package", "unknown")
-                    val title = queuedJson.optString("title", "")
-                    if (settings.isKeepNotificationHistoryEnabled()) {
-                        notifLog.addEntry(pkg, title, "", "DELIVERED", "From offline queue")
-                    }
+                    Log.d(TAG, "Delivered queued notification: ${queuedJson.optString("package", "unknown")}")
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to send queued notification, re-queuing", e)
                     offlineQueue.enqueue(queuedJson)

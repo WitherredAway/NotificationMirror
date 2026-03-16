@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var connectedNodeName: String? = null
+    private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -199,6 +200,23 @@ class MainActivity : AppCompatActivity() {
         // Proactively pull encryption key from DataClient on app launch
         pullEncryptionKeyFromDataClient()
 
+        // Listen for mirroring state changes from phone (via DataClient → SharedPreferences)
+        prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "mirroring_enabled") {
+                runOnUiThread {
+                    val enabled = prefs.getBoolean("mirroring_enabled", true)
+                    mirroringSwitch.isChecked = enabled
+                }
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        val prefs = getSharedPreferences("notif_mirror_settings", MODE_PRIVATE)
+        prefsListener?.let { prefs.unregisterOnSharedPreferenceChangeListener(it) }
     }
 
     /**

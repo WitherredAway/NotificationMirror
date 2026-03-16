@@ -91,13 +91,13 @@ class NotificationLog(private val context: Context) {
         val json = entries.toString()
         try {
             val encrypted = CryptoHelper.encryptString(json, context)
-            // Keep plaintext alongside encrypted during migration for safety
             prefs.edit()
                 .putString(KEY_LOG_ENCRYPTED, encrypted)
+                .remove(KEY_LOG)
                 .apply()
-        } catch (_: Exception) {
-            // Fallback to plaintext if encryption fails
-            prefs.edit().putString(KEY_LOG, json).apply()
+        } catch (e: Exception) {
+            // Never store plaintext — log the failure and skip saving
+            android.util.Log.w("NotificationLog", "Failed to encrypt log entries, skipping save", e)
         }
     }
 
@@ -109,30 +109,28 @@ class NotificationLog(private val context: Context) {
                 val decrypted = CryptoHelper.decryptString(encrypted, context)
                 return JSONArray(decrypted)
             } catch (_: Exception) {
-                // Fall through to plaintext
+                // Key rotation or corrupted data — start fresh rather than silently losing data
+                android.util.Log.w("NotificationLog", "Failed to decrypt log entries (key rotation?), starting fresh")
+                prefs.edit().remove(KEY_LOG_ENCRYPTED).apply()
             }
         }
-        // Fallback to plaintext (legacy or encryption failure)
-        val raw = prefs.getString(KEY_LOG, "[]") ?: "[]"
-        return try {
-            val arr = JSONArray(raw)
-            // Migrate plaintext to encrypted (plaintext kept as fallback)
-            if (arr.length() > 0) {
-                saveEntries(arr)
-                // Verify round-trip before removing plaintext
-                val verifyEncrypted = prefs.getString(KEY_LOG_ENCRYPTED, null)
-                if (verifyEncrypted != null) {
-                    try {
-                        val verifyDecrypted = CryptoHelper.decryptString(verifyEncrypted, context)
-                        JSONArray(verifyDecrypted) // verify it parses
-                        prefs.edit().remove(KEY_LOG).apply()
-                    } catch (_: Exception) { /* keep plaintext */ }
+        // Migrate any legacy plaintext data, then remove it
+        val raw = prefs.getString(KEY_LOG, null)
+        if (raw != null) {
+            return try {
+                val arr = JSONArray(raw)
+                // Migrate to encrypted and remove plaintext
+                if (arr.length() > 0) {
+                    saveEntries(arr)
                 }
+                prefs.edit().remove(KEY_LOG).apply()
+                arr
+            } catch (_: Exception) {
+                prefs.edit().remove(KEY_LOG).apply()
+                JSONArray()
             }
-            arr
-        } catch (_: Exception) {
-            JSONArray()
         }
+        return JSONArray()
     }
 
     data class LogEntry(

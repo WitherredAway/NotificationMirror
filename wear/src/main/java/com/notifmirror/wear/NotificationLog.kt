@@ -87,15 +87,16 @@ class NotificationLog(private val context: Context) {
         try {
             val encrypted = CryptoHelper.encryptString(json, context)
             if (encrypted != null) {
-                // Keep plaintext alongside encrypted during migration for safety
                 prefs.edit()
                     .putString(KEY_LOG_ENCRYPTED, encrypted)
+                    .remove(KEY_LOG)
                     .apply()
                 return
             }
-        } catch (_: Exception) { }
-        // Fallback to plaintext if encryption fails or no key
-        prefs.edit().putString(KEY_LOG, json).apply()
+        } catch (e: Exception) {
+            // Never store plaintext — log the failure and skip saving
+            android.util.Log.w("NotificationLog", "Failed to encrypt log entries, skipping save", e)
+        }
     }
 
     private fun getEntriesRaw(): JSONArray {
@@ -105,31 +106,29 @@ class NotificationLog(private val context: Context) {
             try {
                 val decrypted = CryptoHelper.decryptString(encrypted, context)
                 if (decrypted != null) return JSONArray(decrypted)
-            } catch (_: Exception) { }
-        }
-        // Fallback to plaintext
-        val raw = prefs.getString(KEY_LOG, "[]") ?: "[]"
-        return try {
-            val arr = JSONArray(raw)
-            // Migrate plaintext to encrypted (plaintext kept as fallback)
-            if (arr.length() > 0) {
-                saveEntries(arr)
-                // Verify round-trip before removing plaintext
-                val verifyEncrypted = prefs.getString(KEY_LOG_ENCRYPTED, null)
-                if (verifyEncrypted != null) {
-                    try {
-                        val verifyDecrypted = CryptoHelper.decryptString(verifyEncrypted, context)
-                        if (verifyDecrypted != null) {
-                            JSONArray(verifyDecrypted) // verify it parses
-                            prefs.edit().remove(KEY_LOG).apply()
-                        }
-                    } catch (_: Exception) { /* keep plaintext */ }
-                }
+            } catch (_: Exception) {
+                // Key rotation or corrupted data — start fresh rather than silently losing data
+                android.util.Log.w("NotificationLog", "Failed to decrypt log entries (key rotation?), starting fresh")
+                prefs.edit().remove(KEY_LOG_ENCRYPTED).apply()
             }
-            arr
-        } catch (_: Exception) {
-            JSONArray()
         }
+        // Migrate any legacy plaintext data, then remove it
+        val raw = prefs.getString(KEY_LOG, null)
+        if (raw != null) {
+            return try {
+                val arr = JSONArray(raw)
+                // Migrate to encrypted and remove plaintext
+                if (arr.length() > 0) {
+                    saveEntries(arr)
+                }
+                prefs.edit().remove(KEY_LOG).apply()
+                arr
+            } catch (_: Exception) {
+                prefs.edit().remove(KEY_LOG).apply()
+                JSONArray()
+            }
+        }
+        return JSONArray()
     }
 
     data class LogEntry(

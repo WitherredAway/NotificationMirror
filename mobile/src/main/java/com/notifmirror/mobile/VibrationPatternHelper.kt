@@ -1,12 +1,19 @@
 package com.notifmirror.mobile
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -60,21 +67,32 @@ object VibrationPatternHelper {
             PRESETS
         }
 
-        val items = displayPresets.map { preset ->
+        val scrollView = ScrollView(context).apply {
+            setPadding(0, dpToPx(context, 8), 0, dpToPx(context, 8))
+        }
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(context, 16), 0, dpToPx(context, 16), 0)
+        }
+        scrollView.addView(container)
+
+        val dialog = AlertDialog.Builder(context)
+            .setTitle("Vibration Pattern")
+            .setView(scrollView)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        for (preset in displayPresets) {
             val isSelected = when {
                 preset.name == "Use Default" && currentPattern.isEmpty() -> true
                 preset.name == currentPresetName && currentPattern.isNotEmpty() -> true
                 preset.name == "Custom" && currentPresetName == "Custom" && currentPattern.isNotEmpty() -> true
                 else -> false
             }
-            val check = if (isSelected) " \u2714" else ""
-            "${preset.name}${check}\n${preset.description}"
-        }.toTypedArray()
 
-        AlertDialog.Builder(context)
-            .setTitle("Vibration Pattern")
-            .setItems(items) { _, which ->
-                val preset = displayPresets[which]
+            val card = createPresetCard(context, preset, isSelected, currentPattern)
+            card.setOnClickListener {
+                dialog.dismiss()
                 if (preset.name == "Use Default") {
                     onSelected(preset, "")
                 } else if (preset.name == "Custom") {
@@ -85,8 +103,148 @@ object VibrationPatternHelper {
                     onSelected(preset, preset.pattern)
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            container.addView(card, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dpToPx(context, 6) })
+        }
+
+        dialog.show()
+    }
+
+    private fun createPresetCard(
+        context: Context,
+        preset: VibrationPreset,
+        isSelected: Boolean,
+        currentPattern: String
+    ): LinearLayout {
+        val primaryColor = resolveThemeColor(context, com.google.android.material.R.attr.colorPrimary)
+        val surfaceColor = resolveThemeColor(context, com.google.android.material.R.attr.colorSurfaceVariant)
+        val onSurfaceColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOnSurface)
+        val outlineColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOutline)
+
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(context, 14), dpToPx(context, 12), dpToPx(context, 14), dpToPx(context, 12))
+            val bg = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dpToPx(context, 12).toFloat()
+                if (isSelected) {
+                    setColor(surfaceColor)
+                    setStroke(dpToPx(context, 2), primaryColor)
+                } else {
+                    setColor(surfaceColor and 0x40FFFFFF)
+                    setStroke(dpToPx(context, 1), outlineColor and 0x30FFFFFF.toInt())
+                }
+            }
+            background = bg
+            isClickable = true
+            isFocusable = true
+            val attrs = intArrayOf(android.R.attr.selectableItemBackground)
+            val ta = context.obtainStyledAttributes(attrs)
+            foreground = ta.getDrawable(0)
+            ta.recycle()
+        }
+
+        val topRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val nameText = TextView(context).apply {
+            text = preset.name
+            setTextColor(if (isSelected) primaryColor else onSurfaceColor)
+            textSize = 15f
+            setTypeface(typeface, if (isSelected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        topRow.addView(nameText)
+        if (isSelected) {
+            val checkIcon = TextView(context).apply {
+                text = "\u2714"
+                setTextColor(primaryColor)
+                textSize = 16f
+            }
+            topRow.addView(checkIcon)
+        }
+        card.addView(topRow)
+
+        val descText = TextView(context).apply {
+            text = preset.description
+            setTextColor(outlineColor)
+            textSize = 12f
+            setPadding(0, dpToPx(context, 2), 0, 0)
+        }
+        card.addView(descText)
+
+        // Visual pattern bar
+        val patternToShow = when {
+            preset.name == "Custom" && currentPattern.isNotEmpty() && findPresetForPattern(currentPattern) == null -> currentPattern
+            preset.pattern.isNotEmpty() && preset.name != "Silent" -> preset.pattern
+            else -> null
+        }
+        if (patternToShow != null) {
+            val patternView = PatternBarView(context, patternToShow, primaryColor, outlineColor)
+            card.addView(patternView, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(context, 20)
+            ).apply { topMargin = dpToPx(context, 6) })
+
+            val durationText = TextView(context).apply {
+                text = formatPatternDisplay(patternToShow)
+                setTextColor(outlineColor)
+                textSize = 11f
+                setPadding(0, dpToPx(context, 2), 0, 0)
+            }
+            card.addView(durationText)
+        }
+
+        return card
+    }
+
+    /**
+     * Custom View that draws a visual representation of a vibration pattern.
+     * Filled blocks = vibration, gaps = silence.
+     */
+    class PatternBarView(
+        context: Context,
+        private val pattern: String,
+        private val activeColor: Int,
+        private val inactiveColor: Int
+    ) : View(context) {
+
+        private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = activeColor
+            style = Paint.Style.FILL
+        }
+        private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = inactiveColor and 0x20FFFFFF.toInt()
+            style = Paint.Style.FILL
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val longs = parsePattern(pattern) ?: return
+            val totalMs = longs.sum().coerceAtLeast(1)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            val cornerRadius = h / 2f
+
+            canvas.drawRoundRect(RectF(0f, 0f, w, h), cornerRadius, cornerRadius, bgPaint)
+
+            var x = 0f
+            for (i in longs.indices) {
+                val segWidth = (longs[i].toFloat() / totalMs) * w
+                if (segWidth < 1f) {
+                    x += segWidth
+                    continue
+                }
+                val isVibrating = i % 2 == 1
+                if (isVibrating) {
+                    val rect = RectF(x, 2f, x + segWidth, h - 2f)
+                    canvas.drawRoundRect(rect, (h - 4f) / 2f, (h - 4f) / 2f, activePaint)
+                }
+                x += segWidth
+            }
+        }
     }
 
     private fun showCustomPatternDialog(
@@ -94,15 +252,17 @@ object VibrationPatternHelper {
         currentPattern: String,
         onSave: (String) -> Unit
     ) {
-        // Build a proper custom layout
-        val container = android.widget.LinearLayout(context).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(64, 32, 64, 16)
+        val primaryColor = resolveThemeColor(context, com.google.android.material.R.attr.colorPrimary)
+        val outlineColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOutline)
+
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(context, 24), dpToPx(context, 16), dpToPx(context, 24), dpToPx(context, 8))
         }
 
         val helpText = TextView(context).apply {
             text = "Enter alternating wait,buzz durations in milliseconds.\n\nExample: 0,200,100,200\n= no delay, buzz 200ms, pause 100ms, buzz 200ms"
-            setTextColor(context.getColor(android.R.color.darker_gray))
+            setTextColor(outlineColor)
             textSize = 13f
         }
 
@@ -111,8 +271,12 @@ object VibrationPatternHelper {
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setText(if (currentPattern.isNotEmpty() && findPresetForPattern(currentPattern) == null) currentPattern else "")
             textSize = 16f
-            setPadding(24, 24, 24, 24)
+            setPadding(dpToPx(context, 12), dpToPx(context, 12), dpToPx(context, 12), dpToPx(context, 12))
         }
+
+        val initialPattern = if (currentPattern.isNotEmpty()) currentPattern else "0,200,100,200"
+        var previewBar = PatternBarView(context, initialPattern, primaryColor, outlineColor)
+        val previewBarIndex = 2
 
         val previewButton = MaterialButton(
             context, null,
@@ -131,14 +295,35 @@ object VibrationPatternHelper {
         }
 
         container.addView(helpText)
-        container.addView(input, android.widget.LinearLayout.LayoutParams(
-            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 24 })
-        container.addView(previewButton, android.widget.LinearLayout.LayoutParams(
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
+        container.addView(input, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dpToPx(context, 12) })
+        container.addView(previewBar, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dpToPx(context, 24)
+        ).apply { topMargin = dpToPx(context, 12) })
+        container.addView(previewButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dpToPx(context, 8) })
+
+        // Update preview bar as user types
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val text = s?.toString()?.trim() ?: ""
+                if (text.isNotEmpty() && isValidPattern(text)) {
+                    container.removeViewAt(previewBarIndex)
+                    previewBar = PatternBarView(context, text, primaryColor, outlineColor)
+                    container.addView(previewBar, previewBarIndex, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dpToPx(context, 24)
+                    ).apply { topMargin = dpToPx(context, 12) })
+                }
+            }
+        })
 
         AlertDialog.Builder(context)
             .setTitle("Custom Vibration Pattern")
@@ -226,7 +411,7 @@ object VibrationPatternHelper {
         updateVibrationDisplay(presetButton, patternLabel, customInput, activePattern, allowUseDefault)
 
         presetButton.setOnClickListener {
-            showPresetPicker(context, activePattern, allowUseDefault) { preset, pattern ->
+            showPresetPicker(context, activePattern, allowUseDefault) { _, pattern ->
                 activePattern = pattern
                 updateVibrationDisplay(presetButton, patternLabel, customInput, activePattern, allowUseDefault)
                 onPatternChanged(activePattern)
@@ -236,6 +421,8 @@ object VibrationPatternHelper {
         previewButton.setOnClickListener {
             if (activePattern.isNotEmpty() && isValidPattern(activePattern)) {
                 vibratePattern(context, activePattern)
+            } else if (activePattern.isEmpty() && allowUseDefault) {
+                Toast.makeText(context, "Using default pattern \u2014 preview from global settings", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(context, "No vibration pattern set", Toast.LENGTH_SHORT).show()
             }
@@ -286,5 +473,19 @@ object VibrationPatternHelper {
             patternLabel.text = "${preset?.description ?: ""}  \u2022  ${formatPatternDisplay(pattern)}"
             customInput?.visibility = View.GONE
         }
+    }
+
+    private fun dpToPx(context: Context, dp: Int): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            context.resources.displayMetrics
+        ).toInt()
+    }
+
+    private fun resolveThemeColor(context: Context, attr: Int): Int {
+        val tv = TypedValue()
+        context.theme.resolveAttribute(attr, tv, true)
+        return tv.data
     }
 }

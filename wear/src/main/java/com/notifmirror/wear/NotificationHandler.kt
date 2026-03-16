@@ -227,17 +227,20 @@ object NotificationHandler {
             val key = json.getString("key")
 
             // Use conversation key mapping if available, otherwise fall back to raw key
-            val conversationKey = notifKeyToConversationKey.remove(key) ?: key
-            val notifId = notifIdMap.remove(conversationKey) ?: return
-            conversationMessages.remove(conversationKey)
+            // Synchronized to avoid race conditions with handleNotification
+            val (notifId, _, packageName) = synchronized(idLock) {
+                val convKey = notifKeyToConversationKey.remove(key) ?: key
+                val id = notifIdMap.remove(convKey) ?: return
+                conversationMessages.remove(convKey)
+                Triple(id, convKey, json.optString("package", ""))
+            }
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(notifId)
 
-            val packageName = json.optString("package", "")
             // Cancel the per-app summary if no more notifications for this package
             if (packageName.isNotEmpty()) {
-                val hasOtherNotifs = notifIdMap.keys.any { k ->
-                    k.contains(packageName)
+                val hasOtherNotifs = synchronized(idLock) {
+                    notifIdMap.keys.any { k -> k.contains(packageName) }
                 }
                 if (!hasOtherNotifs) {
                     nm.cancel(packageName.hashCode() + SUMMARY_ID_OFFSET)
