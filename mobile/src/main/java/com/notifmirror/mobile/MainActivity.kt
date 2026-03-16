@@ -164,8 +164,9 @@ class MainActivity : AppCompatActivity() {
         checkForUpdates()
         checkAndRequestPermissions()
 
-        // Sync encryption key to watch on app launch
+        // Sync encryption key and whitelisted apps to watch on app launch
         syncEncryptionKeyFromMainActivity()
+        syncWhitelistedAppsOnLaunch()
 
         // Listen for mirroring state changes from watch (via ReplyReceiverService → SharedPreferences)
         prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -205,6 +206,12 @@ class MainActivity : AppCompatActivity() {
     private fun syncMirroringToWatch(enabled: Boolean) {
         scope.launch {
             WearSyncHelper.syncMirroringToWatch(this@MainActivity, enabled)
+        }
+    }
+
+    private fun syncWhitelistedAppsOnLaunch() {
+        scope.launch {
+            WearSyncHelper.syncWhitelistedAppsToWatch(this@MainActivity, settingsManager.getWhitelistedApps())
         }
     }
 

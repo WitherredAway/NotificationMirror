@@ -197,8 +197,9 @@ class MainActivity : AppCompatActivity() {
 
         checkAndRequestPermissions()
 
-        // Proactively pull encryption key from DataClient on app launch
+        // Proactively pull encryption key and whitelisted apps from DataClient on app launch
         pullEncryptionKeyFromDataClient()
+        pullWhitelistedAppsFromDataClient()
 
         // Listen for mirroring state changes from phone (via DataClient → SharedPreferences)
         prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -292,6 +293,64 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.w("NotifMirrorWear", "Failed to pull encryption key from DataClient", e)
             }
+        }
+    }
+
+    private fun pullWhitelistedAppsFromDataClient() {
+        scope.launch {
+            try {
+                val dataItems = Wearable.getDataClient(this@MainActivity)
+                    .getDataItems(android.net.Uri.parse("wear://*/whitelisted_apps"))
+                    .await()
+                for (item in dataItems) {
+                    val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
+                    val packages = dataMap.getStringArrayList("packages")
+                    val labels = dataMap.getStringArrayList("labels")
+                    if (packages != null && labels != null) {
+                        preCreateNotificationChannels(packages, labels)
+                        break
+                    }
+                }
+                dataItems.release()
+            } catch (e: Exception) {
+                Log.w("NotifMirrorWear", "Failed to pull whitelisted apps from DataClient", e)
+            }
+        }
+    }
+
+    private fun preCreateNotificationChannels(packages: List<String>, labels: List<String>) {
+        val nm = getSystemService(android.app.NotificationManager::class.java)
+        var created = 0
+        for (i in packages.indices) {
+            val pkg = packages[i]
+            val label = if (i < labels.size) labels[i] else pkg.substringAfterLast('.')
+            val channelId = "mirror_$pkg"
+            val groupId = "group_$pkg"
+            if (nm.getNotificationChannel(channelId) != null) continue
+            if (nm.notificationChannelGroups.none { it.id == groupId }) {
+                nm.createNotificationChannelGroup(
+                    android.app.NotificationChannelGroup(groupId, label)
+                )
+            }
+            val channel = android.app.NotificationChannel(
+                channelId, label, android.app.NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Mirrored notifications from $label"
+                enableVibration(false)
+                setSound(
+                    android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION),
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                group = groupId
+            }
+            nm.createNotificationChannel(channel)
+            created++
+        }
+        if (created > 0) {
+            Log.d("NotifMirrorWear", "Pre-created $created notification channels on startup")
         }
     }
 

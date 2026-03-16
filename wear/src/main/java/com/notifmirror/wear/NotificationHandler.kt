@@ -508,8 +508,8 @@ object NotificationHandler {
 
         nm.notify(notifId, builder.build())
 
-        // Manually vibrate if not a silent update and not isSilent
-        if (!silentUpdate && !isSilent) {
+        // Manually vibrate if not a silent update, not isSilent, and not low priority
+        if (!silentUpdate && !isSilent && notifPriority != -1) {
             vibrateManually(context, vibrationPattern)
         }
 
