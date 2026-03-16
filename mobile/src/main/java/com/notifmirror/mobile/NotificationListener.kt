@@ -143,6 +143,16 @@ class NotificationListener : NotificationListenerService() {
         }
 
         val notification = sbn.notification ?: return
+
+        // Skip group summary notifications — these are Android's way of bundling
+        // multiple notifications and carry no useful per-conversation info.
+        // Without this, messaging apps like WhatsApp create duplicate notifications:
+        // one from the actual conversation and one from the summary.
+        if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            Log.d(TAG, "Skipping group summary notification from ${sbn.packageName}")
+            return
+        }
+
         val extras = notification.extras ?: return
 
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -153,6 +163,10 @@ class NotificationListener : NotificationListenerService() {
         if (title.isEmpty() && text.isEmpty()) return
 
         val displayText = bigText ?: text
+
+        // Extract conversation title (stable group/chat name, e.g. "HHH GNG" for WhatsApp groups)
+        // This is set by MessagingStyle.setConversationTitle() and is stable across sender changes
+        val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
 
         // Extract stacked/conversation messages if available
         val conversationMessages = extractConversationMessages(notification, title, displayText)
@@ -231,6 +245,10 @@ class NotificationListener : NotificationListenerService() {
                 }
                 put("conversationMessages", msgsArray)
                 put("isMessagingStyle", true)
+            }
+            // Send stable conversation title for grouping (e.g. WhatsApp group name)
+            if (conversationTitle.isNotEmpty()) {
+                put("conversationTitle", conversationTitle)
             }
             // Send ongoing flag so watch can make persistent notifs persistent
             if (sbn.isOngoing) {
@@ -394,6 +412,10 @@ class NotificationListener : NotificationListenerService() {
                     }
 
                     val notification = sbn.notification ?: continue
+
+                    // Skip group summary notifications (same as onNotificationPosted)
+                    if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) continue
+
                     val extras = notification.extras ?: continue
 
                     val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -404,6 +426,9 @@ class NotificationListener : NotificationListenerService() {
                     if (title.isEmpty() && text.isEmpty()) continue
 
                     val displayText = bigText ?: text
+
+                    // Extract conversation title (stable group/chat name)
+                    val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
 
                     // Extract stacked/conversation messages if available
                     val conversationMessages = extractConversationMessages(notification, title, displayText)
@@ -466,6 +491,10 @@ class NotificationListener : NotificationListenerService() {
                             }
                             put("conversationMessages", msgsArray)
                             put("isMessagingStyle", true)
+                        }
+                        // Send stable conversation title for grouping
+                        if (conversationTitle.isNotEmpty()) {
+                            put("conversationTitle", conversationTitle)
                         }
                         if (iconBase64 != null) put("icon", iconBase64)
                         // Send ongoing flag so watch can make persistent notifs persistent

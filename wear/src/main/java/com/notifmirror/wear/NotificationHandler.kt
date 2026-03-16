@@ -136,10 +136,11 @@ object NotificationHandler {
             }
 
             // Smart grouping: derive a conversation key from the notification
-            // Uses isMessagingStyle flag from phone (auto-detected via EXTRA_MESSAGES)
-            // to group by sender/chat name instead of hardcoding app names
+            // Uses conversationTitle (from EXTRA_CONVERSATION_TITLE) for stable grouping
+            // of group chats where the title changes per sender (e.g. WhatsApp groups)
             val isMessagingStyle = json.optBoolean("isMessagingStyle", false)
-            val conversationKey = deriveConversationKey(packageName, key, title, isMessagingStyle)
+            val conversationTitle = json.optString("conversationTitle", "")
+            val conversationKey = deriveConversationKey(packageName, key, title, isMessagingStyle, conversationTitle)
             // Track reverse mapping for dismissals
             notifKeyToConversationKey[key] = conversationKey
             pruneTrackingMapsIfNeeded()
@@ -163,7 +164,7 @@ object NotificationHandler {
                 val existing = notifIdMap.containsKey(conversationKey)
                 val id = notifIdMap.getOrPut(conversationKey) { nextId.getAndIncrement() }
 
-                // Track conversation messages for stacking (cap at 20 to avoid unbounded memory growth)
+                // Track conversation messages for stacking (cap at 50 to avoid unbounded memory growth)
                 val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
 
                 // If the phone sent pre-extracted conversation messages, use them as the
@@ -188,7 +189,7 @@ object NotificationHandler {
                         msgList.add(Pair(title, text))
                     }
                 }
-                while (msgList.size > 20) { msgList.removeAt(0) }
+                while (msgList.size > 50) { msgList.removeAt(0) }
 
                 // Take a snapshot of messages for use outside the lock
                 Triple(existing, id, ArrayList(msgList))
@@ -231,7 +232,8 @@ object NotificationHandler {
                 isSilent = isSilent, isOngoing = isOngoing,
                 hideContent = hideContent, silentUpdate = (isUpdate && muteContinuation) || isReplyUpdate,
                 conversationHistory = messages,
-                vibrateOnly = vibrateOnly
+                vibrateOnly = vibrateOnly,
+                conversationTitle = conversationTitle
             )
 
             if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
@@ -317,7 +319,8 @@ object NotificationHandler {
         hideContent: Boolean = false,
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList(),
-        vibrateOnly: Boolean = false
+        vibrateOnly: Boolean = false,
+        conversationTitle: String = ""
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -386,7 +389,7 @@ object NotificationHandler {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
-            .setSilent(silentUpdate)
+            .setSilent(isSilent || vibrateOnly || silentUpdate)
 
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
@@ -402,13 +405,13 @@ object NotificationHandler {
 
         // Stack conversation messages using MessagingStyle for better WearOS rendering
         if (!hideContent && conversationHistory.size > 1) {
-            val recent = conversationHistory.takeLast(20)
+            val recent = conversationHistory.takeLast(50)
             val selfPerson = Person.Builder().setName("You").build()
             val distinctSenders = recent.map { it.first }.distinct()
             val isGroupConversation = distinctSenders.size > 1
             val messagingStyle = NotificationCompat.MessagingStyle(selfPerson)
                 .setGroupConversation(isGroupConversation)
-                .setConversationTitle(if (isGroupConversation) title else null)
+                .setConversationTitle(if (isGroupConversation) (conversationTitle.ifEmpty { title }) else null)
             for ((idx, pair) in recent.withIndex()) {
                 val (senderName, msgText) = pair
                 // For self-messages ("You"), pass null as sender so MessagingStyle
@@ -420,9 +423,9 @@ object NotificationHandler {
             }
             builder.setStyle(messagingStyle)
             builder.setNumber(conversationHistory.size)
-            // Override contentTitle for MessagingStyle: use title (chat name) with
+            // Override contentTitle for MessagingStyle: use group name (or title for 1:1) with
             // app label in subText, so WearOS doesn't show "AppLabel: Title" redundantly
-            builder.setContentTitle(title)
+            builder.setContentTitle(if (conversationTitle.isNotEmpty()) conversationTitle else title)
             builder.setSubText(appLabel)
         } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -658,13 +661,27 @@ object NotificationHandler {
     /**
      * Derive a conversation-level grouping key from notification metadata.
      * For messaging apps (detected via MessagingStyle on the phone side),
-     * groups by sender/chat name (title) within the same app.
-     * For other apps, falls back to the notification key.
+     * uses conversationTitle (from EXTRA_CONVERSATION_TITLE) when available
+     * for stable grouping — this is the group/chat name that stays constant
+     * even when different people send messages (e.g. WhatsApp group name).
+     * Falls back to notification title, then notification key.
      */
-    private fun deriveConversationKey(packageName: String, notifKey: String, title: String, isMessagingStyle: Boolean): String {
-        return if (isMessagingStyle && title.isNotEmpty()) {
-            // Group by app + sender/conversation title
-            "$packageName:$title"
+    private fun deriveConversationKey(
+        packageName: String,
+        notifKey: String,
+        title: String,
+        isMessagingStyle: Boolean,
+        conversationTitle: String = ""
+    ): String {
+        return if (isMessagingStyle) {
+            when {
+                // Prefer conversationTitle — stable across sender changes
+                // e.g. "HHH GNG" stays the same regardless of who sent the message
+                conversationTitle.isNotEmpty() -> "$packageName:$conversationTitle"
+                // Fallback to title if no conversationTitle (1:1 chats)
+                title.isNotEmpty() -> "$packageName:$title"
+                else -> notifKey
+            }
         } else {
             // Non-messaging apps: use the original notification key
             notifKey
