@@ -56,7 +56,7 @@ class SettingsManager(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     // Cache compiled Regex patterns to avoid re-compiling on every notification
-    private val regexCache = java.util.concurrent.ConcurrentHashMap<String, Regex?>()
+    private val regexCache = java.util.Collections.synchronizedMap(mutableMapOf<String, Regex?>())
 
     private fun getCachedRegex(pattern: String): Regex? {
         return regexCache.getOrPut(pattern) {
