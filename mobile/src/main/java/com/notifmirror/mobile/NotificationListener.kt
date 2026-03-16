@@ -241,6 +241,8 @@ class NotificationListener : NotificationListenerService() {
             // Send battery saver settings so watch can check locally
             put("batterySaverEnabled", settings.isBatterySaverEnabled())
             put("batterySaverThreshold", settings.getBatterySaverThreshold())
+            // Send vibrate-only-when-unlocked setting (per-app with global fallback)
+            put("vibrateOnlyWhenUnlocked", settings.getEffectiveVibrateOnlyWhenUnlocked(appPackageName))
             // Send effective vibration pattern (per-app or default)
             val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
             if (effectiveVib.isNotEmpty()) {

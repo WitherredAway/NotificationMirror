@@ -133,6 +133,13 @@
 <TextView android:id="@+id/vibrationPatternLabel" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:textSize="12sp" android:textColor="?colorOutline" android:text="0, 200, 100, 200" />
 </LinearLayout>
 <EditText android:id="@+id/defaultVibrationInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:inputType="text" android:textSize="14sp" android:textColor="?colorOnSurface" android:padding="10dp" android:background="@drawable/edit_text_bg" android:hint="Custom: e.g. 0,200,100,200" android:textColorHint="?colorOutline" android:visibility="gone" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vibrate Only When Unlocked" android:textSize="16sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Only vibrate on watch if the watch screen is unlocked" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/vibrateOnlyUnlockedSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Per-app vibration patterns, sounds, and other overrides can be configured from the App Whitelist screen by tapping the gear icon next to each app." android:textSize="12sp" android:textColor="?colorOutline" android:fontFamily="sans-serif-medium" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="HISTORY" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">

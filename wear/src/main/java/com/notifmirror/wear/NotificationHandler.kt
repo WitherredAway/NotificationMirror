@@ -1,5 +1,6 @@
 package com.notifmirror.wear
 
+import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationChannelGroup
 import android.app.NotificationManager
@@ -72,6 +73,7 @@ object NotificationHandler {
             val isOngoing = json.optBoolean("isOngoing", false)
             val hideContent = json.optBoolean("hideContent", false)
             val muteContinuation = json.optBoolean("muteContinuation", false)
+            val vibrateOnlyWhenUnlocked = json.optBoolean("vibrateOnlyWhenUnlocked", false)
             // Respect both phone-side and watch-side history settings
             val phoneKeepHistory = json.optBoolean("keepHistory", true)
             val watchKeepHistory = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
@@ -198,7 +200,8 @@ object NotificationHandler {
                 defaultVibration = defaultVibration, customVibrationPattern = customVibrationPattern,
                 isSilent = isSilent, isOngoing = isOngoing,
                 hideContent = hideContent, silentUpdate = isUpdate && muteContinuation,
-                conversationHistory = messages
+                conversationHistory = messages,
+                vibrateOnlyWhenUnlocked = vibrateOnlyWhenUnlocked
             )
 
             if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
@@ -281,7 +284,8 @@ object NotificationHandler {
         isOngoing: Boolean = false,
         hideContent: Boolean = false,
         silentUpdate: Boolean = false,
-        conversationHistory: List<Pair<String, String>> = emptyList()
+        conversationHistory: List<Pair<String, String>> = emptyList(),
+        vibrateOnlyWhenUnlocked: Boolean = false
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -510,7 +514,17 @@ object NotificationHandler {
 
         // Manually vibrate if not a silent update, not isSilent, and not low priority
         if (!silentUpdate && !isSilent && notifPriority != -1) {
-            vibrateManually(context, vibrationPattern)
+            // If "vibrate only when unlocked" is enabled, skip vibration when watch is locked
+            if (vibrateOnlyWhenUnlocked) {
+                val km = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                if (km.isKeyguardLocked) {
+                    Log.d(TAG, "Skipping vibration: watch screen is locked (vibrateOnlyWhenUnlocked=true)")
+                } else {
+                    vibrateManually(context, vibrationPattern)
+                }
+            } else {
+                vibrateManually(context, vibrationPattern)
+            }
         }
 
         // Create/update summary notification for the per-app group

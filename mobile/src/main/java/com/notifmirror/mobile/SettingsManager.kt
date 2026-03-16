@@ -38,6 +38,7 @@ class SettingsManager(context: Context) {
         private const val KEY_COMPLICATION_SOURCE = "complication_source"
         private const val KEY_COMPLICATION_APP = "complication_app"
         private const val KEY_MIRRORING_ENABLED = "mirroring_enabled"
+        private const val KEY_VIBRATE_ONLY_UNLOCKED = "vibrate_only_when_unlocked"
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
@@ -274,6 +275,14 @@ class SettingsManager(context: Context) {
         prefs.edit().putString(KEY_COMPLICATION_APP, packageName).apply()
     }
 
+    // --- Vibrate Only When Unlocked ---
+
+    fun isVibrateOnlyWhenUnlockedEnabled(): Boolean = prefs.getBoolean(KEY_VIBRATE_ONLY_UNLOCKED, false)
+
+    fun setVibrateOnlyWhenUnlockedEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_VIBRATE_ONLY_UNLOCKED, enabled).apply()
+    }
+
     // --- Default Vibration Pattern ---
 
     fun getDefaultVibrationPattern(): String {
@@ -424,6 +433,10 @@ class SettingsManager(context: Context) {
 
     fun getEffectiveBigTextThreshold(packageName: String): Int {
         return getPerAppInt("big_text_threshold", packageName, getBigTextThreshold())
+    }
+
+    fun getEffectiveVibrateOnlyWhenUnlocked(packageName: String): Boolean {
+        return getPerAppBoolean("vibrate_only_unlocked", packageName, isVibrateOnlyWhenUnlockedEnabled())
     }
 
     fun getEffectiveVibrationPattern(packageName: String): String {

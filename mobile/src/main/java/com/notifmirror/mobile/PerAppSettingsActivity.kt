@@ -63,6 +63,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val overrideMuteContinuation = findViewById<CheckBox>(R.id.overrideMuteContinuation)
         val overrideShowSnooze = findViewById<CheckBox>(R.id.overrideShowSnooze)
         val overrideSnoozeDuration = findViewById<CheckBox>(R.id.overrideSnoozeDuration)
+        val overrideVibrateOnlyUnlocked = findViewById<CheckBox>(R.id.overrideVibrateOnlyUnlocked)
 
         // Value controls
         val perAppOngoingModeGroup = findViewById<RadioGroup>(R.id.perAppOngoingModeGroup)
@@ -83,6 +84,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val keywordWhitelistInput = findViewById<EditText>(R.id.perAppKeywordWhitelist)
         val keywordBlacklistInput = findViewById<EditText>(R.id.perAppKeywordBlacklist)
         val perAppScreenModeGroup = findViewById<RadioGroup>(R.id.perAppScreenModeGroup)
+        val vibrateOnlyUnlockedSwitch = findViewById<SwitchMaterial>(R.id.perAppVibrateOnlyUnlocked)
 
         // Floating save button — hidden until changes are made (matches global settings pattern)
         val saveButton = findViewById<MaterialButton>(R.id.perAppSaveButton)
@@ -141,6 +143,10 @@ class PerAppSettingsActivity : AppCompatActivity() {
         snoozeDurationInput.setText(settings.getEffectiveSnoozeDuration(packageName).toString())
         snoozeDurationInput.isEnabled = overrideSnoozeDuration.isChecked
 
+        overrideVibrateOnlyUnlocked.isChecked = settings.isPerAppBooleanCustomized("vibrate_only_unlocked", packageName)
+        vibrateOnlyUnlockedSwitch.isChecked = settings.getEffectiveVibrateOnlyWhenUnlocked(packageName)
+        vibrateOnlyUnlockedSwitch.isEnabled = overrideVibrateOnlyUnlocked.isChecked
+
         overrideScreenOffMode.isChecked = settings.isPerAppIntCustomized("screen_off_mode", packageName)
         when (settings.getEffectiveScreenOffMode(packageName)) {
             SettingsManager.SCREEN_MODE_ALWAYS -> perAppScreenModeGroup.check(R.id.perAppRadioAlways)
@@ -187,11 +193,12 @@ class PerAppSettingsActivity : AppCompatActivity() {
         SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideScreenOffMode, perAppScreenModeGroup, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideShowSnooze, showSnoozeSwitch, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideSnoozeDuration, snoozeDurationInput, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideVibrateOnlyUnlocked, vibrateOnlyUnlockedSwitch, showSave)
 
         // Show save button when switches, radio groups, or text inputs change
         SettingsUIHelper.wireSwitchesToShowSave(
             listOf(muteContinuationSwitch, autoDismissSwitch, autoCancelSwitch,
-                showOpenSwitch, showMuteSwitch, showSnoozeSwitch),
+                showOpenSwitch, showMuteSwitch, showSnoozeSwitch, vibrateOnlyUnlockedSwitch),
             showSave
         )
         SettingsUIHelper.wireRadioGroupsToShowSave(
@@ -326,6 +333,12 @@ class PerAppSettingsActivity : AppCompatActivity() {
 
             settings.setPerAppKeywordWhitelist(packageName, whitelistLines)
             settings.setPerAppKeywordBlacklist(packageName, blacklistLines)
+
+            if (overrideVibrateOnlyUnlocked.isChecked) {
+                settings.setPerAppBoolean("vibrate_only_unlocked", packageName, vibrateOnlyUnlockedSwitch.isChecked)
+            } else {
+                settings.clearPerAppBoolean("vibrate_only_unlocked", packageName)
+            }
 
             // Save vibration
             if (currentVibPattern.isNotEmpty()) {

@@ -78,6 +78,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val vibrationPatternLabel = findViewById<TextView>(R.id.vibrationPatternLabel)
         val defaultVibrationInput = findViewById<EditText>(R.id.defaultVibrationInput)
         val saveButton = findViewById<MaterialButton>(R.id.saveSettingsButton)
+        val vibrateOnlyUnlockedSwitch = findViewById<SwitchMaterial>(R.id.vibrateOnlyUnlockedSwitch)
         var currentVibrationPattern = settings.getDefaultVibrationPattern()
 
         // Load current values - Behavior
@@ -135,7 +136,8 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Note: complicationSourceGroup listener is set below with showSave integration
 
-        // Load current values - Vibration (setup moved after showSave is defined below)
+        // Load current values - Vibration
+        vibrateOnlyUnlockedSwitch.isChecked = settings.isVibrateOnlyWhenUnlockedEnabled()
 
         // Hide when locked
         val hideWhenLockedSwitch = findViewById<SwitchMaterial>(R.id.hideWhenLockedSwitch)
@@ -195,7 +197,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val switches = listOf(dndSwitch,
             autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch,
             hideWhenLockedSwitch, muteContinuationSwitch, keepHistorySwitch,
-            showSnoozeButtonSwitch, batterySaverSwitch)
+            showSnoozeButtonSwitch, batterySaverSwitch, vibrateOnlyUnlockedSwitch)
         for (sw in switches) {
             sw.setOnCheckedChangeListener { _, _ -> showSave() }
         }
@@ -294,6 +296,7 @@ class AppSettingsActivity : AppCompatActivity() {
             settings.setHideWhenLockedEnabled(hideWhenLockedSwitch.isChecked)
             settings.setMuteContinuationEnabled(muteContinuationSwitch.isChecked)
             settings.setShowSnoozeButtonEnabled(showSnoozeButtonSwitch.isChecked)
+            settings.setVibrateOnlyWhenUnlockedEnabled(vibrateOnlyUnlockedSwitch.isChecked)
             settings.setBatterySaverEnabled(batterySaverSwitch.isChecked)
             settings.setSnoozeDurationMinutes(snoozeDur)
             settings.setBatterySaverThreshold(batteryThreshold)
