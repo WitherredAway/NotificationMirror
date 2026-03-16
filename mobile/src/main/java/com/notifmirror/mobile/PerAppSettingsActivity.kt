@@ -1,7 +1,6 @@
 package com.notifmirror.mobile
 
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
@@ -83,6 +82,11 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val snoozeDurationInput = findViewById<EditText>(R.id.perAppSnoozeDuration)
         val keywordWhitelistInput = findViewById<EditText>(R.id.perAppKeywordWhitelist)
         val keywordBlacklistInput = findViewById<EditText>(R.id.perAppKeywordBlacklist)
+        val perAppScreenModeGroup = findViewById<RadioGroup>(R.id.perAppScreenModeGroup)
+
+        // Floating save button — hidden until changes are made (matches global settings pattern)
+        val saveButton = findViewById<MaterialButton>(R.id.perAppSaveButton)
+        val showSave = { saveButton.visibility = View.VISIBLE }
 
         // Load existing per-app settings
         overrideOngoingMode.isChecked = settings.isPerAppIntCustomized("ongoing_mode", packageName)
@@ -91,7 +95,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
             SettingsManager.ONGOING_ONLY -> perAppOngoingModeGroup.check(R.id.perAppOngoingOnly)
             SettingsManager.ONGOING_ALL_PERSISTENT -> perAppOngoingModeGroup.check(R.id.perAppOngoingAll)
         }
-        setRadioGroupEnabled(perAppOngoingModeGroup, overrideOngoingMode.isChecked)
+        SettingsUIHelper.setRadioGroupEnabled(perAppOngoingModeGroup, overrideOngoingMode.isChecked)
 
         overrideMuteContinuation.isChecked = settings.isPerAppBooleanCustomized("mute_continuation", packageName)
         muteContinuationSwitch.isChecked = settings.getEffectiveMuteContinuation(packageName)
@@ -102,13 +106,12 @@ class PerAppSettingsActivity : AppCompatActivity() {
         autoDismissSwitch.isEnabled = overrideAutoDismiss.isChecked
 
         overridePriority.isChecked = settings.isPerAppIntCustomized("priority", packageName)
-        val effectivePriority = settings.getEffectivePriority(packageName)
-        when (effectivePriority) {
+        when (settings.getEffectivePriority(packageName)) {
             SettingsManager.PRIORITY_HIGH -> priorityGroup.check(R.id.perAppPriorityHigh)
             SettingsManager.PRIORITY_DEFAULT -> priorityGroup.check(R.id.perAppPriorityDefault)
             SettingsManager.PRIORITY_LOW -> priorityGroup.check(R.id.perAppPriorityLow)
         }
-        setRadioGroupEnabled(priorityGroup, overridePriority.isChecked)
+        SettingsUIHelper.setRadioGroupEnabled(priorityGroup, overridePriority.isChecked)
 
         overrideAutoCancel.isChecked = settings.isPerAppBooleanCustomized("auto_cancel", packageName)
         autoCancelSwitch.isChecked = settings.getEffectiveAutoCancel(packageName)
@@ -138,15 +141,13 @@ class PerAppSettingsActivity : AppCompatActivity() {
         snoozeDurationInput.setText(settings.getEffectiveSnoozeDuration(packageName).toString())
         snoozeDurationInput.isEnabled = overrideSnoozeDuration.isChecked
 
-        val perAppScreenModeGroup = findViewById<RadioGroup>(R.id.perAppScreenModeGroup)
         overrideScreenOffMode.isChecked = settings.isPerAppIntCustomized("screen_off_mode", packageName)
-        val effectiveScreenMode = settings.getEffectiveScreenOffMode(packageName)
-        when (effectiveScreenMode) {
+        when (settings.getEffectiveScreenOffMode(packageName)) {
             SettingsManager.SCREEN_MODE_ALWAYS -> perAppScreenModeGroup.check(R.id.perAppRadioAlways)
             SettingsManager.SCREEN_MODE_SCREEN_OFF_ONLY -> perAppScreenModeGroup.check(R.id.perAppRadioScreenOff)
             SettingsManager.SCREEN_MODE_SILENT_WHEN_ON -> perAppScreenModeGroup.check(R.id.perAppRadioSilent)
         }
-        setRadioGroupEnabled(perAppScreenModeGroup, overrideScreenOffMode.isChecked)
+        SettingsUIHelper.setRadioGroupEnabled(perAppScreenModeGroup, overrideScreenOffMode.isChecked)
 
         // Load keyword filters
         val perAppWhitelist = settings.getPerAppKeywordWhitelist(packageName)
@@ -170,25 +171,41 @@ class PerAppSettingsActivity : AppCompatActivity() {
             allowUseDefault = true
         ) { pattern ->
             currentVibPattern = pattern
+            showSave()
         }
 
-        // Wire up override checkboxes to enable/disable controls
-        overrideOngoingMode.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(perAppOngoingModeGroup, checked) }
-        overrideMuteContinuation.setOnCheckedChangeListener { _, checked -> muteContinuationSwitch.isEnabled = checked }
-        overrideAutoDismiss.setOnCheckedChangeListener { _, checked -> autoDismissSwitch.isEnabled = checked }
-        overridePriority.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(priorityGroup, checked) }
-        overrideAutoCancel.setOnCheckedChangeListener { _, checked -> autoCancelSwitch.isEnabled = checked }
-        overrideShowOpen.setOnCheckedChangeListener { _, checked -> showOpenSwitch.isEnabled = checked }
-        overrideShowMute.setOnCheckedChangeListener { _, checked -> showMuteSwitch.isEnabled = checked }
-        overrideBigText.setOnCheckedChangeListener { _, checked -> bigTextInput.isEnabled = checked }
-        overrideMuteDuration.setOnCheckedChangeListener { _, checked -> muteDurationInput.isEnabled = checked }
-        overrideScreenOffMode.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(perAppScreenModeGroup, checked) }
-        overrideShowSnooze.setOnCheckedChangeListener { _, checked -> showSnoozeSwitch.isEnabled = checked }
-        overrideSnoozeDuration.setOnCheckedChangeListener { _, checked -> snoozeDurationInput.isEnabled = checked }
+        // Wire up override checkboxes — uses shared utility for consistency with global settings
+        SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideOngoingMode, perAppOngoingModeGroup, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideMuteContinuation, muteContinuationSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideAutoDismiss, autoDismissSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overridePriority, priorityGroup, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideAutoCancel, autoCancelSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideShowOpen, showOpenSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideShowMute, showMuteSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideBigText, bigTextInput, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideMuteDuration, muteDurationInput, showSave)
+        SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideScreenOffMode, perAppScreenModeGroup, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideShowSnooze, showSnoozeSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideSnoozeDuration, snoozeDurationInput, showSave)
+
+        // Show save button when switches, radio groups, or text inputs change
+        SettingsUIHelper.wireSwitchesToShowSave(
+            listOf(muteContinuationSwitch, autoDismissSwitch, autoCancelSwitch,
+                showOpenSwitch, showMuteSwitch, showSnoozeSwitch),
+            showSave
+        )
+        SettingsUIHelper.wireRadioGroupsToShowSave(
+            listOf(perAppOngoingModeGroup, priorityGroup, perAppScreenModeGroup),
+            showSave
+        )
+        SettingsUIHelper.wireEditTextsToShowSave(
+            listOf(bigTextInput, muteDurationInput, snoozeDurationInput,
+                keywordWhitelistInput, keywordBlacklistInput),
+            showSave
+        )
 
         // Save button
-        findViewById<MaterialButton>(R.id.perAppSaveButton).setOnClickListener {
-            // Save boolean overrides
+        saveButton.setOnClickListener {
             if (overrideOngoingMode.isChecked) {
                 val ongoingMode = when (perAppOngoingModeGroup.checkedRadioButtonId) {
                     R.id.perAppOngoingOnly -> SettingsManager.ONGOING_ONLY
@@ -307,16 +324,8 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 }
             }
 
-            if (whitelistLines.isNotEmpty()) {
-                settings.setPerAppKeywordWhitelist(packageName, whitelistLines)
-            } else {
-                settings.setPerAppKeywordWhitelist(packageName, emptyList())
-            }
-            if (blacklistLines.isNotEmpty()) {
-                settings.setPerAppKeywordBlacklist(packageName, blacklistLines)
-            } else {
-                settings.setPerAppKeywordBlacklist(packageName, emptyList())
-            }
+            settings.setPerAppKeywordWhitelist(packageName, whitelistLines)
+            settings.setPerAppKeywordBlacklist(packageName, blacklistLines)
 
             // Save vibration
             if (currentVibPattern.isNotEmpty()) {
@@ -347,11 +356,4 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 .show()
         }
     }
-
-    private fun setRadioGroupEnabled(group: RadioGroup, enabled: Boolean) {
-        for (i in 0 until group.childCount) {
-            group.getChildAt(i).isEnabled = enabled
-        }
-    }
-
 }

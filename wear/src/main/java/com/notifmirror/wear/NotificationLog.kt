@@ -114,16 +114,19 @@ class NotificationLog(private val context: Context) {
                 prefs.edit().remove(KEY_LOG_ENCRYPTED).apply()
             }
         }
-        // Migrate any legacy plaintext data, then remove it
+        // Migrate any legacy plaintext data
         val raw = prefs.getString(KEY_LOG, null)
         if (raw != null) {
             return try {
                 val arr = JSONArray(raw)
-                // Migrate to encrypted and remove plaintext
+                // Try to migrate to encrypted storage
                 if (arr.length() > 0) {
                     saveEntries(arr)
                 }
-                prefs.edit().remove(KEY_LOG).apply()
+                // Only remove plaintext if encrypted storage now has the data
+                if (prefs.getString(KEY_LOG_ENCRYPTED, null) != null) {
+                    prefs.edit().remove(KEY_LOG).apply()
+                }
                 arr
             } catch (_: Exception) {
                 prefs.edit().remove(KEY_LOG).apply()

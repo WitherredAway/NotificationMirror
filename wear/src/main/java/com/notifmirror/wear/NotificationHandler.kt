@@ -346,7 +346,8 @@ object NotificationHandler {
             .setContentText(displayText)
             .setPriority(if (isSilent || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(if (isOngoing) false else autoCancel)
-            .setOngoing(isOngoing)
+            // Don't set ongoing on watch — let users swipe to dismiss.
+            // Phone will re-send the notification when it reappears.
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
@@ -367,17 +368,27 @@ object NotificationHandler {
         // Stack conversation messages using MessagingStyle for better WearOS rendering
         if (!hideContent && conversationHistory.size > 1) {
             val recent = conversationHistory.takeLast(20)
-            val selfPerson = Person.Builder().setName("Me").build()
+            val selfPerson = Person.Builder().setName("You").build()
+            val distinctSenders = recent.map { it.first }.distinct()
+            val isGroupConversation = distinctSenders.size > 1
             val messagingStyle = NotificationCompat.MessagingStyle(selfPerson)
-                .setConversationTitle(if (recent.map { it.first }.distinct().size > 1) appLabel else null)
+                .setGroupConversation(isGroupConversation)
+                .setConversationTitle(if (isGroupConversation) title else null)
             for ((idx, pair) in recent.withIndex()) {
                 val (senderName, msgText) = pair
-                val sender = Person.Builder().setName(senderName).build()
+                // For self-messages ("You"), pass null as sender so MessagingStyle
+                // renders them on the right side (outgoing message style)
+                val sender = if (senderName == "You") null
+                    else Person.Builder().setName(senderName).build()
                 // Use incrementing timestamps so messages are ordered correctly
                 messagingStyle.addMessage(msgText, System.currentTimeMillis() - (recent.size - idx) * 1000L, sender)
             }
             builder.setStyle(messagingStyle)
             builder.setNumber(conversationHistory.size)
+            // Override contentTitle for MessagingStyle: use title (chat name) with
+            // app label in subText, so WearOS doesn't show "AppLabel: Title" redundantly
+            builder.setContentTitle(title)
+            builder.setSubText(appLabel)
         } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
         }

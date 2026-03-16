@@ -540,9 +540,16 @@ class NotificationListener : NotificationListenerService() {
         if (msgBundle != null && msgBundle.isNotEmpty()) {
             for (item in msgBundle) {
                 if (item is android.os.Bundle) {
-                    // sender is null for messages sent by the current user (MessagingStyle convention)
+                    // Extract sender name: try deprecated CharSequence "sender" first,
+                    // then extract from "sender_person" Person parcelable (newer API),
+                    // fall back to "You" for self-messages (null sender = current user convention)
                     val sender = item.getCharSequence("sender")?.toString()
-                        ?: item.getCharSequence("sender_person")?.toString()
+                        ?: run {
+                            // sender_person is a Person Parcelable, not a CharSequence
+                            val personBundle = item.getBundle("sender_person")
+                            personBundle?.getString("name")
+                                ?: (item.getParcelable<android.app.Person>("sender_person"))?.name?.toString()
+                        }
                         ?: "You"
                     val msgText = item.getCharSequence("text")?.toString() ?: continue
                     messages.add(Pair(sender, msgText))
