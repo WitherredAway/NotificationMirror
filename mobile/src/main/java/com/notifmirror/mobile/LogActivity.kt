@@ -329,20 +329,16 @@ class LogActivity : AppCompatActivity() {
         scope.launch {
             try {
                 val json = JSONObject().apply {
-                    put("packageName", entry.packageName)
+                    put("key", "repush_${System.currentTimeMillis()}")
+                    put("package", entry.packageName)
                     put("title", entry.title)
                     put("text", entry.text)
                     put("isRepush", true)
                 }
 
-                // Encrypt before sending
-                val encrypted = CryptoHelper.encryptString(json.toString(), this@LogActivity)
-                if (encrypted == null) {
-                    runOnUiThread {
-                        Toast.makeText(this@LogActivity, "Encryption failed", Toast.LENGTH_SHORT).show()
-                    }
-                    return@launch
-                }
+                // Encrypt before sending (use raw binary, not Base64 string)
+                val key = CryptoHelper.getOrCreateKey(this@LogActivity)
+                val encrypted = CryptoHelper.encrypt(json.toString().toByteArray(Charsets.UTF_8), key)
 
                 val nodes = Wearable.getNodeClient(this@LogActivity).connectedNodes.await()
                 if (nodes.isEmpty()) {
@@ -354,7 +350,7 @@ class LogActivity : AppCompatActivity() {
 
                 for (node in nodes) {
                     Wearable.getMessageClient(this@LogActivity)
-                        .sendMessage(node.id, "/notification", encrypted.toByteArray())
+                        .sendMessage(node.id, "/notification", encrypted)
                         .await()
                 }
                 runOnUiThread {
