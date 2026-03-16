@@ -136,10 +136,11 @@ object NotificationHandler {
             }
 
             // Smart grouping: derive a conversation key from the notification
-            // Uses isMessagingStyle flag from phone (auto-detected via EXTRA_MESSAGES)
-            // to group by sender/chat name instead of hardcoding app names
+            // Uses conversationTitle (from EXTRA_CONVERSATION_TITLE) for stable grouping
+            // of group chats where the title changes per sender (e.g. WhatsApp groups)
             val isMessagingStyle = json.optBoolean("isMessagingStyle", false)
-            val conversationKey = deriveConversationKey(packageName, key, title, isMessagingStyle)
+            val conversationTitle = json.optString("conversationTitle", "")
+            val conversationKey = deriveConversationKey(packageName, key, title, isMessagingStyle, conversationTitle)
             // Track reverse mapping for dismissals
             notifKeyToConversationKey[key] = conversationKey
             pruneTrackingMapsIfNeeded()
@@ -658,13 +659,27 @@ object NotificationHandler {
     /**
      * Derive a conversation-level grouping key from notification metadata.
      * For messaging apps (detected via MessagingStyle on the phone side),
-     * groups by sender/chat name (title) within the same app.
-     * For other apps, falls back to the notification key.
+     * uses conversationTitle (from EXTRA_CONVERSATION_TITLE) when available
+     * for stable grouping — this is the group/chat name that stays constant
+     * even when different people send messages (e.g. WhatsApp group name).
+     * Falls back to notification title, then notification key.
      */
-    private fun deriveConversationKey(packageName: String, notifKey: String, title: String, isMessagingStyle: Boolean): String {
-        return if (isMessagingStyle && title.isNotEmpty()) {
-            // Group by app + sender/conversation title
-            "$packageName:$title"
+    private fun deriveConversationKey(
+        packageName: String,
+        notifKey: String,
+        title: String,
+        isMessagingStyle: Boolean,
+        conversationTitle: String = ""
+    ): String {
+        return if (isMessagingStyle) {
+            when {
+                // Prefer conversationTitle — stable across sender changes
+                // e.g. "HHH GNG" stays the same regardless of who sent the message
+                conversationTitle.isNotEmpty() -> "$packageName:$conversationTitle"
+                // Fallback to title if no conversationTitle (1:1 chats)
+                title.isNotEmpty() -> "$packageName:$title"
+                else -> notifKey
+            }
         } else {
             // Non-messaging apps: use the original notification key
             notifKey

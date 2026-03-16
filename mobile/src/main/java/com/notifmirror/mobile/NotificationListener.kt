@@ -154,6 +154,10 @@ class NotificationListener : NotificationListenerService() {
 
         val displayText = bigText ?: text
 
+        // Extract conversation title (stable group/chat name, e.g. "HHH GNG" for WhatsApp groups)
+        // This is set by MessagingStyle.setConversationTitle() and is stable across sender changes
+        val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+
         // Extract stacked/conversation messages if available
         val conversationMessages = extractConversationMessages(notification, title, displayText)
 
@@ -231,6 +235,10 @@ class NotificationListener : NotificationListenerService() {
                 }
                 put("conversationMessages", msgsArray)
                 put("isMessagingStyle", true)
+            }
+            // Send stable conversation title for grouping (e.g. WhatsApp group name)
+            if (conversationTitle.isNotEmpty()) {
+                put("conversationTitle", conversationTitle)
             }
             // Send ongoing flag so watch can make persistent notifs persistent
             if (sbn.isOngoing) {
@@ -405,6 +413,9 @@ class NotificationListener : NotificationListenerService() {
 
                     val displayText = bigText ?: text
 
+                    // Extract conversation title (stable group/chat name)
+                    val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+
                     // Extract stacked/conversation messages if available
                     val conversationMessages = extractConversationMessages(notification, title, displayText)
 
@@ -466,6 +477,10 @@ class NotificationListener : NotificationListenerService() {
                             }
                             put("conversationMessages", msgsArray)
                             put("isMessagingStyle", true)
+                        }
+                        // Send stable conversation title for grouping
+                        if (conversationTitle.isNotEmpty()) {
+                            put("conversationTitle", conversationTitle)
                         }
                         if (iconBase64 != null) put("icon", iconBase64)
                         // Send ongoing flag so watch can make persistent notifs persistent
