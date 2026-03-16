@@ -93,7 +93,6 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
                 }
             }
             "/action_result" -> handleActionResult(messageEvent)
-            "/set_app_sound" -> handleSetAppSound(messageEvent)
         }
     }
 
@@ -160,24 +159,6 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle action result", e)
-        }
-    }
-
-    private fun handleSetAppSound(messageEvent: MessageEvent) {
-        try {
-            val json = org.json.JSONObject(String(messageEvent.data))
-            val packageName = json.getString("package")
-            val soundUri = json.getString("soundUri")
-
-            val prefs = getSharedPreferences("notif_sound_settings", Context.MODE_PRIVATE)
-            if (soundUri == "default") {
-                prefs.edit().remove("sound_$packageName").apply()
-            } else {
-                prefs.edit().putString("sound_$packageName", soundUri).apply()
-            }
-            Log.d(TAG, "Set sound for $packageName: $soundUri")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to handle set_app_sound", e)
         }
     }
 

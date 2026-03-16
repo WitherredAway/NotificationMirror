@@ -14,27 +14,16 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.switchmaterial.SwitchMaterial
-import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import org.json.JSONArray
-import org.json.JSONObject
 
 class PerAppSettingsActivity : AppCompatActivity() {
 
     private lateinit var settings: SettingsManager
     private lateinit var packageName: String
-    private var selectedSoundUri: String = "default"
-    private var selectedSoundName = "Default"
     private var currentVibPattern = ""
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-
-    // Watch sounds synced via DataClient — loaded dynamically
-    private var watchSoundNames = mutableListOf<String>()
-    private var watchSoundUris = mutableListOf<String>()
 
     companion object {
         const val EXTRA_PACKAGE_NAME = "extra_package_name"
@@ -95,7 +84,6 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val vibPreviewButton = findViewById<MaterialButton>(R.id.perAppVibPreviewButton)
         val vibPatternLabel = findViewById<TextView>(R.id.perAppVibPatternLabel)
         val vibPatternInput = findViewById<EditText>(R.id.perAppVibPattern)
-        val soundNameDisplay = findViewById<TextView>(R.id.perAppSoundName)
         val showSnoozeSwitch = findViewById<SwitchMaterial>(R.id.perAppShowSnooze)
         val snoozeDurationInput = findViewById<EditText>(R.id.perAppSnoozeDuration)
         val keywordWhitelistInput = findViewById<EditText>(R.id.perAppKeywordWhitelist)
@@ -189,19 +177,6 @@ class PerAppSettingsActivity : AppCompatActivity() {
             currentVibPattern = pattern
         }
 
-        // Load saved sound selection
-        val savedSoundUri = settings.getSoundUri(packageName)
-        val savedSoundName = settings.getSoundDisplayName(packageName)
-        if (savedSoundUri.isNotEmpty()) {
-            selectedSoundUri = savedSoundUri
-            selectedSoundName = savedSoundName.ifEmpty { savedSoundUri }
-            soundNameDisplay.text = "Sound: $selectedSoundName"
-            soundNameDisplay.visibility = View.VISIBLE
-        }
-
-        // Load watch sounds from DataClient
-        loadWatchSounds(soundNameDisplay)
-
         // Wire up override checkboxes to enable/disable controls
         overrideOngoingMode.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(perAppOngoingModeGroup, checked) }
         overrideMuteContinuation.setOnCheckedChangeListener { _, checked -> muteContinuationSwitch.isEnabled = checked }
@@ -215,33 +190,6 @@ class PerAppSettingsActivity : AppCompatActivity() {
         overrideScreenOffMode.setOnCheckedChangeListener { _, checked -> setRadioGroupEnabled(perAppScreenModeGroup, checked) }
         overrideShowSnooze.setOnCheckedChangeListener { _, checked -> showSnoozeSwitch.isEnabled = checked }
         overrideSnoozeDuration.setOnCheckedChangeListener { _, checked -> snoozeDurationInput.isEnabled = checked }
-
-        // Sound buttons
-        findViewById<MaterialButton>(R.id.perAppPickSound).setOnClickListener {
-            if (watchSoundNames.isEmpty()) {
-                Toast.makeText(this, "No watch sounds available. Open the watch app to sync.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            val names = watchSoundNames.toTypedArray()
-            val currentIndex = watchSoundUris.indexOf(selectedSoundUri).coerceAtLeast(0)
-            AlertDialog.Builder(this)
-                .setTitle("Select Watch Sound")
-                .setSingleChoiceItems(names, currentIndex) { dialog, which ->
-                    selectedSoundUri = watchSoundUris[which]
-                    selectedSoundName = watchSoundNames[which]
-                    soundNameDisplay.text = "Sound: $selectedSoundName"
-                    soundNameDisplay.visibility = View.VISIBLE
-                    dialog.dismiss()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
-        }
-
-        findViewById<MaterialButton>(R.id.perAppClearSound).setOnClickListener {
-            selectedSoundUri = "default"
-            selectedSoundName = "Default"
-            soundNameDisplay.visibility = View.GONE
-        }
 
         // Save button
         findViewById<MaterialButton>(R.id.perAppSaveButton).setOnClickListener {
@@ -386,14 +334,6 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 settings.removeVibrationPattern(packageName)
             }
 
-            // Save sound and send to watch
-            if (selectedSoundUri != "default") {
-                settings.setSoundUri(packageName, selectedSoundUri, selectedSoundName)
-            } else {
-                settings.removeSoundUri(packageName)
-            }
-            sendSoundSelectionToWatch(packageName, selectedSoundUri)
-
             Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show()
             finish()
         }
@@ -410,73 +350,6 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
-        }
-    }
-
-    /**
-     * Load the list of available notification sounds from the watch via DataClient.
-     * The watch syncs this list when its app is opened.
-     */
-    private fun loadWatchSounds(soundNameDisplay: TextView) {
-        scope.launch {
-            try {
-                val dataItems = Wearable.getDataClient(this@PerAppSettingsActivity)
-                    .getDataItems(android.net.Uri.parse("wear://*/watch_sounds"))
-                    .await()
-
-                for (item in dataItems) {
-                    val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
-                    val soundsJson = dataMap.getString("sounds_json") ?: continue
-                    val arr = JSONArray(soundsJson)
-
-                    watchSoundNames.clear()
-                    watchSoundUris.clear()
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.getJSONObject(i)
-                        watchSoundNames.add(obj.getString("name"))
-                        watchSoundUris.add(obj.getString("uri"))
-                    }
-                    Log.d(TAG, "Loaded ${watchSoundNames.size} watch sounds")
-                    break
-                }
-                dataItems.release()
-
-                // Update display if saved sound matches a watch sound
-                if (selectedSoundUri != "default") {
-                    val idx = watchSoundUris.indexOf(selectedSoundUri)
-                    if (idx >= 0) {
-                        selectedSoundName = watchSoundNames[idx]
-                        soundNameDisplay.text = "Sound: $selectedSoundName"
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to load watch sounds", e)
-            }
-        }
-    }
-
-    /**
-     * Send the selected sound URI to the watch so it can store it
-     * and apply it to the notification channel for this app.
-     */
-    private fun sendSoundSelectionToWatch(pkg: String, soundUri: String) {
-        scope.launch {
-            try {
-                val json = JSONObject().apply {
-                    put("package", pkg)
-                    put("soundUri", soundUri)
-                }
-                val nodes = Wearable.getNodeClient(this@PerAppSettingsActivity)
-                    .connectedNodes.await()
-                for (node in nodes) {
-                    Wearable.getMessageClient(this@PerAppSettingsActivity)
-                        .sendMessage(node.id, "/set_app_sound", json.toString().toByteArray())
-                        .await()
-                }
-                Log.d(TAG, "Sent sound selection to watch: $pkg -> $soundUri")
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to send sound selection to watch", e)
-            }
         }
     }
 

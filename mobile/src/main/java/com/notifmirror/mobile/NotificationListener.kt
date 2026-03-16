@@ -216,6 +216,10 @@ class NotificationListener : NotificationListenerService() {
                 put("conversationMessages", msgsArray)
                 put("isMessagingStyle", true)
             }
+            // Send ongoing flag so watch can make persistent notifs persistent
+            if (sbn.isOngoing) {
+                put("isOngoing", true)
+            }
             put("muteDuration", settings.getEffectiveMuteDuration(appPackageName))
             // Send all configurable values to watch (per-app with fallback to global)
             put("notifPriority", settings.getEffectivePriority(appPackageName))
@@ -247,11 +251,6 @@ class NotificationListener : NotificationListenerService() {
             val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
             if (effectiveVib.isNotEmpty()) {
                 put("vibrationPattern", effectiveVib)
-            }
-            // Send custom sound URI if set for this app
-            val customSound = settings.getEffectiveSoundUri(appPackageName)
-            if (customSound.isNotEmpty()) {
-                put("soundUri", customSound)
             }
             // Send complication settings so watch can filter by app
             put("complicationSource", settings.getComplicationSource())
@@ -449,6 +448,10 @@ class NotificationListener : NotificationListenerService() {
                             put("isMessagingStyle", true)
                         }
                         if (iconBase64 != null) put("icon", iconBase64)
+                        // Send ongoing flag so watch can make persistent notifs persistent
+                        if (sbn.isOngoing) {
+                            put("isOngoing", true)
+                        }
                         put("muteDuration", settings.getEffectiveMuteDuration(appPackageName))
                         put("notifPriority", settings.getEffectivePriority(appPackageName))
                         put("bigTextThreshold", settings.getEffectiveBigTextThreshold(appPackageName))
@@ -473,8 +476,6 @@ class NotificationListener : NotificationListenerService() {
                         put("batterySaverThreshold", settings.getBatterySaverThreshold())
                         val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
                         if (effectiveVib.isNotEmpty()) put("vibrationPattern", effectiveVib)
-                        val customSound = settings.getEffectiveSoundUri(appPackageName)
-                        if (customSound.isNotEmpty()) put("soundUri", customSound)
                         put("complicationSource", settings.getComplicationSource())
                         val complicationApp = settings.getComplicationApp()
                         if (complicationApp.isNotEmpty()) put("complicationApp", complicationApp)

@@ -421,10 +421,6 @@ class MainActivity : AppCompatActivity() {
             if (effectiveVib.isNotEmpty()) {
                 put("vibrationPattern", effectiveVib)
             }
-            val effectiveSound = settingsManager.getEffectiveSoundUri(packageName)
-            if (effectiveSound.isNotEmpty()) {
-                put("soundUri", effectiveSound)
-            }
             // Resolve app label for the selected package
             val appLabel = try {
                 val ai = this@MainActivity.packageManager.getApplicationInfo(packageName, 0)

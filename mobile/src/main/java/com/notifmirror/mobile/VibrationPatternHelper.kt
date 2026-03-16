@@ -160,20 +160,26 @@ object VibrationPatternHelper {
     }
 
     fun vibratePattern(context: Context, pattern: String) {
-        val longs = parsePattern(pattern) ?: return
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vm.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
+        try {
+            val longs = parsePattern(pattern) ?: return
+            // Skip vibration if pattern is all zeros (silent)
+            if (longs.all { it == 0L }) return
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vm.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createWaveform(longs, -1))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(longs, -1)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(longs, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(longs, -1)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Vibration failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

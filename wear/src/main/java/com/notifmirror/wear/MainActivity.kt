@@ -2,7 +2,6 @@ package com.notifmirror.wear
 
 import android.content.ComponentName
 import android.content.Intent
-import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -19,15 +18,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.color.DynamicColors
-import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import org.json.JSONArray
-import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -203,8 +199,6 @@ class MainActivity : AppCompatActivity() {
         // Proactively pull encryption key from DataClient on app launch
         pullEncryptionKeyFromDataClient()
 
-        // Sync available notification sounds to phone
-        syncAvailableSoundsToPhone()
     }
 
     /**
@@ -255,52 +249,6 @@ class MainActivity : AppCompatActivity() {
                 Log.d("NotifMirrorWear", "Mirroring toggle synced to phone: enabled=$enabled")
             } catch (e: Exception) {
                 Log.e("NotifMirrorWear", "Failed to sync mirroring toggle to phone", e)
-            }
-        }
-    }
-
-    /**
-     * Enumerate available notification sounds on the watch and sync the list
-     * to the phone via Wearable DataClient so the phone can display them in per-app settings.
-     */
-    private fun syncAvailableSoundsToPhone() {
-        scope.launch {
-            try {
-                val rm = RingtoneManager(this@MainActivity)
-                rm.setType(RingtoneManager.TYPE_NOTIFICATION)
-                val cursor = rm.cursor
-
-                val soundsArray = JSONArray()
-                // Add "Default" and "Silent" as first options
-                soundsArray.put(JSONObject().apply {
-                    put("name", "Default")
-                    put("uri", "default")
-                })
-                soundsArray.put(JSONObject().apply {
-                    put("name", "Silent")
-                    put("uri", "")
-                })
-
-                while (cursor.moveToNext()) {
-                    val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
-                    val uri = rm.getRingtoneUri(cursor.position).toString()
-                    soundsArray.put(JSONObject().apply {
-                        put("name", title)
-                        put("uri", uri)
-                    })
-                }
-
-                val putReq = PutDataMapRequest.create("/watch_sounds").apply {
-                    dataMap.putString("sounds_json", soundsArray.toString())
-                    dataMap.putLong("timestamp", System.currentTimeMillis())
-                }
-                Wearable.getDataClient(this@MainActivity)
-                    .putDataItem(putReq.asPutDataRequest().setUrgent())
-                    .await()
-
-                Log.d("NotifMirrorWear", "Synced ${soundsArray.length()} sounds to phone")
-            } catch (e: Exception) {
-                Log.w("NotifMirrorWear", "Failed to sync sounds to phone", e)
             }
         }
     }

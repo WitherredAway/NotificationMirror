@@ -39,7 +39,8 @@ object NotificationHandler {
     private val notifIdMap = java.util.concurrent.ConcurrentHashMap<String, Int>()
     // Track message history per conversation key for stacking
     private val conversationMessages = java.util.concurrent.ConcurrentHashMap<String, MutableList<Pair<String, String>>>()
-    private var nextId = 1000
+    private val nextId = java.util.concurrent.atomic.AtomicInteger(1000)
+    private val idLock = Any()
     private const val SUMMARY_ID_OFFSET = 500000
 
     private val DEFAULT_VIBRATION = longArrayOf(0, 200, 100, 200)
@@ -67,8 +68,8 @@ object NotificationHandler {
             val muteDuration = json.optInt("muteDuration", 30)
             val defaultVibration = json.optString("defaultVibration", "0,200,100,200")
             val customVibrationPattern = json.optString("vibrationPattern", "")
-            val customSoundUri = json.optString("soundUri", "")
             val isSilent = json.optBoolean("silent", false)
+            val isOngoing = json.optBoolean("isOngoing", false)
             val hideContent = json.optBoolean("hideContent", false)
             val muteContinuation = json.optBoolean("muteContinuation", false)
             // Respect both phone-side and watch-side history settings
@@ -125,16 +126,23 @@ object NotificationHandler {
             notifKeyToConversationKey[key] = conversationKey
 
             // Reuse notification ID for same conversation key to stack messages
-            val isUpdate = notifIdMap.containsKey(conversationKey)
-            val notifId = notifIdMap.getOrPut(conversationKey) { nextId++ }
+            // Synchronized to avoid race between containsKey and getOrPut
+            val (isUpdate, notifId) = synchronized(idLock) {
+                val existing = notifIdMap.containsKey(conversationKey)
+                val id = notifIdMap.getOrPut(conversationKey) { nextId.getAndIncrement() }
+                Pair(existing, id)
+            }
 
             // Track conversation messages for stacking (cap at 20 to avoid unbounded memory growth)
             val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
 
-            // If the phone sent pre-extracted conversation messages (e.g. during sync),
-            // seed the history from them instead of just adding the top-level text
+            // If the phone sent pre-extracted conversation messages, use them as the
+            // authoritative history (replaces any local state for this conversation).
+            // This avoids duplicating the first message since the phone already includes
+            // ALL messages in the conversation each time.
             val phoneConversationMsgs = json.optJSONArray("conversationMessages")
-            if (phoneConversationMsgs != null && phoneConversationMsgs.length() > 0 && msgList.isEmpty()) {
+            if (phoneConversationMsgs != null && phoneConversationMsgs.length() > 0) {
+                msgList.clear()
                 for (i in 0 until phoneConversationMsgs.length()) {
                     val msgObj = phoneConversationMsgs.getJSONObject(i)
                     val sender = msgObj.optString("sender", title)
@@ -143,12 +151,12 @@ object NotificationHandler {
                         msgList.add(Pair(sender, msgText))
                     }
                 }
-            }
-
-            // Always add the current message (avoid duplicating the last phone message)
-            val lastMsg = msgList.lastOrNull()
-            if (lastMsg == null || lastMsg.first != title || lastMsg.second != text) {
-                msgList.add(Pair(title, text))
+            } else {
+                // Non-messaging app: append current message
+                val lastMsg = msgList.lastOrNull()
+                if (lastMsg == null || lastMsg.first != title || lastMsg.second != text) {
+                    msgList.add(Pair(title, text))
+                }
             }
             while (msgList.size > 20) { msgList.removeAt(0) }
 
@@ -181,7 +189,7 @@ object NotificationHandler {
                 notifPriority, bigTextThreshold, autoCancel, showOpenButton, showMuteButton,
                 muteDuration = muteDuration, showSnoozeButton = showSnoozeButton, snoozeDuration = snoozeDuration,
                 defaultVibration = defaultVibration, customVibrationPattern = customVibrationPattern,
-                customSoundUri = customSoundUri, isSilent = isSilent,
+                isSilent = isSilent, isOngoing = isOngoing,
                 hideContent = hideContent, silentUpdate = isUpdate && muteContinuation,
                 conversationHistory = messages
             )
@@ -259,8 +267,8 @@ object NotificationHandler {
         snoozeDuration: Int = 5,
         defaultVibration: String = "0,200,100,200",
         customVibrationPattern: String = "",
-        customSoundUri: String = "",
         isSilent: Boolean = false,
+        isOngoing: Boolean = false,
         hideContent: Boolean = false,
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList()
@@ -279,51 +287,35 @@ object NotificationHandler {
             -1 -> NotificationManager.IMPORTANCE_LOW
             else -> NotificationManager.IMPORTANCE_HIGH
         }
-        // Resolve sound URI for this app from watch-side per-app settings
-        val watchSoundPrefs = context.getSharedPreferences("notif_sound_settings", Context.MODE_PRIVATE)
-        val perAppSoundUri = watchSoundPrefs.getString("sound_$packageName", null)
-        // null = use default, "" = silent, otherwise a specific URI
-        val soundUri: Uri? = when {
-            isSilent -> null
-            perAppSoundUri == "" -> null // explicitly silent
-            perAppSoundUri != null -> Uri.parse(perAppSoundUri) // specific sound
-            customSoundUri == "silent" -> null
-            else -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) // default
-        }
-
-        // Build a channel ID that includes a hash of the sound setting so channel changes take effect
-        val soundHash = (perAppSoundUri ?: customSoundUri).hashCode().toString(16)
-        val effectiveChannelId = channelId + "_s" + soundHash
-
-        // Delete any old channels for this app so settings always take effect
-        val existingChannels = nm.notificationChannels
-        for (ch in existingChannels) {
-            val isThisAppChannel = ch.id == channelId || ch.id.startsWith(channelId + "_")
-            if (isThisAppChannel && ch.id != effectiveChannelId) {
-                nm.deleteNotificationChannel(ch.id)
+        // Use a stable per-app channel so users can customize sound/vibration
+        // through OS notification channel settings (long-press notification → settings).
+        // Only create the channel if it doesn't already exist to preserve user customizations.
+        if (nm.getNotificationChannel(channelId) == null) {
+            // Also clean up any old hash-based channels from previous versions
+            val existingChannels = nm.notificationChannels
+            for (ch in existingChannels) {
+                if (ch.id.startsWith(channelId + "_")) {
+                    nm.deleteNotificationChannel(ch.id)
+                }
             }
-        }
 
-        val channel = NotificationChannel(
-            effectiveChannelId,
-            appLabel,
-            if (isSilent) NotificationManager.IMPORTANCE_LOW else importance
-        ).apply {
-            description = "Mirrored notifications from $appLabel"
-            // Vibration is handled manually via Vibrator API
-            enableVibration(false)
-            // Sound is handled via the channel natively
-            if (soundUri != null) {
-                setSound(soundUri, AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build())
-            } else {
-                setSound(null, null)
+            val channel = NotificationChannel(
+                channelId,
+                appLabel,
+                if (isSilent) NotificationManager.IMPORTANCE_LOW else importance
+            ).apply {
+                description = "Mirrored notifications from $appLabel"
+                // Vibration is handled manually via Vibrator API
+                enableVibration(false)
+                setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build())
+                this.group = groupId
             }
-            this.group = groupId
+            nm.createNotificationChannel(channel)
         }
-        nm.createNotificationChannel(channel)
 
         val compatPriority = when (notifPriority) {
             0 -> NotificationCompat.PRIORITY_DEFAULT
@@ -336,12 +328,13 @@ object NotificationHandler {
 
         // For mute-continuation: keep the SAME channel but suppress alerts via
         // setOnlyAlertOnce + setSilent so WearOS doesn't re-vibrate/sound
-        val builder = NotificationCompat.Builder(context, effectiveChannelId)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(displayTitle)
             .setContentText(displayText)
             .setPriority(if (isSilent || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
-            .setAutoCancel(autoCancel)
+            .setAutoCancel(if (isOngoing) false else autoCancel)
+            .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
@@ -494,7 +487,7 @@ object NotificationHandler {
 
         // Create/update summary notification for the per-app group
         val summaryId = packageName.hashCode() + SUMMARY_ID_OFFSET
-        val summaryBuilder = NotificationCompat.Builder(context, effectiveChannelId)
+        val summaryBuilder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(appLabel)
             .setContentText(title)

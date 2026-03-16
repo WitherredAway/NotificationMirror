@@ -14,8 +14,6 @@ class SettingsManager(context: Context) {
         private const val KEY_SCREEN_OFF_MODE = "screen_off_mode"
         private const val KEY_MUTE_DURATION = "mute_duration_minutes"
         private const val KEY_VIBRATION_PREFIX = "vibration_"
-        private const val KEY_SOUND_PREFIX = "sound_"
-        private const val KEY_SOUND_NAME_PREFIX = "sound_name_"
         private const val KEY_DEFAULT_VIBRATION = "default_vibration_pattern"
         private const val KEY_ONGOING_MODE = "ongoing_mode"
 
@@ -305,41 +303,6 @@ class SettingsManager(context: Context) {
         prefs.edit().remove(KEY_VIBRATION_PREFIX + packageName).apply()
     }
 
-    // --- Per-App Sound ---
-
-    fun getSoundUri(packageName: String): String {
-        return prefs.getString(KEY_SOUND_PREFIX + packageName, "") ?: ""
-    }
-
-    fun getSoundDisplayName(packageName: String): String {
-        return prefs.getString(KEY_SOUND_NAME_PREFIX + packageName, "") ?: ""
-    }
-
-    fun setSoundUri(packageName: String, uri: String, displayName: String) {
-        prefs.edit()
-            .putString(KEY_SOUND_PREFIX + packageName, uri)
-            .putString(KEY_SOUND_NAME_PREFIX + packageName, displayName)
-            .apply()
-    }
-
-    fun removeSoundUri(packageName: String) {
-        prefs.edit()
-            .remove(KEY_SOUND_PREFIX + packageName)
-            .remove(KEY_SOUND_NAME_PREFIX + packageName)
-            .apply()
-    }
-
-    fun getAllCustomSounds(): Map<String, String> {
-        val result = mutableMapOf<String, String>()
-        for ((key, value) in prefs.all) {
-            if (key.startsWith(KEY_SOUND_NAME_PREFIX) && value is String && value.isNotEmpty()) {
-                val pkg = key.removePrefix(KEY_SOUND_NAME_PREFIX)
-                result[pkg] = value
-            }
-        }
-        return result
-    }
-
     // --- Per-App Settings (null/empty = use global default) ---
 
     private fun perAppKey(setting: String, packageName: String): String {
@@ -462,10 +425,6 @@ class SettingsManager(context: Context) {
         return if (custom.isNotEmpty()) custom else getDefaultVibrationPattern()
     }
 
-    fun getEffectiveSoundUri(packageName: String): String {
-        return getSoundUri(packageName)
-    }
-
     // --- Per-App Keyword Filters ---
 
     fun getPerAppKeywordWhitelist(packageName: String): List<String> {
@@ -527,7 +486,6 @@ class SettingsManager(context: Context) {
             if (prefs.getBoolean(perAppEnabledKey(s, packageName), false)) return true
         }
         if (getVibrationPattern(packageName).isNotEmpty()) return true
-        if (getSoundUri(packageName).isNotEmpty()) return true
         if (getPerAppKeywordWhitelist(packageName).isNotEmpty()) return true
         if (getPerAppKeywordBlacklist(packageName).isNotEmpty()) return true
         return false
@@ -545,7 +503,6 @@ class SettingsManager(context: Context) {
         }
         editor.apply()
         removeVibrationPattern(packageName)
-        removeSoundUri(packageName)
         clearPerAppKeywordFilters(packageName)
     }
 
