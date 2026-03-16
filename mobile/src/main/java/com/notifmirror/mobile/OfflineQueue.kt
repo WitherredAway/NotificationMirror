@@ -26,9 +26,12 @@ class OfflineQueue(private val context: Context) {
 
     fun enqueue(notificationJson: JSONObject) {
         val queue = getQueue()
-        // Add timestamp to track when it was queued
-        notificationJson.put("queuedAt", System.currentTimeMillis())
-        queue.put(notificationJson)
+        // Copy to avoid mutating the caller's object and preserve original queuedAt on re-enqueue
+        val copy = JSONObject(notificationJson.toString())
+        if (!copy.has("queuedAt")) {
+            copy.put("queuedAt", System.currentTimeMillis())
+        }
+        queue.put(copy)
 
         // Trim to max size (drop oldest)
         while (queue.length() > MAX_QUEUE_SIZE) {

@@ -262,7 +262,7 @@ class FilterSettingsActivity : AppCompatActivity() {
     private fun resolveThemeColor(attr: Int): Int {
         val tv = android.util.TypedValue()
         theme.resolveAttribute(attr, tv, true)
-        return getColor(tv.resourceId)
+        return tv.data
     }
 
     private fun saveFilters(): Boolean {

@@ -22,6 +22,7 @@ object CryptoHelper {
     private const val GCM_IV_LENGTH = 12
     private const val GCM_TAG_LENGTH = 128
 
+    @Synchronized
     fun getOrCreateKey(context: Context): SecretKey {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val stored = prefs.getString(KEY_AES, null)

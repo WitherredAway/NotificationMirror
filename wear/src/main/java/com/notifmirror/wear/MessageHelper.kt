@@ -49,7 +49,7 @@ object MessageHelper {
                         NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedDismiss)
                     )
                 } else {
-                    NotificationHandler.handleDismissal(context, messageEvent)
+                    Log.w(TAG, "Cannot decrypt dismiss — dropping (key not available)")
                 }
             }
             "/action_result" -> handleActionResult(context, messageEvent)
