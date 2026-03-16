@@ -17,10 +17,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.color.DynamicColors
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-
 class AppPickerActivity : AppCompatActivity() {
 
     private lateinit var settings: SettingsManager
@@ -104,11 +100,6 @@ class AppPickerActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         settings.setWhitelistedApps(selectedApps)
-        // Sync whitelisted apps to watch so it can pre-create notification channels
-        val apps = selectedApps.toSet()
-        CoroutineScope(Dispatchers.IO).launch {
-            WearSyncHelper.syncWhitelistedAppsToWatch(this@AppPickerActivity, apps)
-        }
     }
 
     data class AppInfo(

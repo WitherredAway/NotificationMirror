@@ -39,39 +39,6 @@ object WearSyncHelper {
     }
 
     /**
-     * Sync the whitelisted app list (package → label) to the watch via DataClient.
-     * The watch uses this to pre-create notification channels so they appear
-     * in Galaxy Watch Manager for sound customization before any notification arrives.
-     */
-    suspend fun syncWhitelistedAppsToWatch(context: Context, packages: Set<String>) {
-        try {
-            val pm = context.packageManager
-            val putReq = PutDataMapRequest.create("/whitelisted_apps").apply {
-                val pkgArray = ArrayList<String>(packages.size)
-                val labelArray = ArrayList<String>(packages.size)
-                for (pkg in packages) {
-                    pkgArray.add(pkg)
-                    val label = try {
-                        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
-                    } catch (_: Exception) {
-                        pkg.substringAfterLast('.')
-                    }
-                    labelArray.add(label)
-                }
-                dataMap.putStringArrayList("packages", pkgArray)
-                dataMap.putStringArrayList("labels", labelArray)
-                dataMap.putLong("timestamp", System.currentTimeMillis())
-            }
-            Wearable.getDataClient(context)
-                .putDataItem(putReq.asPutDataRequest().setUrgent())
-                .await()
-            Log.d(TAG, "Synced ${packages.size} whitelisted apps to watch")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to sync whitelisted apps to watch", e)
-        }
-    }
-
-    /**
      * Convert an app's icon to a Base64-encoded PNG string for sending to the watch.
      * Returns null if the icon cannot be loaded.
      */

@@ -88,49 +88,9 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
                     val prefs = getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
                     prefs.edit().putBoolean("mirroring_enabled", enabled).apply()
                     Log.d(TAG, "Mirroring state synced from phone via PersistentListener: enabled=$enabled")
-                } else if (path == "/whitelisted_apps") {
-                    val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
-                    val packages = dataMap.getStringArrayList("packages") ?: continue
-                    val labels = dataMap.getStringArrayList("labels") ?: continue
-                    preCreateNotificationChannels(packages, labels)
                 }
             }
         }
-    }
-
-    private fun preCreateNotificationChannels(packages: List<String>, labels: List<String>) {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        var created = 0
-        for (i in packages.indices) {
-            val pkg = packages[i]
-            val label = if (i < labels.size) labels[i] else pkg.substringAfterLast('.')
-            val channelId = "mirror_$pkg"
-            val groupId = "group_$pkg"
-            // Don't overwrite existing channels (preserves user customizations)
-            if (nm.getNotificationChannel(channelId) != null) continue
-            if (nm.notificationChannelGroups.none { it.id == groupId }) {
-                nm.createNotificationChannelGroup(
-                    android.app.NotificationChannelGroup(groupId, label)
-                )
-            }
-            val channel = NotificationChannel(
-                channelId, label, NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Mirrored notifications from $label"
-                enableVibration(false)
-                setSound(
-                    android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION),
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                group = groupId
-            }
-            nm.createNotificationChannel(channel)
-            created++
-        }
-        Log.d(TAG, "Pre-created $created notification channels for ${packages.size} whitelisted apps")
     }
 
     private fun createNotificationChannel() {
