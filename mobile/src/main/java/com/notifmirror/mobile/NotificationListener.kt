@@ -420,9 +420,14 @@ class NotificationListener : NotificationListenerService() {
                 }
 
                 if (settings.isKeepNotificationHistoryEnabled()) {
+                    val sendStatus = if (anySendSucceeded) "SENT" else "SEND_FAILED"
+                    val sendDetail = if (anySendSucceeded)
+                        "${actionsJson.length()} actions, sent to ${nodes.size} node(s)"
+                    else
+                        "${actionsJson.length()} actions, all ${nodes.size} node(s) failed"
                     notifLog.addEntry(
-                        appPackageName, title, displayText, "SENT",
-                        "${actionsJson.length()} actions, sent to ${nodes.size} node(s)",
+                        appPackageName, title, displayText, sendStatus,
+                        sendDetail,
                         notifKey = notifKey,
                         actionsJson = actionsJson.toString(),
                         conversationKey = logConversationKey
