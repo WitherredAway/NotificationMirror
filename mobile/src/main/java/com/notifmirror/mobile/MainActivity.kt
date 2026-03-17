@@ -325,12 +325,28 @@ class MainActivity : AppCompatActivity() {
                         updateButton.isEnabled = false
                         updateButton.text = "Downloading..."
                     }
-                } else {
+                } else if (info != null) {
                     // Up to date — show version
-                    val versionName = info?.currentVersion ?: try {
+                    val versionName = info.currentVersion.ifEmpty {
+                        try {
+                            packageManager.getPackageInfo(packageName, 0).versionName
+                        } catch (_: Exception) { "?" }
+                    }
+                    updateTitle.text = "Up to date \u2014 v$versionName"
+                    val tv = android.util.TypedValue()
+                    theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, tv, true)
+                    updateTitle.setTextColor(tv.data)
+                    updateSubtitle.visibility = View.GONE
+                    updateButtonsRow.visibility = View.GONE
+                } else {
+                    // Check failed (no internet, API error, etc.)
+                    val versionName = try {
                         packageManager.getPackageInfo(packageName, 0).versionName
                     } catch (_: Exception) { "?" }
-                    updateTitle.text = "Up to date \u2014 v$versionName"
+                    updateTitle.text = "v$versionName \u2014 could not check for updates"
+                    val tv = android.util.TypedValue()
+                    theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, tv, true)
+                    updateTitle.setTextColor(tv.data)
                     updateSubtitle.visibility = View.GONE
                     updateButtonsRow.visibility = View.GONE
                 }
@@ -376,12 +392,7 @@ class MainActivity : AppCompatActivity() {
                     val nodeClient = Wearable.getNodeClient(this@MainActivity)
                     val nodes = nodeClient.connectedNodes.await()
                     if (nodes.isNotEmpty()) {
-                        for (node in nodes) {
-                            Wearable.getMessageClient(this@MainActivity)
-                                .sendMessage(node.id, "/request_logcat", ByteArray(0))
-                                .await()
-                        }
-                        // Wait briefly for watch to respond with logcat data
+                        // Register listener BEFORE sending the request to avoid race condition
                         val latch = java.util.concurrent.CountDownLatch(1)
                         var watchLogcat = "(Watch did not respond within timeout)"
                         val listener = com.google.android.gms.wearable.MessageClient.OnMessageReceivedListener { messageEvent ->
@@ -390,8 +401,14 @@ class MainActivity : AppCompatActivity() {
                                 latch.countDown()
                             }
                         }
-                        Wearable.getMessageClient(this@MainActivity).addListener(listener)
-                        latch.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                        Wearable.getMessageClient(this@MainActivity).addListener(listener).await()
+                        // Now send the request
+                        for (node in nodes) {
+                            Wearable.getMessageClient(this@MainActivity)
+                                .sendMessage(node.id, "/request_logcat", ByteArray(0))
+                                .await()
+                        }
+                        latch.await(15, java.util.concurrent.TimeUnit.SECONDS)
                         Wearable.getMessageClient(this@MainActivity).removeListener(listener)
                         sb.appendLine(watchLogcat)
                     } else {

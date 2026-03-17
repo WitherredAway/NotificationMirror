@@ -1,159 +1,437 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="?android:colorBackground">
-<ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:paddingBottom="100dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Settings" android:textSize="22sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="BEHAVIOR" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DND Sync" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Skip mirroring when phone is in Do Not Disturb mode" android:textSize="12sp" android:textColor="?colorOutline" />
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:colorBackground">
+
+<ScrollView
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingTop="20dp"
+    android:paddingBottom="100dp">
+
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="4dp"
+    android:text="Settings"
+    android:textSize="22sp"
+    android:textStyle="bold"
+    android:textColor="?colorOnSurface" />
+
+<!-- ==================== MIRRORING ==================== -->
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:layout_marginStart="4dp"
+    android:text="MIRRORING"
+    android:textSize="12sp"
+    android:textStyle="bold"
+    android:textColor="?colorPrimary"
+    android:letterSpacing="0.1" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:background="@drawable/settings_card_bg"
+    android:padding="16dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Screen-Off Mirroring" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:text="Control mirroring behavior based on phone screen state"
+        android:textSize="12sp" android:textColor="?colorOutline" />
+    <RadioGroup android:id="@+id/screenModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:orientation="vertical">
+        <RadioButton android:id="@+id/radioAlways" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Always mirror" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioScreenOff" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Only mirror when screen is off" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioSilent" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Mirror always, but silent when screen is on" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioVibrateOnlyWhenOn" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Mirror always, vibrate only (no sound) when screen is on" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+    </RadioGroup>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DND Sync" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Skip mirroring when phone is in Do Not Disturb mode" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/dndSyncSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Background Notifications" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:text="Control mirroring of ongoing and persistent notifications"
+        android:textSize="12sp" android:textColor="?colorOutline" />
+    <RadioGroup android:id="@+id/ongoingModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:orientation="vertical">
+        <RadioButton android:id="@+id/radioOngoingNone" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="None &#8212; skip all ongoing/persistent" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioOngoingOnly" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Ongoing only &#8212; music, timers, navigation" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioOngoingAll" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="All persistent &#8212; includes foreground services" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+    </RadioGroup>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto-Dismiss Sync" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Dismiss watch notification when dismissed on phone" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/autoDismissSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hide Content When Locked" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Hide notification text on watch when phone is locked" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/hideWhenLockedSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mute Continuation Alerts" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Silence follow-up messages in an active conversation" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/muteContinuationSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
 </LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/dndSyncSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+<!-- ==================== WATCH NOTIFICATIONS ==================== -->
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:layout_marginStart="4dp"
+    android:text="WATCH NOTIFICATIONS"
+    android:textSize="12sp"
+    android:textStyle="bold"
+    android:textColor="?colorPrimary"
+    android:letterSpacing="0.1" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:background="@drawable/settings_card_bg"
+    android:padding="16dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Notification Priority" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:text="Controls how prominently notifications appear on watch"
+        android:textSize="12sp" android:textColor="?colorOutline" />
+    <RadioGroup android:id="@+id/priorityGroup" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:orientation="vertical">
+        <RadioButton android:id="@+id/radioPriorityHigh" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="High (heads-up, sound, vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioPriorityDefault" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Default (no heads-up, sound + vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioPriorityLow" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Low (silent, no vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+    </RadioGroup>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto-Cancel on Tap" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Dismiss notification when tapped on watch" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/autoCancelSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Open on Watch Button" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Add button to open companion app when available" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/showOpenButtonSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Mute Button" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Add quick-mute button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/showMuteButtonSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Expanded Text Threshold" android:textSize="15sp" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Text longer than this will show in expanded view on watch" android:textSize="12sp" android:textColor="?colorOutline" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <EditText android:id="@+id/bigTextThresholdInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="characters" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
+    </LinearLayout>
+
 </LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:text="Background Notifications" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Control mirroring of ongoing and persistent (foreground service) notifications" android:textSize="12sp" android:textColor="?colorOutline" />
-<RadioGroup android:id="@+id/ongoingModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical">
-<RadioButton android:id="@+id/radioOngoingNone" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="None — skip all ongoing/persistent" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioOngoingOnly" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Ongoing only — music, timers, navigation" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioOngoingAll" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="All persistent — includes foreground services" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-</RadioGroup>
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto-Dismiss Sync" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Dismiss watch notification when dismissed on phone" android:textSize="12sp" android:textColor="?colorOutline" />
+
+<!-- ==================== SNOOZE & MUTE ==================== -->
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:layout_marginStart="4dp"
+    android:text="SNOOZE &amp; MUTE"
+    android:textSize="12sp"
+    android:textStyle="bold"
+    android:textColor="?colorPrimary"
+    android:letterSpacing="0.1" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:background="@drawable/settings_card_bg"
+    android:padding="16dp">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Snooze Button" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Add snooze button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/showSnoozeButtonSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Snooze Duration" android:textSize="15sp" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Duration for the Snooze button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <EditText android:id="@+id/snoozeDurationInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="minutes" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mute Duration" android:textSize="15sp" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Duration for the Mute button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <EditText android:id="@+id/muteDurationInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="minutes" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
+    </LinearLayout>
+
 </LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/autoDismissSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+<!-- ==================== VIBRATION ==================== -->
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:layout_marginStart="4dp"
+    android:text="VIBRATION"
+    android:textSize="12sp"
+    android:textStyle="bold"
+    android:textColor="?colorPrimary"
+    android:letterSpacing="0.1" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:background="@drawable/settings_card_bg"
+    android:padding="16dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Default Vibration Pattern" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:text="Used for apps without a custom pattern" android:textSize="12sp" android:textColor="?colorOutline" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/vibrationPresetButton"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="10dp" android:text="Short Buzz" android:textAllCaps="false"
+        android:textSize="14sp" android:gravity="start|center_vertical"
+        android:paddingStart="12dp" android:paddingEnd="12dp"
+        android:drawableEnd="@android:drawable/arrow_down_float" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <com.google.android.material.button.MaterialButton android:id="@+id/vibrationPreviewButton"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content" android:layout_height="40dp"
+            android:text="Preview" android:textAllCaps="false" android:textSize="13sp" />
+        <TextView android:id="@+id/vibrationPatternLabel" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:layout_marginStart="12dp" android:textSize="12sp"
+            android:textColor="?colorOutline" android:text="0, 200, 100, 200" />
+    </LinearLayout>
+    <EditText android:id="@+id/defaultVibrationInput" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:inputType="text" android:textSize="14sp" android:textColor="?colorOnSurface"
+        android:padding="10dp" android:background="@drawable/edit_text_bg"
+        android:hint="Custom: e.g. 0,200,100,200" android:textColorHint="?colorOutline" android:visibility="gone" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Per-app vibration patterns, sounds, and other overrides can be configured from the App Whitelist screen by tapping the gear icon next to each app."
+        android:textSize="12sp" android:textColor="?colorOutline" android:fontFamily="sans-serif-medium" />
+
 </LinearLayout>
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hide Content When Locked" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Hide notification text on watch when phone is locked" android:textSize="12sp" android:textColor="?colorOutline" />
+
+<!-- ==================== COMPLICATION ==================== -->
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:layout_marginStart="4dp"
+    android:text="COMPLICATION"
+    android:textSize="12sp"
+    android:textStyle="bold"
+    android:textColor="?colorPrimary"
+    android:letterSpacing="0.1" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:background="@drawable/settings_card_bg"
+    android:padding="16dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Complication Source" android:textSize="15sp" android:textStyle="bold" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:text="What to show on the watch face complication"
+        android:textSize="12sp" android:textColor="?colorOutline" />
+    <RadioGroup android:id="@+id/complicationSourceGroup" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:orientation="vertical">
+        <RadioButton android:id="@+id/radioComplicationMostRecent" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Most recent notification" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/radioComplicationSpecificApp" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Specific app" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+    </RadioGroup>
+    <com.google.android.material.button.MaterialButton android:id="@+id/complicationAppButton"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:text="Select App" android:textAllCaps="false"
+        android:textSize="14sp" android:gravity="start|center_vertical"
+        android:paddingStart="12dp" android:paddingEnd="12dp" android:visibility="gone" />
+
 </LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/hideWhenLockedSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+<!-- ==================== BATTERY SAVER ==================== -->
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:layout_marginStart="4dp"
+    android:text="BATTERY SAVER"
+    android:textSize="12sp"
+    android:textStyle="bold"
+    android:textColor="?colorPrimary"
+    android:letterSpacing="0.1" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:background="@drawable/settings_card_bg"
+    android:padding="16dp">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Battery Saver Mode" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Reduce mirroring when watch battery is low" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/batterySaverSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Battery Threshold" android:textSize="15sp" android:textColor="?colorOnSurface" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Skip mirroring when watch battery is below this percentage" android:textSize="12sp" android:textColor="?colorOutline" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <EditText android:id="@+id/batterySaverThresholdInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="%" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
+    </LinearLayout>
+
 </LinearLayout>
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mute Continuation Alerts" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Silence follow-up messages in an active conversation" android:textSize="12sp" android:textColor="?colorOutline" />
+
+<!-- ==================== DATA & UPDATES ==================== -->
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:layout_marginStart="4dp"
+    android:text="DATA &amp; UPDATES"
+    android:textSize="12sp"
+    android:textStyle="bold"
+    android:textColor="?colorPrimary"
+    android:letterSpacing="0.1" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:background="@drawable/settings_card_bg"
+    android:padding="16dp">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Keep Notification History" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Save mirrored notifications to the log for later viewing" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/keepHistorySwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto-Update" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Automatically download and install updates from GitHub" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/autoUpdateSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <ProgressBar android:id="@+id/updateProgressBar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" style="@android:style/Widget.ProgressBar.Horizontal" android:visibility="gone" />
+    <TextView android:id="@+id/updateStatusText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textSize="12sp" android:textColor="?colorOnSurfaceVariant" android:visibility="gone" />
+
 </LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/muteContinuationSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:text="Screen-Off Mirroring" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Control mirroring behavior based on phone screen state" android:textSize="12sp" android:textColor="?colorOutline" />
-<RadioGroup android:id="@+id/screenModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical">
-<RadioButton android:id="@+id/radioAlways" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Always mirror" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioScreenOff" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Only mirror when screen is off" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioSilent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Mirror always, but silent when screen is on" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioVibrateOnlyWhenOn" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Mirror always, vibrate only (no sound) when screen is on" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-</RadioGroup>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="WATCH NOTIFICATIONS" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Notification Priority" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Controls how prominently notifications appear on watch" android:textSize="12sp" android:textColor="?colorOutline" />
-<RadioGroup android:id="@+id/priorityGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical">
-<RadioButton android:id="@+id/radioPriorityHigh" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="High (heads-up, sound, vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioPriorityDefault" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Default (no heads-up, sound + vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioPriorityLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Low (silent, no vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-</RadioGroup>
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto-Cancel on Tap" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Dismiss notification when tapped on watch" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/autoCancelSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Open on Watch Button" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Add button to open companion app when available" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/showOpenButtonSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Mute Button" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Add quick-mute button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/showMuteButtonSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:text="Expanded Text Threshold" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Text longer than this will show in expanded view on watch" android:textSize="12sp" android:textColor="?colorOutline" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
-<EditText android:id="@+id/bigTextThresholdInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="characters" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="SNOOZE" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Show Snooze Button" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Add snooze button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/showSnoozeButtonSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Snooze Duration" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Duration for the Snooze button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
-<EditText android:id="@+id/snoozeDurationInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="minutes" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="BATTERY SAVER" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Battery Saver Mode" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Reduce mirroring when watch battery is low" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/batterySaverSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Battery Threshold" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Skip mirroring when watch battery is below this percentage" android:textSize="12sp" android:textColor="?colorOutline" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
-<EditText android:id="@+id/batterySaverThresholdInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="%" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="COMPLICATION" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Complication Source" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="What to show on the watch face complication" android:textSize="12sp" android:textColor="?colorOutline" />
-<RadioGroup android:id="@+id/complicationSourceGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical">
-<RadioButton android:id="@+id/radioComplicationMostRecent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Most recent notification" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-<RadioButton android:id="@+id/radioComplicationSpecificApp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Specific app" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-</RadioGroup>
-<com.google.android.material.button.MaterialButton android:id="@+id/complicationAppButton" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Select App" android:textAllCaps="false" android:textSize="14sp" android:gravity="start|center_vertical" android:paddingStart="12dp" android:paddingEnd="12dp" android:visibility="gone" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="QUICK MUTE" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Mute Duration" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Duration for the Mute button on watch notifications" android:textSize="12sp" android:textColor="?colorOutline" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
-<EditText android:id="@+id/muteDurationInput" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="16sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="10dp" android:background="@drawable/edit_text_bg" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="minutes" android:textSize="14sp" android:textColor="?colorOnSurfaceVariant" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="VIBRATION" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Default Vibration Pattern" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Used for apps without a custom pattern" android:textSize="12sp" android:textColor="?colorOutline" />
-<com.google.android.material.button.MaterialButton android:id="@+id/vibrationPresetButton" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Short Buzz" android:textAllCaps="false" android:textSize="14sp" android:gravity="start|center_vertical" android:paddingStart="12dp" android:paddingEnd="12dp" android:drawableEnd="@android:drawable/arrow_down_float" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical">
-<com.google.android.material.button.MaterialButton android:id="@+id/vibrationPreviewButton" style="@style/Widget.Material3.Button.TonalButton" android:layout_width="wrap_content" android:layout_height="40dp" android:text="Preview" android:textAllCaps="false" android:textSize="13sp" />
-<TextView android:id="@+id/vibrationPatternLabel" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:textSize="12sp" android:textColor="?colorOutline" android:text="0, 200, 100, 200" />
-</LinearLayout>
-<EditText android:id="@+id/defaultVibrationInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:inputType="text" android:textSize="14sp" android:textColor="?colorOnSurface" android:padding="10dp" android:background="@drawable/edit_text_bg" android:hint="Custom: e.g. 0,200,100,200" android:textColorHint="?colorOutline" android:visibility="gone" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Per-app vibration patterns, sounds, and other overrides can be configured from the App Whitelist screen by tapping the gear icon next to each app." android:textSize="12sp" android:textColor="?colorOutline" android:fontFamily="sans-serif-medium" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="HISTORY" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Keep Notification History" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Save mirrored notifications to the log for later viewing" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/keepHistorySwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="UPDATES" android:textSize="12sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp" android:gravity="center_vertical">
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto-Update" android:textSize="16sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Automatically download and install updates from GitHub" android:textSize="12sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/autoUpdateSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-</LinearLayout>
-<ProgressBar android:id="@+id/updateProgressBar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" style="@android:style/Widget.ProgressBar.Horizontal" android:visibility="gone" />
-<TextView android:id="@+id/updateStatusText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textSize="12sp" android:textColor="?colorOnSurfaceVariant" android:visibility="gone" android:layout_marginBottom="80dp" />
+
 </LinearLayout>
 </ScrollView>
-<com.google.android.material.button.MaterialButton android:id="@+id/saveSettingsButton" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginHorizontal="20dp" android:layout_marginBottom="24dp" android:layout_gravity="bottom" android:text="Save Settings" android:textAllCaps="false" android:textSize="16sp" android:visibility="gone" android:elevation="8dp" />
+
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/saveSettingsButton"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginBottom="24dp"
+    android:layout_gravity="bottom"
+    android:text="Save Settings"
+    android:textAllCaps="false"
+    android:textSize="16sp"
+    android:visibility="gone"
+    android:elevation="8dp" />
+
 </FrameLayout>

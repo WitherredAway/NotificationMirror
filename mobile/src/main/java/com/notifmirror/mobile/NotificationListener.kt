@@ -387,6 +387,15 @@ class NotificationListener : NotificationListenerService() {
                 }
                 if (plainBytes.size > MAX_PAYLOAD_BYTES) {
                     Log.w(TAG, "Payload still too large after stripping picture (${plainBytes.size} bytes), skipping")
+                    if (settings.isKeepNotificationHistoryEnabled()) {
+                        notifLog.addEntry(
+                            appPackageName, title, displayText, "SKIPPED",
+                            "Payload too large (${plainBytes.size} bytes)",
+                            notifKey = notifKey,
+                            actionsJson = actionsJson.toString(),
+                            conversationKey = logConversationKey
+                        )
+                    }
                     return@launch
                 }
 

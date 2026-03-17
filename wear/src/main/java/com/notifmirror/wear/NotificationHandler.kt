@@ -14,6 +14,8 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -249,7 +251,10 @@ object NotificationHandler {
                 pictureBitmap = pictureBitmap
             )
 
-            if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
+            if (!isUpdate) {
+                NotificationTileService.incrementCount(context, packageName)
+                NotificationComplicationService.incrementActiveCount(context)
+            }
 
             // Sync complication settings from phone to watch
             val complicationSource = json.optString("complicationSource", "")
@@ -298,6 +303,7 @@ object NotificationHandler {
             }
             if (packageName.isNotEmpty()) {
                 NotificationTileService.decrementCount(context, packageName)
+                NotificationComplicationService.decrementActiveCount(context)
             }
 
             Log.d(TAG, "Dismissed notification $notifId for key: $key")
@@ -585,10 +591,14 @@ object NotificationHandler {
 
         // Manually vibrate if not a silent update, not isSilent, and not low priority
         // vibrateOnly mode: suppress sound (via low-priority notification) but still vibrate
-        if (!silentUpdate && !isSilent && notifPriority != -1) {
-            vibrateManually(context, vibrationPattern)
-        } else if (vibrateOnly && !silentUpdate) {
-            vibrateManually(context, vibrationPattern)
+        // Post with a short delay so the system finishes processing the notification
+        // before we trigger our own vibration (avoids the OS canceling it).
+        val shouldVibrate = (!silentUpdate && !isSilent && notifPriority != -1) ||
+            (vibrateOnly && !silentUpdate)
+        if (shouldVibrate) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                vibrateManually(context, vibrationPattern)
+            }, 150)
         }
 
         // Create/update summary notification for the per-app group
@@ -610,9 +620,12 @@ object NotificationHandler {
     /**
      * Manually vibrate the watch using Vibrator API.
      * This bypasses the notification channel vibration which Android caches.
+     * Uses AudioAttributes so the vibration is routed correctly on WearOS
+     * and isn't suppressed by DND / notification-priority filters.
      */
     private fun vibrateManually(context: Context, pattern: LongArray) {
         try {
+            if (pattern.all { it == 0L }) return
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
                 vm.defaultVibrator
@@ -620,7 +633,13 @@ object NotificationHandler {
                 @Suppress("DEPRECATION")
                 context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             }
-            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            val effect = VibrationEffect.createWaveform(pattern, -1)
+            val attrs = android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            vibrator.vibrate(effect, attrs)
+            Log.d(TAG, "Vibrated with pattern: ${pattern.joinToString(",")}")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to vibrate manually", e)
         }
