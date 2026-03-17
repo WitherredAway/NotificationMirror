@@ -230,6 +230,10 @@ class NotificationListener : NotificationListenerService() {
         // Get app icon as base64
         val iconBase64 = getAppIconBase64(appPackageName)
 
+        // Extract notification picture (BigPictureStyle) if available
+        // e.g. WhatsApp photo messages, Instagram posts, etc.
+        val pictureBase64 = extractPictureBase64(extras)
+
         // Process ALL actions and store them
         val actionsJson = JSONArray()
         val actions = notification.actions
@@ -268,6 +272,9 @@ class NotificationListener : NotificationListenerService() {
             put("actions", actionsJson)
             if (iconBase64 != null) {
                 put("icon", iconBase64)
+            }
+            if (pictureBase64 != null) {
+                put("picture", pictureBase64)
             }
             // Include stacked conversation messages so the watch can render them
             if (conversationMessages.isNotEmpty()) {
@@ -696,6 +703,40 @@ class NotificationListener : NotificationListenerService() {
         }
 
         return emptyList()
+    }
+
+    /**
+     * Extract the notification picture (BigPictureStyle) as a compressed base64 string.
+     * Returns null if no picture is attached.
+     * Resizes large images to keep the payload within Wear MessageClient limits.
+     */
+    private fun extractPictureBase64(extras: android.os.Bundle): String? {
+        return try {
+            // EXTRA_PICTURE is set by BigPictureStyle notifications (photo messages, etc.)
+            val picture = extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE) ?: return null
+
+            // Scale down if too large — Wear MessageClient has a ~100KB payload limit,
+            // and we're already sending icon + actions + messages in the same payload.
+            // Target max dimension 400px for a good balance of quality vs size on watch.
+            val maxDim = 400
+            val scaled = if (picture.width > maxDim || picture.height > maxDim) {
+                val ratio = minOf(maxDim.toFloat() / picture.width, maxDim.toFloat() / picture.height)
+                val newW = (picture.width * ratio).toInt()
+                val newH = (picture.height * ratio).toInt()
+                Bitmap.createScaledBitmap(picture, newW, newH, true)
+            } else {
+                picture
+            }
+
+            val baos = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+            val bytes = baos.toByteArray()
+            Log.d(TAG, "Extracted notification picture: ${picture.width}x${picture.height} -> ${scaled.width}x${scaled.height}, ${bytes.size} bytes")
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to extract notification picture", e)
+            null
+        }
     }
 
     private fun getAppIconBase64(packageName: String): String? {

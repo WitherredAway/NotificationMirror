@@ -73,6 +73,7 @@ object NotificationHandler {
             val subText = json.optString("subText", "")
             val actionsArray = json.optJSONArray("actions")
             val iconBase64 = json.optString("icon", "")
+            val pictureBase64 = json.optString("picture", "")
             val appLabel = json.optString("appLabel", "")
 
             val notifPriority = json.optInt("notifPriority", 1)
@@ -215,6 +216,16 @@ object NotificationHandler {
                 }
             } else null
 
+            val pictureBitmap = if (pictureBase64.isNotEmpty()) {
+                try {
+                    val bytes = Base64.decode(pictureBase64, Base64.NO_WRAP)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to decode picture", e)
+                    null
+                }
+            } else null
+
             // Use phone-provided app label, fallback to cached or local resolution
             val resolvedAppLabel = if (appLabel.isNotEmpty()) {
                 // Cache the phone-provided label for future use (e.g. when phone is disconnected)
@@ -234,7 +245,8 @@ object NotificationHandler {
                 hideContent = hideContent, silentUpdate = (isUpdate && muteContinuation) || isReplyUpdate,
                 conversationHistory = messages,
                 vibrateOnly = vibrateOnly,
-                conversationTitle = conversationTitle
+                conversationTitle = conversationTitle,
+                pictureBitmap = pictureBitmap
             )
 
             if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
@@ -321,7 +333,8 @@ object NotificationHandler {
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList(),
         vibrateOnly: Boolean = false,
-        conversationTitle: String = ""
+        conversationTitle: String = "",
+        pictureBitmap: Bitmap? = null
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -446,6 +459,13 @@ object NotificationHandler {
             // app label in subText, so WearOS doesn't show "AppLabel: Title" redundantly
             builder.setContentTitle(if (conversationTitle.isNotEmpty()) conversationTitle else title)
             builder.setSubText(appLabel)
+        } else if (!hideContent && pictureBitmap != null) {
+            // BigPictureStyle for notifications with attached images (e.g. photo messages)
+            builder.setStyle(
+                NotificationCompat.BigPictureStyle()
+                    .bigPicture(pictureBitmap)
+                    .setSummaryText(text)
+            )
         } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
         }
