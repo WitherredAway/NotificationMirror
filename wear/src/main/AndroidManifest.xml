@@ -80,6 +80,14 @@
                     android:host="*"
                     android:pathPrefix="/action_result"
                     android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/notification_dismiss"
+                    android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/request_logcat"
+                    android:scheme="wear" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
