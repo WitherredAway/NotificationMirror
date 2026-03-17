@@ -394,21 +394,25 @@ class NotificationListener : NotificationListenerService() {
                 val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
                 val messageBytes = CryptoHelper.encrypt(plainBytes, key)
 
+                var anySendSucceeded = false
                 for (node in nodes) {
                     try {
                         Wearable.getMessageClient(this@NotificationListener)
                             .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
                             .await()
                         Log.d(TAG, "Sent to node: ${node.displayName}")
+                        anySendSucceeded = true
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to send to node ${node.displayName}: ${e.message}")
                     }
                 }
-                sentNotificationKeys.add(notifKey)
-                pruneSentKeysIfNeeded()
-                // Store content hash so we skip re-forwarding if content hasn't changed
-                lastContentHash[notifKey] = contentHash
-                pruneContentHashesIfNeeded()
+                if (anySendSucceeded) {
+                    sentNotificationKeys.add(notifKey)
+                    pruneSentKeysIfNeeded()
+                    // Store content hash so we skip re-forwarding if content hasn't changed
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
+                }
 
                 // Also flush any queued notifications
                 if (!offlineQueue.isEmpty()) {

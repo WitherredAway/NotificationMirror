@@ -27,6 +27,7 @@ class OngoingDismissReceiver : BroadcastReceiver() {
 
         Log.d(TAG, "Ongoing notification dismissed from watch: $notifKey")
 
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val json = JSONObject().apply {
@@ -42,6 +43,8 @@ class OngoingDismissReceiver : BroadcastReceiver() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to request resend of ongoing notification", e)
+            } finally {
+                pendingResult.finish()
             }
         }
     }
