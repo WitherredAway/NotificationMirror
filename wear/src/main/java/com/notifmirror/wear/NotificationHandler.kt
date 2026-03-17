@@ -391,6 +391,24 @@ object NotificationHandler {
             .setOnlyAlertOnce(silentUpdate)
             .setSilent(isSilent || vibrateOnly || silentUpdate)
 
+        // For ongoing notifications: set a DeleteIntent so we know when the user
+        // dismisses it from the watch. This triggers a resend from the phone if
+        // the notification is still active there.
+        if (isOngoing) {
+            val dismissIntent = Intent(context, OngoingDismissReceiver::class.java).apply {
+                action = "com.notifmirror.wear.ONGOING_DISMISSED"
+                putExtra(OngoingDismissReceiver.EXTRA_NOTIF_KEY, notifKey)
+            }
+            val dismissRequestCode = (notifKey + "ongoing_dismiss").hashCode() and 0x7FFFFFFF
+            val dismissPendingIntent = PendingIntent.getBroadcast(
+                context,
+                dismissRequestCode,
+                dismissIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setDeleteIntent(dismissPendingIntent)
+        }
+
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
         }

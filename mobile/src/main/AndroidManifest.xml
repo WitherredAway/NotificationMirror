@@ -105,6 +105,13 @@
                     android:pathPrefix="/request_sync"
                     android:scheme="wear" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/resend_ongoing"
+                    android:scheme="wear" />
+            </intent-filter>
         </service>
 
         <provider

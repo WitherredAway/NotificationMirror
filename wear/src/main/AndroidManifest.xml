@@ -59,6 +59,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".OngoingDismissReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.notifmirror.wear.ONGOING_DISMISSED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".NotificationReceiverService"
             android:exported="true">

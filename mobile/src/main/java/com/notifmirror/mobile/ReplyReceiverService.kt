@@ -28,6 +28,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/request_key" -> handleKeyRequest()
             "/mirroring_toggle" -> handleMirroringToggle(messageEvent)
             "/request_sync" -> handleRequestSync()
+            "/resend_ongoing" -> handleResendOngoing(messageEvent)
         }
     }
 
@@ -164,6 +165,44 @@ class ReplyReceiverService : WearableListenerService() {
             }
         } else {
             Log.w(TAG, "NotificationListener not active — cannot sync")
+        }
+    }
+
+    /**
+     * Handle resend request for an ongoing notification that was dismissed from the watch.
+     * Checks if the notification is still active on the phone and re-triggers forwarding.
+     */
+    private fun handleResendOngoing(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val notifKey = json.getString("key")
+
+            Log.d(TAG, "Watch dismissed ongoing notification, checking if still active: $notifKey")
+
+            val listener = NotificationListener.instance
+            if (listener == null) {
+                Log.w(TAG, "NotificationListener not active — cannot resend ongoing")
+                return
+            }
+
+            // Find the notification in active notifications
+            val activeNotifs = listener.getActiveNotifications() ?: return
+            val sbn = activeNotifs.find { it.key == notifKey }
+            if (sbn == null) {
+                Log.d(TAG, "Notification $notifKey no longer active — not resending")
+                return
+            }
+
+            if (!sbn.isOngoing) {
+                Log.d(TAG, "Notification $notifKey is no longer ongoing — not resending")
+                return
+            }
+
+            // Re-trigger onNotificationPosted to resend it to the watch
+            Log.d(TAG, "Resending ongoing notification to watch: $notifKey")
+            listener.onNotificationPosted(sbn)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle resend ongoing", e)
         }
     }
 
