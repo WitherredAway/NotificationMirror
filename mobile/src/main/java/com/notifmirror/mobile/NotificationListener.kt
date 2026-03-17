@@ -35,8 +35,13 @@ class NotificationListener : NotificationListenerService() {
         // Track notification keys that were actually sent/queued to the watch
         // so we only send dismiss events for notifications the watch knows about
         private val sentNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        // Track content hash per notification key to skip re-forwarding unchanged notifications.
+        // WhatsApp re-posts ALL unread notifications when a new message arrives;
+        // without this, unchanged conversations re-alert on the watch.
+        private val lastContentHash = java.util.concurrent.ConcurrentHashMap<String, Int>()
         private const val MAX_PENDING_ACTIONS = 500
         private const val MAX_SENT_KEYS = 500
+        private const val MAX_CONTENT_HASHES = 500
         var instance: NotificationListener? = null
             private set
 
@@ -56,6 +61,14 @@ class NotificationListener : NotificationListenerService() {
                     val iter = sentNotificationKeys.iterator()
                     repeat(excess) { if (iter.hasNext()) { iter.next(); iter.remove() } }
                 }
+            }
+        }
+
+        /** Prune lastContentHash if it grows too large */
+        private fun pruneContentHashesIfNeeded() {
+            if (lastContentHash.size > MAX_CONTENT_HASHES) {
+                val keysToRemove = lastContentHash.keys.take(lastContentHash.size - MAX_CONTENT_HASHES)
+                keysToRemove.forEach { lastContentHash.remove(it) }
             }
         }
     }
@@ -182,6 +195,18 @@ class NotificationListener : NotificationListenerService() {
             }
         }
 
+        // Skip re-forwarding unchanged notifications.
+        // WhatsApp re-posts ALL unread notifications when any new message arrives;
+        // without this check, unchanged conversations re-alert on the watch.
+        val notifKey = sbn.key
+        val contentHash = (title + "|" + displayText + "|" + conversationTitle + "|" +
+            conversationMessages.joinToString(",") { "${it.first}:${it.second}" }).hashCode()
+        val previousHash = lastContentHash[notifKey]
+        if (previousHash == contentHash) {
+            Log.d(TAG, "Skipping unchanged notification: $title from ${sbn.packageName}")
+            return
+        }
+
         // Check app whitelist
         if (!settings.isAppWhitelisted(sbn.packageName)) {
             return
@@ -199,7 +224,6 @@ class NotificationListener : NotificationListenerService() {
             return
         }
 
-        val notifKey = sbn.key
         val appPackageName = sbn.packageName
         val postTime = sbn.postTime
 
@@ -344,6 +368,9 @@ class NotificationListener : NotificationListenerService() {
                 }
                 sentNotificationKeys.add(notifKey)
                 pruneSentKeysIfNeeded()
+                // Store content hash so we skip re-forwarding if content hasn't changed
+                lastContentHash[notifKey] = contentHash
+                pruneContentHashesIfNeeded()
 
                 // Also flush any queued notifications
                 if (!offlineQueue.isEmpty()) {
@@ -578,6 +605,8 @@ class NotificationListener : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         val keysToRemove = pendingActions.keys.filter { it.startsWith(sbn.key + ":") }
         keysToRemove.forEach { pendingActions.remove(it) }
+        // Clean up content hash so a re-posted notification with the same key is treated as new
+        lastContentHash.remove(sbn.key)
 
         // Only send dismiss events for notifications we actually sent to the watch
         if (!sentNotificationKeys.remove(sbn.key)) return
