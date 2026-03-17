@@ -696,8 +696,9 @@ object NotificationHandler {
                 // Prefer conversationTitle — stable across sender changes
                 // e.g. "HHH GNG" stays the same regardless of who sent the message
                 conversationTitle.isNotEmpty() -> "$packageName:$conversationTitle"
-                // Fallback to title if no conversationTitle (1:1 chats)
-                title.isNotEmpty() -> "$packageName:$title"
+                // Use notification key for messaging apps without conversationTitle.
+                // The notifKey is stable per conversation (same chat always has same key)
+                // unlike the title which changes per sender in group chats.
                 else -> notifKey
             }
         } else {

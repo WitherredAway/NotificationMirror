@@ -166,10 +166,21 @@ class NotificationListener : NotificationListenerService() {
 
         // Extract conversation title (stable group/chat name, e.g. "HHH GNG" for WhatsApp groups)
         // This is set by MessagingStyle.setConversationTitle() and is stable across sender changes
-        val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+        var conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
 
         // Extract stacked/conversation messages if available
         val conversationMessages = extractConversationMessages(notification, title, displayText)
+
+        // Fallback: if conversationTitle is empty but this looks like a group chat
+        // (multiple distinct senders in messages), try using subText as the group name.
+        // WhatsApp often puts the group name in subText for group notifications.
+        if (conversationTitle.isEmpty() && conversationMessages.size > 1) {
+            val distinctSenders = conversationMessages.map { it.first }.distinct()
+            if (distinctSenders.size > 1 && !subText.isNullOrEmpty()) {
+                conversationTitle = subText
+                Log.d(TAG, "Using subText as conversationTitle fallback: $conversationTitle")
+            }
+        }
 
         // Check app whitelist
         if (!settings.isAppWhitelisted(sbn.packageName)) {
@@ -428,10 +439,19 @@ class NotificationListener : NotificationListenerService() {
                     val displayText = bigText ?: text
 
                     // Extract conversation title (stable group/chat name)
-                    val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+                    var conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
 
                     // Extract stacked/conversation messages if available
                     val conversationMessages = extractConversationMessages(notification, title, displayText)
+
+                    // Fallback: use subText as group name when conversationTitle is missing
+                    if (conversationTitle.isEmpty() && conversationMessages.size > 1) {
+                        val distinctSenders = conversationMessages.map { it.first }.distinct()
+                        if (distinctSenders.size > 1 && !subText.isNullOrEmpty()) {
+                            conversationTitle = subText
+                            Log.d(TAG, "Sync: using subText as conversationTitle fallback: $conversationTitle")
+                        }
+                    }
 
                     // App whitelist filter
                     if (!settings.isAppWhitelisted(sbn.packageName)) continue
