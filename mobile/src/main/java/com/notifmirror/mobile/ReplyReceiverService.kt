@@ -201,6 +201,10 @@ class ReplyReceiverService : WearableListenerService() {
                 return
             }
 
+            // Clear content hash so the resend isn't blocked by dedup
+            // (content hasn't changed, but we need to re-send it)
+            NotificationListener.lastContentHash.remove(notifKey)
+
             // Re-trigger onNotificationPosted to resend it to the watch
             Log.d(TAG, "Resending ongoing notification to watch: $notifKey")
             listener.onNotificationPosted(sbn)

@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updateSubtitle: TextView
     private lateinit var updateButton: com.google.android.material.button.MaterialButton
     private lateinit var updateWatchButton: com.google.android.material.button.MaterialButton
+    private lateinit var updateButtonsRow: LinearLayout
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
@@ -146,11 +147,9 @@ class MainActivity : AppCompatActivity() {
             syncCurrentNotifications()
         }
 
-        val versionText = findViewById<TextView>(R.id.versionText)
-        try {
-            val pInfo = packageManager.getPackageInfo(packageName, 0)
-            versionText.text = "v${pInfo.versionName}"
-        } catch (_: Exception) {}
+        findViewById<LinearLayout>(R.id.exportLogsButton).setOnClickListener {
+            exportDebugLogs()
+        }
 
         findViewById<TextView>(R.id.githubLink).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
@@ -162,6 +161,15 @@ class MainActivity : AppCompatActivity() {
         updateSubtitle = findViewById(R.id.updateSubtitle)
         updateButton = findViewById(R.id.updateButton)
         updateWatchButton = findViewById(R.id.updateWatchButton)
+        updateButtonsRow = findViewById(R.id.updateButtonsRow)
+
+        // Show current version in the banner immediately
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            updateTitle.text = "v${pInfo.versionName} — Checking for updates..."
+        } catch (_: Exception) {
+            updateTitle.text = "Checking for updates..."
+        }
 
         checkForUpdates()
         checkAndRequestPermissions()
@@ -262,9 +270,11 @@ class MainActivity : AppCompatActivity() {
         checker.checkForUpdate { info ->
             runOnUiThread {
                 if (info != null && info.isUpdateAvailable) {
-                    updateBanner.visibility = View.VISIBLE
                     updateTitle.text = "Update available"
-                    updateSubtitle.text = "v${info.currentVersion} → v${info.latestVersion}"
+                    updateTitle.setTextColor(getColor(com.google.android.material.R.color.design_default_color_primary))
+                    updateSubtitle.visibility = View.VISIBLE
+                    updateSubtitle.text = "v${info.currentVersion} \u2192 v${info.latestVersion}"
+                    updateButtonsRow.visibility = View.VISIBLE
 
                     // Phone APK manual download button
                     updateButton.setOnClickListener {
@@ -285,18 +295,18 @@ class MainActivity : AppCompatActivity() {
                                 runOnUiThread {
                                     if (file != null) {
                                         updateWatchButton.text = "Downloaded"
-                                        android.widget.Toast.makeText(
+                                        Toast.makeText(
                                             this,
                                             "Watch APK saved to Downloads/${file.name}",
-                                            android.widget.Toast.LENGTH_LONG
+                                            Toast.LENGTH_LONG
                                         ).show()
                                     } else {
                                         updateWatchButton.isEnabled = true
                                         updateWatchButton.text = "Watch APK"
-                                        android.widget.Toast.makeText(
+                                        Toast.makeText(
                                             this,
                                             "Failed to download watch APK",
-                                            android.widget.Toast.LENGTH_SHORT
+                                            Toast.LENGTH_SHORT
                                         ).show()
                                     }
                                 }
@@ -313,7 +323,97 @@ class MainActivity : AppCompatActivity() {
                         updateButton.text = "Downloading..."
                     }
                 } else {
-                    updateBanner.visibility = View.GONE
+                    // Up to date — show version
+                    val versionName = info?.currentVersion ?: try {
+                        packageManager.getPackageInfo(packageName, 0).versionName
+                    } catch (_: Exception) { "?" }
+                    updateTitle.text = "Up to date \u2014 v$versionName"
+                    updateSubtitle.visibility = View.GONE
+                    updateButtonsRow.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    private fun exportDebugLogs() {
+        Toast.makeText(this, "Collecting logs...", Toast.LENGTH_SHORT).show()
+        scope.launch {
+            try {
+                val sb = StringBuilder()
+                sb.appendLine("=== NotificationMirror Debug Logs ===")
+                sb.appendLine("Exported: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())}")
+                sb.appendLine()
+
+                // Phone notification log
+                val phoneLog = NotificationLog(this@MainActivity)
+                val phoneEntries = phoneLog.getEntries()
+                sb.appendLine("=== PHONE NOTIFICATION LOG (${phoneEntries.size} entries) ===")
+                for (entry in phoneEntries) {
+                    val time = java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(entry.time))
+                    sb.appendLine("[$time] [${entry.status}] ${entry.packageName}: ${entry.title} — ${entry.text}")
+                    if (entry.detail.isNotEmpty()) sb.appendLine("  Detail: ${entry.detail}")
+                    if (entry.conversationKey.isNotEmpty()) sb.appendLine("  ConvKey: ${entry.conversationKey}")
+                }
+                sb.appendLine()
+
+                // Request watch logs via MessageClient
+                sb.appendLine("=== WATCH LOG ===")
+                try {
+                    val nodeClient = Wearable.getNodeClient(this@MainActivity)
+                    val nodes = nodeClient.connectedNodes.await()
+                    if (nodes.isNotEmpty()) {
+                        // Request watch logs
+                        for (node in nodes) {
+                            Wearable.getMessageClient(this@MainActivity)
+                                .sendMessage(node.id, "/request_logs", ByteArray(0))
+                                .await()
+                        }
+                        sb.appendLine("(Watch log request sent — watch logs will be included in next export if watch responds)")
+                    } else {
+                        sb.appendLine("(No watch connected — watch logs not available)")
+                    }
+                } catch (e: Exception) {
+                    sb.appendLine("(Failed to request watch logs: ${e.message})")
+                }
+                sb.appendLine()
+
+                // Device info
+                sb.appendLine("=== DEVICE INFO ===")
+                sb.appendLine("Phone: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+                sb.appendLine("Android: ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
+                try {
+                    val pInfo = packageManager.getPackageInfo(packageName, 0)
+                    sb.appendLine("App version: ${pInfo.versionName} (code ${pInfo.longVersionCode})")
+                } catch (_: Exception) {}
+                sb.appendLine("Mirroring enabled: ${settingsManager.isMirroringEnabled()}")
+                sb.appendLine("Whitelisted apps: ${settingsManager.getWhitelistedApps().size}")
+
+                // Save to Downloads
+                val fileName = "NotifMirror-Debug-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.txt"
+                val resolver = contentResolver
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { it.write(sb.toString().toByteArray()) }
+                    contentValues.clear()
+                    contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                    resolver.update(uri, contentValues, null, null)
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Debug logs saved to Downloads/$fileName", Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Failed to create log file", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to export debug logs", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }

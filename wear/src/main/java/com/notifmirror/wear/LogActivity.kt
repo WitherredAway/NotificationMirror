@@ -107,7 +107,8 @@ class LogActivity : AppCompatActivity() {
         recyclerView.setOnGenericMotionListener { v, event ->
             if (event.action == MotionEvent.ACTION_SCROLL) {
                 val delta = -event.getAxisValue(MotionEvent.AXIS_SCROLL)
-                v.scrollBy(0, (delta * dpToPx(40)).toInt())
+                val scrollAmount = (delta * dpToPx(64)).toInt()
+                (v as RecyclerView).smoothScrollBy(0, scrollAmount)
                 true
             } else {
                 false

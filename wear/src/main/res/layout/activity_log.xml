@@ -40,45 +40,45 @@
 
         <ImageButton
             android:id="@+id/searchButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_search"
             android:background="@drawable/bg_circle_button"
             android:scaleType="centerInside"
-            android:padding="8dp"
+            android:padding="7dp"
             android:contentDescription="Search"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginEnd="5dp" />
 
         <ImageButton
             android:id="@+id/filterButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_grid"
             android:background="@drawable/bg_circle_button"
             android:scaleType="centerInside"
-            android:padding="8dp"
+            android:padding="7dp"
             android:contentDescription="Filter by app"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginEnd="5dp" />
 
         <ImageButton
             android:id="@+id/groupToggleButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:src="@drawable/ic_notification"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_group_view"
             android:background="@drawable/bg_circle_button"
             android:scaleType="centerInside"
-            android:padding="8dp"
+            android:padding="7dp"
             android:contentDescription="Toggle grouping"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginEnd="5dp" />
 
         <ImageButton
             android:id="@+id/clearLogButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_close"
             android:background="@drawable/bg_circle_button"
             android:scaleType="centerInside"
-            android:padding="8dp"
+            android:padding="7dp"
             android:contentDescription="Clear log" />
 
     </LinearLayout>

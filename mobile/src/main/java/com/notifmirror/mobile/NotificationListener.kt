@@ -38,7 +38,7 @@ class NotificationListener : NotificationListenerService() {
         // Track content hash per notification key to skip re-forwarding unchanged notifications.
         // WhatsApp re-posts ALL unread notifications when a new message arrives;
         // without this, unchanged conversations re-alert on the watch.
-        private val lastContentHash = java.util.concurrent.ConcurrentHashMap<String, Int>()
+        val lastContentHash = java.util.concurrent.ConcurrentHashMap<String, Int>()
         private const val MAX_PENDING_ACTIONS = 500
         private const val MAX_SENT_KEYS = 500
         private const val MAX_CONTENT_HASHES = 500
@@ -374,16 +374,35 @@ class NotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
+                // Payload size safety check: WearOS MessageClient has ~100KB practical limit.
+                // If payload is too large (e.g. due to big picture), strip the picture and retry.
+                val MAX_PAYLOAD_BYTES = 80_000 // 80KB safety threshold
+                var jsonString = json.toString()
+                var plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                if (plainBytes.size > MAX_PAYLOAD_BYTES && json.has("picture")) {
+                    Log.w(TAG, "Payload too large (${plainBytes.size} bytes), stripping picture")
+                    json.remove("picture")
+                    jsonString = json.toString()
+                    plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                }
+                if (plainBytes.size > MAX_PAYLOAD_BYTES) {
+                    Log.w(TAG, "Payload still too large after stripping picture (${plainBytes.size} bytes), skipping")
+                    return@launch
+                }
+
                 // Encrypt notification data before sending
-                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
                 val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
                 val messageBytes = CryptoHelper.encrypt(plainBytes, key)
 
                 for (node in nodes) {
-                    Wearable.getMessageClient(this@NotificationListener)
-                        .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
-                        .await()
-                    Log.d(TAG, "Sent to node: ${node.displayName}")
+                    try {
+                        Wearable.getMessageClient(this@NotificationListener)
+                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                            .await()
+                        Log.d(TAG, "Sent to node: ${node.displayName}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to send to node ${node.displayName}: ${e.message}")
+                    }
                 }
                 sentNotificationKeys.add(notifKey)
                 pruneSentKeysIfNeeded()

@@ -48,7 +48,7 @@ object NotificationHandler {
 
     // Track recently replied conversation keys to suppress re-alert when app updates with your reply
     private val recentReplies = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    private const val REPLY_SILENCE_WINDOW_MS = 15000L // 15 seconds
+    private const val REPLY_SILENCE_WINDOW_MS = 5000L // 5 seconds
 
     /** Called by ReplyActivity after sending a reply to mark the conversation as recently replied */
     fun markReplied(notifKey: String) {
@@ -388,7 +388,9 @@ object NotificationHandler {
             else -> NotificationCompat.PRIORITY_HIGH
         }
 
-        val displayTitle = if (hideContent) appLabel else "$appLabel: $title"
+        // Show just the notification title (not "AppLabel: Title") — app identity
+        // is conveyed via subText and the per-app notification channel/group
+        val displayTitle = if (hideContent) appLabel else title
         val displayText = if (hideContent) "Notification content hidden (phone locked)" else text
 
         // For mute-continuation: keep the SAME channel but suppress alerts via
@@ -427,13 +429,9 @@ object NotificationHandler {
             builder.setLargeIcon(iconBitmap)
         }
 
-        if (hideContent) {
-            builder.setSubText(appLabel)
-        } else if (subText.isNotEmpty()) {
-            builder.setSubText(subText)
-        } else {
-            builder.setSubText(appLabel)
-        }
+        // Always show app label in subText so users know which app the notification
+        // is from (title no longer includes "AppLabel: " prefix)
+        builder.setSubText(appLabel)
 
         // Stack conversation messages using MessagingStyle for better WearOS rendering
         if (!hideContent && conversationHistory.size > 1) {
