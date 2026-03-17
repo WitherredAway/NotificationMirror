@@ -420,24 +420,35 @@ class MainActivity : AppCompatActivity() {
 
                 // Save to Downloads
                 val fileName = "NotifMirror-Logcat-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.txt"
-                val resolver = contentResolver
-                val contentValues = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
-                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
-                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
-                }
-                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                if (uri != null) {
-                    resolver.openOutputStream(uri)?.use { it.write(sb.toString().toByteArray()) }
-                    contentValues.clear()
-                    contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
-                    resolver.update(uri, contentValues, null, null)
-                    runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Logcat saved to Downloads/$fileName", Toast.LENGTH_LONG).show()
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    // API 29+: use MediaStore.Downloads
+                    val resolver = contentResolver
+                    val contentValues = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
+                        put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
+                        put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                    }
+                    val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    if (uri != null) {
+                        resolver.openOutputStream(uri)?.use { it.write(sb.toString().toByteArray()) }
+                        contentValues.clear()
+                        contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                        resolver.update(uri, contentValues, null, null)
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Logcat saved to Downloads/$fileName", Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Failed to create log file", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 } else {
+                    // API 28: fallback to app-specific external files directory
+                    val dir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS)
+                    val file = java.io.File(dir, fileName)
+                    file.writeText(sb.toString())
                     runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Failed to create log file", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Logcat saved to ${file.absolutePath}", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
