@@ -28,6 +28,7 @@ class UpdateChecker(private val context: Context) {
         private const val KEY_LAST_CHECK = "last_check_time"
         private const val KEY_LATEST_VERSION = "latest_version"
         private const val KEY_DOWNLOAD_URL = "download_url"
+        private const val KEY_WATCH_DOWNLOAD_URL = "watch_download_url"
         private const val KEY_RELEASE_NOTES = "release_notes"
         private const val CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L // 6 hours
     }
@@ -36,6 +37,7 @@ class UpdateChecker(private val context: Context) {
         val latestVersion: String,
         val currentVersion: String,
         val downloadUrl: String,
+        val watchDownloadUrl: String,
         val releaseNotes: String,
         val isUpdateAvailable: Boolean
     )
@@ -73,16 +75,18 @@ class UpdateChecker(private val context: Context) {
                     val assets = json.getJSONArray("assets")
 
                     var phoneApkUrl = ""
+                    var watchApkUrl = ""
                     for (i in 0 until assets.length()) {
                         val asset = assets.getJSONObject(i)
                         val name = asset.getString("name").lowercase()
                         if (name.contains("phone") && name.endsWith(".apk")) {
                             phoneApkUrl = asset.getString("browser_download_url")
-                            break
+                        } else if (name.contains("watch") && name.endsWith(".apk")) {
+                            watchApkUrl = asset.getString("browser_download_url")
                         }
                     }
 
-                    // If no phone-specific APK, look for any APK
+                    // If no phone-specific APK, look for any non-watch APK
                     if (phoneApkUrl.isEmpty()) {
                         for (i in 0 until assets.length()) {
                             val asset = assets.getJSONObject(i)
@@ -102,6 +106,7 @@ class UpdateChecker(private val context: Context) {
                         .putLong(KEY_LAST_CHECK, now)
                         .putString(KEY_LATEST_VERSION, tagName)
                         .putString(KEY_DOWNLOAD_URL, phoneApkUrl)
+                        .putString(KEY_WATCH_DOWNLOAD_URL, watchApkUrl)
                         .putString(KEY_RELEASE_NOTES, releaseNotes)
                         .apply()
 
@@ -109,6 +114,7 @@ class UpdateChecker(private val context: Context) {
                         latestVersion = tagName,
                         currentVersion = currentVersion,
                         downloadUrl = phoneApkUrl,
+                        watchDownloadUrl = watchApkUrl,
                         releaseNotes = releaseNotes,
                         isUpdateAvailable = isNewer
                     )
@@ -170,6 +176,59 @@ class UpdateChecker(private val context: Context) {
         }
     }
 
+    /**
+     * Download the watch APK to the Downloads folder.
+     * Returns the destination file path via callback so the UI can tell the user.
+     */
+    fun downloadWatchApk(watchDownloadUrl: String, callback: (File?) -> Unit) {
+        try {
+            val fileName = "NotificationMirror-Watch-update.apk"
+            val file = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                fileName
+            )
+            if (file.exists()) file.delete()
+
+            val request = DownloadManager.Request(Uri.parse(watchDownloadUrl))
+                .setTitle("Notification Mirror Watch Update")
+                .setDescription("Downloading watch APK...")
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val downloadId = dm.enqueue(request)
+
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                    if (id == downloadId) {
+                        Log.d(TAG, "Watch APK downloaded to: ${file.absolutePath}")
+                        callback(file)
+                        try {
+                            context.unregisterReceiver(this)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(
+                    receiver,
+                    IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                    Context.RECEIVER_EXPORTED
+                )
+            } else {
+                context.registerReceiver(
+                    receiver,
+                    IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to download watch APK", e)
+            callback(null)
+        }
+    }
+
     private fun installApk(file: File) {
         try {
             val uri = FileProvider.getUriForFile(
@@ -215,6 +274,7 @@ class UpdateChecker(private val context: Context) {
     private fun getCachedUpdateInfo(): UpdateInfo? {
         val latestVersion = prefs.getString(KEY_LATEST_VERSION, null) ?: return null
         val downloadUrl = prefs.getString(KEY_DOWNLOAD_URL, "") ?: ""
+        val watchDownloadUrl = prefs.getString(KEY_WATCH_DOWNLOAD_URL, "") ?: ""
         val releaseNotes = prefs.getString(KEY_RELEASE_NOTES, "") ?: ""
         val currentVersion = getCurrentVersion()
 
@@ -222,6 +282,7 @@ class UpdateChecker(private val context: Context) {
             latestVersion = latestVersion,
             currentVersion = currentVersion,
             downloadUrl = downloadUrl,
+            watchDownloadUrl = watchDownloadUrl,
             releaseNotes = releaseNotes,
             isUpdateAvailable = isVersionNewer(latestVersion, currentVersion)
         )

@@ -8,6 +8,7 @@
 <TextView android:id="@+id/statusText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:text="Connected" android:textSize="12sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/mirroringSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
+<TextView android:id="@+id/updateAvailableText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:padding="8dp" android:background="@drawable/bg_card" android:textSize="11sp" android:textColor="?colorPrimary" android:gravity="center" android:visibility="gone" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:layout_marginStart="4dp" android:text="NAVIGATE" android:textSize="10sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" android:layout_gravity="start" />
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
 <LinearLayout android:id="@+id/syncButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
@@ -19,11 +20,11 @@
 <ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Sync" />
 </LinearLayout>
 <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
-<LinearLayout android:id="@+id/notifSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
-<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Settings" /></FrameLayout>
+<LinearLayout android:id="@+id/viewLogButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_history" android:contentDescription="Log" /></FrameLayout>
 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="10dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="WearOS Notification Settings" android:textSize="12sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="System notification preferences" android:textSize="10sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Log" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="View mirrored notification history" android:textSize="10sp" android:textColor="?colorOutline" />
 </LinearLayout>
 <ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
 </LinearLayout>
@@ -37,11 +38,11 @@
 <ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
 </LinearLayout>
 <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
-<LinearLayout android:id="@+id/viewLogButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
-<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_history" android:contentDescription="Log" /></FrameLayout>
+<LinearLayout android:id="@+id/notifSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Settings" /></FrameLayout>
 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="10dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Log" android:textSize="12sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="View mirrored notification history" android:textSize="10sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="WearOS Notification Settings" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="System notification preferences" android:textSize="10sp" android:textColor="?colorOutline" />
 </LinearLayout>
 <ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
 </LinearLayout>

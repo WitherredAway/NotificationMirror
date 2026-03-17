@@ -67,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updateTitle: TextView
     private lateinit var updateSubtitle: TextView
     private lateinit var updateButton: com.google.android.material.button.MaterialButton
+    private lateinit var updateWatchButton: com.google.android.material.button.MaterialButton
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
@@ -160,6 +161,7 @@ class MainActivity : AppCompatActivity() {
         updateTitle = findViewById(R.id.updateTitle)
         updateSubtitle = findViewById(R.id.updateSubtitle)
         updateButton = findViewById(R.id.updateButton)
+        updateWatchButton = findViewById(R.id.updateWatchButton)
 
         checkForUpdates()
         checkAndRequestPermissions()
@@ -263,6 +265,8 @@ class MainActivity : AppCompatActivity() {
                     updateBanner.visibility = View.VISIBLE
                     updateTitle.text = "Update available"
                     updateSubtitle.text = "v${info.currentVersion} → v${info.latestVersion}"
+
+                    // Phone APK manual download button
                     updateButton.setOnClickListener {
                         if (info.downloadUrl.isNotEmpty()) {
                             checker.downloadAndInstall(info.downloadUrl)
@@ -271,7 +275,38 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    // Auto-update if enabled
+                    // Watch APK manual download button
+                    if (info.watchDownloadUrl.isNotEmpty()) {
+                        updateWatchButton.visibility = View.VISIBLE
+                        updateWatchButton.setOnClickListener {
+                            updateWatchButton.isEnabled = false
+                            updateWatchButton.text = "Downloading..."
+                            checker.downloadWatchApk(info.watchDownloadUrl) { file ->
+                                runOnUiThread {
+                                    if (file != null) {
+                                        updateWatchButton.text = "Downloaded"
+                                        android.widget.Toast.makeText(
+                                            this,
+                                            "Watch APK saved to Downloads/${file.name}",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    } else {
+                                        updateWatchButton.isEnabled = true
+                                        updateWatchButton.text = "Watch APK"
+                                        android.widget.Toast.makeText(
+                                            this,
+                                            "Failed to download watch APK",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        updateWatchButton.visibility = View.GONE
+                    }
+
+                    // Auto-update: automatically download and install phone APK only
                     if (settingsManager.isAutoUpdateEnabled() && info.downloadUrl.isNotEmpty()) {
                         checker.downloadAndInstall(info.downloadUrl)
                         updateButton.isEnabled = false

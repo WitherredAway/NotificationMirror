@@ -155,6 +155,9 @@ class MainActivity : AppCompatActivity() {
             versionText.text = "v${pInfo.versionName}"
         } catch (_: Exception) {}
 
+        // Check for updates and show indicator
+        checkForUpdates()
+
         findViewById<TextView>(R.id.githubLink).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
         }
@@ -269,6 +272,54 @@ class MainActivity : AppCompatActivity() {
                 Log.e("NotifMirrorWear", "Failed to sync mirroring toggle to phone", e)
             }
         }
+    }
+
+    private fun checkForUpdates() {
+        val updateText = findViewById<TextView>(R.id.updateAvailableText)
+        scope.launch {
+            try {
+                val url = java.net.URL("https://api.github.com/repos/WitherredAway/NotificationMirror/releases/latest")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                if (conn.responseCode == 200) {
+                    val response = conn.inputStream.bufferedReader().readText()
+                    val json = org.json.JSONObject(response)
+                    val tagName = json.getString("tag_name").removePrefix("v")
+
+                    val currentVersion = try {
+                        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
+                    } catch (_: Exception) { "0.0.0" }
+
+                    if (isVersionNewer(tagName, currentVersion)) {
+                        runOnUiThread {
+                            updateText.text = "Update available: v$tagName"
+                            updateText.visibility = android.view.View.VISIBLE
+                        }
+                    }
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.w("NotifMirrorWear", "Failed to check for updates", e)
+            }
+        }
+    }
+
+    private fun isVersionNewer(remote: String, local: String): Boolean {
+        try {
+            val remoteParts = remote.split(".").map { it.toIntOrNull() ?: 0 }
+            val localParts = local.split(".").map { it.toIntOrNull() ?: 0 }
+            for (i in 0 until maxOf(remoteParts.size, localParts.size)) {
+                val r = remoteParts.getOrElse(i) { 0 }
+                val l = localParts.getOrElse(i) { 0 }
+                if (r > l) return true
+                if (r < l) return false
+            }
+        } catch (_: Exception) {}
+        return false
     }
 
     private fun pullEncryptionKeyFromDataClient() {
