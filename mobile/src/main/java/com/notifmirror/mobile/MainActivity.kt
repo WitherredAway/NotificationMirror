@@ -336,45 +336,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exportDebugLogs() {
-        Toast.makeText(this, "Collecting logs...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Collecting logcat logs...", Toast.LENGTH_SHORT).show()
         scope.launch {
             try {
                 val sb = StringBuilder()
                 sb.appendLine("=== NotificationMirror Debug Logs ===")
                 sb.appendLine("Exported: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())}")
-                sb.appendLine()
-
-                // Phone notification log
-                val phoneLog = NotificationLog(this@MainActivity)
-                val phoneEntries = phoneLog.getEntries()
-                sb.appendLine("=== PHONE NOTIFICATION LOG (${phoneEntries.size} entries) ===")
-                for (entry in phoneEntries) {
-                    val time = java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(entry.time))
-                    sb.appendLine("[$time] [${entry.status}] ${entry.packageName}: ${entry.title} — ${entry.text}")
-                    if (entry.detail.isNotEmpty()) sb.appendLine("  Detail: ${entry.detail}")
-                    if (entry.conversationKey.isNotEmpty()) sb.appendLine("  ConvKey: ${entry.conversationKey}")
-                }
-                sb.appendLine()
-
-                // Request watch logs via MessageClient
-                sb.appendLine("=== WATCH LOG ===")
-                try {
-                    val nodeClient = Wearable.getNodeClient(this@MainActivity)
-                    val nodes = nodeClient.connectedNodes.await()
-                    if (nodes.isNotEmpty()) {
-                        // Request watch logs
-                        for (node in nodes) {
-                            Wearable.getMessageClient(this@MainActivity)
-                                .sendMessage(node.id, "/request_logs", ByteArray(0))
-                                .await()
-                        }
-                        sb.appendLine("(Watch log request sent — watch logs will be included in next export if watch responds)")
-                    } else {
-                        sb.appendLine("(No watch connected — watch logs not available)")
-                    }
-                } catch (e: Exception) {
-                    sb.appendLine("(Failed to request watch logs: ${e.message})")
-                }
                 sb.appendLine()
 
                 // Device info
@@ -387,9 +354,52 @@ class MainActivity : AppCompatActivity() {
                 } catch (_: Exception) {}
                 sb.appendLine("Mirroring enabled: ${settingsManager.isMirroringEnabled()}")
                 sb.appendLine("Whitelisted apps: ${settingsManager.getWhitelistedApps().size}")
+                sb.appendLine()
+
+                // Phone logcat — capture logs from this app's process
+                sb.appendLine("=== PHONE LOGCAT ===")
+                try {
+                    val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "2000", "--pid=${android.os.Process.myPid()}"))
+                    val logcatOutput = process.inputStream.bufferedReader().readText()
+                    sb.appendLine(logcatOutput)
+                } catch (e: Exception) {
+                    sb.appendLine("(Failed to capture phone logcat: ${e.message})")
+                }
+                sb.appendLine()
+
+                // Request watch logcat via MessageClient
+                sb.appendLine("=== WATCH LOGCAT ===")
+                try {
+                    val nodeClient = Wearable.getNodeClient(this@MainActivity)
+                    val nodes = nodeClient.connectedNodes.await()
+                    if (nodes.isNotEmpty()) {
+                        for (node in nodes) {
+                            Wearable.getMessageClient(this@MainActivity)
+                                .sendMessage(node.id, "/request_logcat", ByteArray(0))
+                                .await()
+                        }
+                        // Wait briefly for watch to respond with logcat data
+                        val latch = java.util.concurrent.CountDownLatch(1)
+                        var watchLogcat = "(Watch did not respond within timeout)"
+                        val listener = com.google.android.gms.wearable.MessageClient.OnMessageReceivedListener { messageEvent ->
+                            if (messageEvent.path == "/logcat_response") {
+                                watchLogcat = String(messageEvent.data, Charsets.UTF_8)
+                                latch.countDown()
+                            }
+                        }
+                        Wearable.getMessageClient(this@MainActivity).addListener(listener)
+                        latch.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                        Wearable.getMessageClient(this@MainActivity).removeListener(listener)
+                        sb.appendLine(watchLogcat)
+                    } else {
+                        sb.appendLine("(No watch connected)")
+                    }
+                } catch (e: Exception) {
+                    sb.appendLine("(Failed to request watch logcat: ${e.message})")
+                }
 
                 // Save to Downloads
-                val fileName = "NotifMirror-Debug-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.txt"
+                val fileName = "NotifMirror-Logcat-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.txt"
                 val resolver = contentResolver
                 val contentValues = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
@@ -403,7 +413,7 @@ class MainActivity : AppCompatActivity() {
                     contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
                     resolver.update(uri, contentValues, null, null)
                     runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Debug logs saved to Downloads/$fileName", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "Logcat saved to Downloads/$fileName", Toast.LENGTH_LONG).show()
                     }
                 } else {
                     runOnUiThread {
