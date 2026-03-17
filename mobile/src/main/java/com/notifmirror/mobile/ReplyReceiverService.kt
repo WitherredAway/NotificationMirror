@@ -1,5 +1,6 @@
 package com.notifmirror.mobile
 
+import android.app.Notification
 import android.app.RemoteInput
 import android.content.Intent
 import android.os.Bundle
@@ -51,6 +52,7 @@ class ReplyReceiverService : WearableListenerService() {
 
             val actionKey = "$notifKey:$actionIndex"
             val action = NotificationListener.pendingActions[actionKey]
+                ?: recoverAction(notifKey, actionIndex)
             if (action == null) {
                 Log.w(TAG, "No pending action found for key: $actionKey")
                 sendActionResult(false, "Notification was dismissed — action no longer available")
@@ -91,6 +93,7 @@ class ReplyReceiverService : WearableListenerService() {
 
             val actionKey = "$notifKey:$actionIndex"
             val action = NotificationListener.pendingActions[actionKey]
+                ?: recoverAction(notifKey, actionIndex)
             if (action == null) {
                 Log.w(TAG, "No pending action found for key: $actionKey")
                 sendActionResult(false, "Notification was dismissed — action no longer available")
@@ -204,6 +207,27 @@ class ReplyReceiverService : WearableListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle resend ongoing", e)
         }
+    }
+
+    /**
+     * Recover a notification action from active notifications when pendingActions
+     * doesn't have it (e.g. after NotificationListener service restart which
+     * clears the in-memory map). Re-populates pendingActions for future use.
+     */
+    private fun recoverAction(notifKey: String, actionIndex: Int): Notification.Action? {
+        val listener = NotificationListener.instance ?: return null
+        val activeNotifs = listener.getActiveNotifications() ?: return null
+        val sbn = activeNotifs.find { it.key == notifKey } ?: return null
+        val actions = sbn.notification?.actions ?: return null
+
+        Log.d(TAG, "Recovering actions from active notification: $notifKey (${actions.size} actions)")
+
+        // Re-populate pendingActions for ALL actions on this notification
+        for ((index, action) in actions.withIndex()) {
+            NotificationListener.pendingActions["$notifKey:$index"] = action
+        }
+
+        return if (actionIndex < actions.size) actions[actionIndex] else null
     }
 
     private fun handleKeyRequest() {
