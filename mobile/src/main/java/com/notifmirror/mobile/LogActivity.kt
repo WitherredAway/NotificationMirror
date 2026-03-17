@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -47,14 +48,26 @@ class LogActivity : AppCompatActivity() {
     private lateinit var countText: TextView
     private lateinit var emptyText: TextView
     private lateinit var filterButton: ImageButton
+    private lateinit var groupToggleButton: ImageButton
     private var allEntries: List<NotificationLog.LogEntry> = emptyList()
     private var filteredEntries: List<NotificationLog.LogEntry> = emptyList()
     private var displayedCount = 0
     private val displayedItems = mutableListOf<NotificationLog.LogEntry>()
     private var logAdapter: LogEntryAdapter? = null
+    private var groupAdapter: GroupedLogAdapter? = null
     private var appList: List<String> = emptyList()
     private var selectedApp: String = "All Apps"
     private var searchQuery: String = ""
+    private var isGrouped: Boolean = true
+
+    /** A conversation group: entries sharing the same conversationKey */
+    data class ConversationGroup(
+        val conversationKey: String,
+        val packageName: String,
+        val conversationTitle: String,
+        val entries: List<NotificationLog.LogEntry>,
+        val latestTime: Long
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +79,7 @@ class LogActivity : AppCompatActivity() {
         countText = findViewById(R.id.countText)
         emptyText = findViewById(R.id.emptyText)
         filterButton = findViewById(R.id.filterButton)
+        groupToggleButton = findViewById(R.id.groupToggleButton)
         val exportButton = findViewById<ImageButton>(R.id.exportLogButton)
         val clearButton = findViewById<ImageButton>(R.id.clearLogButton)
 
@@ -119,6 +133,13 @@ class LogActivity : AppCompatActivity() {
             showFilterDialog()
         }
 
+        groupToggleButton.setOnClickListener {
+            isGrouped = !isGrouped
+            updateGroupIcon()
+            displayFiltered()
+        }
+        updateGroupIcon()
+
         loadEntries()
         displayFiltered()
     }
@@ -127,6 +148,16 @@ class LogActivity : AppCompatActivity() {
         super.onResume()
         loadEntries()
         displayFiltered()
+    }
+
+    private fun updateGroupIcon() {
+        if (isGrouped) {
+            val typedValue = TypedValue()
+            theme.resolveAttribute(com.google.android.material.R.attr.colorPrimary, typedValue, true)
+            groupToggleButton.setColorFilter(typedValue.data)
+        } else {
+            groupToggleButton.clearColorFilter()
+        }
     }
 
     private fun showFilterDialog() {
@@ -221,14 +252,56 @@ class LogActivity : AppCompatActivity() {
         emptyText.visibility = View.GONE
         recyclerView.visibility = View.VISIBLE
         filteredEntries = filtered
+
+        if (isGrouped) {
+            displayGrouped(filtered)
+        } else {
+            displayFlat(filtered)
+        }
+    }
+
+    private fun displayFlat(filtered: List<NotificationLog.LogEntry>) {
         displayedCount = minOf(PAGE_SIZE, filtered.size)
         displayedItems.clear()
         displayedItems.addAll(filtered.subList(0, displayedCount))
         logAdapter = LogEntryAdapter(displayedItems)
+        groupAdapter = null
         recyclerView.adapter = logAdapter
     }
 
+    private fun displayGrouped(filtered: List<NotificationLog.LogEntry>) {
+        val groups = buildConversationGroups(filtered)
+        groupAdapter = GroupedLogAdapter(groups)
+        logAdapter = null
+        recyclerView.adapter = groupAdapter
+    }
+
+    private fun buildConversationGroups(entries: List<NotificationLog.LogEntry>): List<ConversationGroup> {
+        val groupMap = linkedMapOf<String, MutableList<NotificationLog.LogEntry>>()
+        for (entry in entries) {
+            val key = deriveGroupKey(entry)
+            groupMap.getOrPut(key) { mutableListOf() }.add(entry)
+        }
+        return groupMap.map { (key, groupEntries) ->
+            val latest = groupEntries.first()
+            val convTitle = if (key.contains(":")) key.substringAfter(":") else ""
+            ConversationGroup(
+                conversationKey = key,
+                packageName = latest.packageName,
+                conversationTitle = convTitle,
+                entries = groupEntries,
+                latestTime = latest.time
+            )
+        }.sortedByDescending { it.latestTime }
+    }
+
+    private fun deriveGroupKey(entry: NotificationLog.LogEntry): String {
+        if (entry.conversationKey.isNotEmpty()) return entry.conversationKey
+        return "${entry.packageName}:${entry.title}"
+    }
+
     private fun loadMore() {
+        if (isGrouped) return
         if (displayedCount >= filteredEntries.size) return
         val oldCount = displayedCount
         val newCount = minOf(displayedCount + PAGE_SIZE, filteredEntries.size)
@@ -319,6 +392,149 @@ class LogActivity : AppCompatActivity() {
         }
 
         override fun getItemCount() = entries.size
+    }
+
+    // ── Grouped view adapter ───────────────────────────────────────────
+
+    private inner class GroupedLogAdapter(private val groups: List<ConversationGroup>) :
+        RecyclerView.Adapter<GroupedLogAdapter.ViewHolder>() {
+
+        private val sdf = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault())
+        private val expandedPositions = mutableSetOf<Int>()
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val appName: TextView = view.findViewById(R.id.logAppName)
+            val groupCount: TextView = view.findViewById(R.id.logGroupCount)
+            val time: TextView = view.findViewById(R.id.logTime)
+            val conversationTitle: TextView = view.findViewById(R.id.logConversationTitle)
+            val messagesContainer: LinearLayout = view.findViewById(R.id.logMessagesContainer)
+            val actionsContainer: ChipGroup = view.findViewById(R.id.logActionsContainer)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_log_group, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val group = groups[position]
+            val latestEntry = group.entries.first()
+
+            holder.appName.text = getAppDisplayName(group.packageName)
+            holder.time.text = sdf.format(Date(group.latestTime))
+            holder.groupCount.text = "(${group.entries.size})"
+
+            if (group.conversationTitle.isNotEmpty()) {
+                holder.conversationTitle.text = group.conversationTitle
+                holder.conversationTitle.visibility = View.VISIBLE
+            } else {
+                holder.conversationTitle.visibility = View.GONE
+            }
+
+            holder.messagesContainer.removeAllViews()
+            val isExpanded = expandedPositions.contains(position)
+            val entriesToShow = if (isExpanded) {
+                group.entries.reversed()
+            } else {
+                group.entries.take(3).reversed()
+            }
+
+            for (entry in entriesToShow) {
+                val msgView = TextView(holder.itemView.context).apply {
+                    val prefix = if (entry.title.isNotEmpty() && group.conversationTitle.isNotEmpty()) {
+                        "${entry.title}: "
+                    } else if (entry.title.isNotEmpty()) {
+                        "${entry.title}: "
+                    } else {
+                        ""
+                    }
+                    text = "$prefix${entry.text}"
+                    textSize = 13f
+                    val tv = TypedValue()
+                    context.theme.resolveAttribute(
+                        com.google.android.material.R.attr.colorOnSurfaceVariant, tv, true
+                    )
+                    setTextColor(tv.data)
+                    setPadding(0, 2, 0, 2)
+                    maxLines = 3
+                }
+                holder.messagesContainer.addView(msgView)
+            }
+
+            if (!isExpanded && group.entries.size > 3) {
+                val moreView = TextView(holder.itemView.context).apply {
+                    text = "\u25BE ${group.entries.size - 3} more messages"
+                    textSize = 12f
+                    val tv = TypedValue()
+                    context.theme.resolveAttribute(
+                        com.google.android.material.R.attr.colorPrimary, tv, true
+                    )
+                    setTextColor(tv.data)
+                    setPadding(0, 4, 0, 0)
+                }
+                holder.messagesContainer.addView(moreView)
+            } else if (isExpanded && group.entries.size > 3) {
+                val lessView = TextView(holder.itemView.context).apply {
+                    text = "\u25B4 Show less"
+                    textSize = 12f
+                    val tv = TypedValue()
+                    context.theme.resolveAttribute(
+                        com.google.android.material.R.attr.colorPrimary, tv, true
+                    )
+                    setTextColor(tv.data)
+                    setPadding(0, 4, 0, 0)
+                }
+                holder.messagesContainer.addView(lessView)
+            }
+
+            holder.itemView.setOnClickListener {
+                val adapterPosition = holder.adapterPosition
+                if (adapterPosition == RecyclerView.NO_POSITION) return@setOnClickListener
+                if (expandedPositions.contains(adapterPosition)) {
+                    expandedPositions.remove(adapterPosition)
+                } else {
+                    expandedPositions.add(adapterPosition)
+                }
+                notifyItemChanged(adapterPosition)
+            }
+
+            holder.actionsContainer.removeAllViews()
+            if (latestEntry.actionsJson.isNotEmpty() && latestEntry.notifKey.isNotEmpty()) {
+                try {
+                    val actions = JSONArray(latestEntry.actionsJson)
+                    if (actions.length() > 0) {
+                        holder.actionsContainer.visibility = View.VISIBLE
+                        for (i in 0 until actions.length()) {
+                            val actionObj = actions.getJSONObject(i)
+                            val actionTitle = actionObj.getString("title")
+                            val actionIndex = actionObj.getInt("index")
+                            val hasRemoteInput = actionObj.getBoolean("hasRemoteInput")
+
+                            val chip = Chip(holder.itemView.context).apply {
+                                text = actionTitle
+                                isCheckable = false
+                                isClickable = true
+                            }
+
+                            chip.setOnClickListener {
+                                triggerAction(latestEntry.notifKey, actionIndex, hasRemoteInput)
+                            }
+
+                            holder.actionsContainer.addView(chip)
+                        }
+                    } else {
+                        holder.actionsContainer.visibility = View.GONE
+                    }
+                } catch (_: Exception) {
+                    holder.actionsContainer.visibility = View.GONE
+                }
+            } else {
+                holder.actionsContainer.visibility = View.GONE
+            }
+        }
+
+        override fun getItemCount() = groups.size
     }
 
     /**

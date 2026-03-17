@@ -333,6 +333,17 @@ class NotificationListener : NotificationListenerService() {
             }
         }
 
+        // Derive conversation key for log grouping (mirrors watch-side logic)
+        val isMessagingStyle = conversationMessages.isNotEmpty()
+        val logConversationKey = if (isMessagingStyle) {
+            when {
+                conversationTitle.isNotEmpty() -> "$appPackageName:$conversationTitle"
+                else -> notifKey
+            }
+        } else {
+            notifKey
+        }
+
         Log.d(TAG, "Forwarding notification: $title from $appPackageName (${actionsJson.length()} actions)")
 
         scope.launch {
@@ -349,7 +360,8 @@ class NotificationListener : NotificationListenerService() {
                             appPackageName, title, displayText, "QUEUED",
                             "Watch disconnected, queued for delivery",
                             notifKey = notifKey,
-                            actionsJson = actionsJson.toString()
+                            actionsJson = actionsJson.toString(),
+                            conversationKey = logConversationKey
                         )
                     }
                     return@launch
@@ -382,7 +394,8 @@ class NotificationListener : NotificationListenerService() {
                         appPackageName, title, displayText, "SENT",
                         "${actionsJson.length()} actions, sent to ${nodes.size} node(s)",
                         notifKey = notifKey,
-                        actionsJson = actionsJson.toString()
+                        actionsJson = actionsJson.toString(),
+                        conversationKey = logConversationKey
                     )
                 }
             } catch (e: Exception) {
@@ -603,8 +616,9 @@ class NotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        val keysToRemove = pendingActions.keys.filter { it.startsWith(sbn.key + ":") }
-        keysToRemove.forEach { pendingActions.remove(it) }
+        // Keep pendingActions after dismiss so replies/actions still work from the log.
+        // The PendingIntent inside often remains valid even after the notification is gone
+        // (e.g. WhatsApp keeps them alive). pruneActionsIfNeeded() handles memory bounds.
         // Clean up content hash so a re-posted notification with the same key is treated as new
         lastContentHash.remove(sbn.key)
 

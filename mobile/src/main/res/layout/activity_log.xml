@@ -27,6 +27,17 @@
             android:textColor="?colorOnSurface" />
 
         <ImageButton
+            android:id="@+id/groupToggleButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_sort_alphabetically"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:scaleType="centerInside"
+            android:padding="8dp"
+            android:contentDescription="Toggle grouping"
+            android:tint="?colorOnSurfaceVariant" />
+
+        <ImageButton
             android:id="@+id/filterButton"
             android:layout_width="40dp"
             android:layout_height="40dp"

@@ -200,7 +200,8 @@ object NotificationHandler {
                 notifLog.addEntry(
                     packageName, title, text, "RECEIVED", "$actionCount actions",
                     notifKey = key,
-                    actionsJson = actionsArray?.toString() ?: ""
+                    actionsJson = actionsArray?.toString() ?: "",
+                    conversationKey = conversationKey
                 )
             }
 
