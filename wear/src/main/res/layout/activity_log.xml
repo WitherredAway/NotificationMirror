@@ -21,67 +21,85 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:paddingTop="46dp"
+        android:paddingTop="56dp"
         android:paddingBottom="24dp"
         android:paddingStart="2dp"
         android:paddingEnd="2dp"
         android:focusable="true"
         android:focusableInTouchMode="true" />
 
-    <!-- Floating toolbar at top center -->
-    <LinearLayout
+    <!-- Floating toolbar — arc arrangement for round screens -->
+    <FrameLayout
         android:id="@+id/toolbarRow"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
         android:layout_gravity="top|center_horizontal"
-        android:orientation="horizontal"
-        android:paddingTop="4dp"
-        android:gravity="center_vertical">
+        android:paddingTop="2dp">
 
-        <ImageButton
-            android:id="@+id/searchButton"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:src="@drawable/ic_search"
-            android:background="@drawable/bg_circle_button"
-            android:scaleType="centerInside"
-            android:padding="7dp"
-            android:contentDescription="Search"
-            android:layout_marginEnd="5dp" />
+        <!-- Top row: 2 center buttons, closer together -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <ImageButton
-            android:id="@+id/filterButton"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:src="@drawable/ic_grid"
-            android:background="@drawable/bg_circle_button"
-            android:scaleType="centerInside"
-            android:padding="7dp"
-            android:contentDescription="Filter by app"
-            android:layout_marginEnd="5dp" />
+            <ImageButton
+                android:id="@+id/searchButton"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:src="@drawable/ic_search"
+                android:background="@drawable/bg_circle_button"
+                android:scaleType="centerInside"
+                android:padding="7dp"
+                android:contentDescription="Search"
+                android:layout_marginEnd="6dp" />
 
-        <ImageButton
-            android:id="@+id/groupToggleButton"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:src="@drawable/ic_group_view"
-            android:background="@drawable/bg_circle_button"
-            android:scaleType="centerInside"
-            android:padding="7dp"
-            android:contentDescription="Toggle grouping"
-            android:layout_marginEnd="5dp" />
+            <ImageButton
+                android:id="@+id/filterButton"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:src="@drawable/ic_grid"
+                android:background="@drawable/bg_circle_button"
+                android:scaleType="centerInside"
+                android:padding="7dp"
+                android:contentDescription="Filter by app" />
 
-        <ImageButton
-            android:id="@+id/clearLogButton"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:src="@drawable/ic_close"
-            android:background="@drawable/bg_circle_button"
-            android:scaleType="centerInside"
-            android:padding="7dp"
-            android:contentDescription="Clear log" />
+        </LinearLayout>
 
-    </LinearLayout>
+        <!-- Bottom row: 2 outer buttons, spaced wider for arc feel -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="26dp">
+
+            <ImageButton
+                android:id="@+id/groupToggleButton"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:src="@drawable/ic_group_view"
+                android:background="@drawable/bg_circle_button"
+                android:scaleType="centerInside"
+                android:padding="7dp"
+                android:contentDescription="Toggle grouping"
+                android:layout_marginEnd="20dp" />
+
+            <ImageButton
+                android:id="@+id/clearLogButton"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:src="@drawable/ic_close"
+                android:background="@drawable/bg_circle_button"
+                android:scaleType="centerInside"
+                android:padding="7dp"
+                android:contentDescription="Clear log" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 
     <!-- Count text at bottom center -->
     <TextView

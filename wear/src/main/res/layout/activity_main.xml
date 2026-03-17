@@ -12,8 +12,9 @@
 </LinearLayout>
 <!-- Update available (hidden by default) -->
 <TextView android:id="@+id/updateAvailableText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:padding="6dp" android:background="@drawable/bg_card" android:textSize="10sp" android:textColor="?colorPrimary" android:gravity="center" android:visibility="gone" />
-<!-- Quick actions -->
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
+<!-- ACTIONS section -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="ACTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
 <LinearLayout android:id="@+id/syncButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
 <FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_sync" android:contentDescription="Sync" /></FrameLayout>
 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Sync Notifications" android:textSize="12sp" android:textColor="?colorOnSurface" />
@@ -25,7 +26,10 @@
 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Notification Log" android:textSize="12sp" android:textColor="?colorOnSurface" />
 <ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
 </LinearLayout>
-<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.25" />
+</LinearLayout>
+<!-- SETTINGS section -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="SETTINGS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
 <LinearLayout android:id="@+id/phoneSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
 <FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Phone Settings" /></FrameLayout>
 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Phone Settings" android:textSize="12sp" android:textColor="?colorOnSurface" />
@@ -38,8 +42,9 @@
 <ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
 </LinearLayout>
 </LinearLayout>
-<!-- Options -->
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="6dp" android:paddingHorizontal="12dp">
+<!-- OPTIONS section -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="OPTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="6dp" android:paddingHorizontal="12dp">
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Keep History" android:textSize="11sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/keepHistorySwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
