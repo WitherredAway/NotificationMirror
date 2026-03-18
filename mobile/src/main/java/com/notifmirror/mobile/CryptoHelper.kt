@@ -22,24 +22,37 @@ object CryptoHelper {
     private const val GCM_IV_LENGTH = 12
     private const val GCM_TAG_LENGTH = 128
 
+    // Cache the key in memory to avoid repeated SharedPreferences + Base64 decode on every notification
+    @Volatile
+    private var cachedKey: SecretKey? = null
+
+    // Reuse SecureRandom instance (thread-safe) instead of creating a new one per encrypt call
+    private val secureRandom = SecureRandom()
+
     @Synchronized
     fun getOrCreateKey(context: Context): SecretKey {
+        cachedKey?.let { return it }
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val stored = prefs.getString(KEY_AES, null)
         if (stored != null) {
             val decoded = Base64.decode(stored, Base64.NO_WRAP)
-            return SecretKeySpec(decoded, "AES")
+            val key = SecretKeySpec(decoded, "AES")
+            cachedKey = key
+            return key
         }
         val keyGen = KeyGenerator.getInstance("AES")
-        keyGen.init(AES_KEY_SIZE, SecureRandom())
+        keyGen.init(AES_KEY_SIZE, secureRandom)
         val key = keyGen.generateKey()
         prefs.edit().putString(KEY_AES, Base64.encodeToString(key.encoded, Base64.NO_WRAP)).apply()
+        cachedKey = key
         return key
     }
 
+    @Synchronized
     fun importKey(context: Context, keyBytes: ByteArray) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_AES, Base64.encodeToString(keyBytes, Base64.NO_WRAP)).apply()
+        cachedKey = SecretKeySpec(keyBytes, "AES")
     }
 
     fun getKeyBytes(context: Context): ByteArray {
@@ -49,7 +62,7 @@ object CryptoHelper {
     fun encrypt(data: ByteArray, key: SecretKey): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         val iv = ByteArray(GCM_IV_LENGTH)
-        SecureRandom().nextBytes(iv)
+        secureRandom.nextBytes(iv)
         cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
         val encrypted = cipher.doFinal(data)
         // Prepend IV to ciphertext

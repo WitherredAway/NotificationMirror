@@ -53,20 +53,18 @@ class NotificationComplicationService : SuspendingComplicationDataSourceService(
 
         fun updateComplication(context: Context, appLabel: String, packageName: String, title: String, text: String) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val now = System.currentTimeMillis()
+            // Single batch write instead of two separate apply() calls
             prefs.edit()
                 .putString(KEY_LAST_TITLE, title)
                 .putString(KEY_LAST_TEXT, text)
                 .putString(KEY_LAST_APP, appLabel)
                 .putString(KEY_LAST_PACKAGE, packageName)
-                .putLong(KEY_LAST_TIME, System.currentTimeMillis())
-                .apply()
-
-            // Also store per-app latest
-            prefs.edit()
+                .putLong(KEY_LAST_TIME, now)
                 .putString("app_title_$packageName", title)
                 .putString("app_text_$packageName", text)
                 .putString("app_label_$packageName", appLabel)
-                .putLong("app_time_$packageName", System.currentTimeMillis())
+                .putLong("app_time_$packageName", now)
                 .apply()
 
             requestUpdate(context)

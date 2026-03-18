@@ -70,8 +70,13 @@ object WearSyncHelper {
             }
             val stream = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.PNG, iconQuality, stream)
-            // Recycle bitmap if we created a new one (not the original drawable bitmap)
-            if (drawable !is BitmapDrawable) {
+            // Recycle bitmap to free native memory, but only if it's a NEW bitmap
+            // we created. createScaledBitmap returns the SAME object when source
+            // dimensions already match target, so we must guard against recycling
+            // the drawable's own bitmap.
+            if (drawable is BitmapDrawable) {
+                if (bitmap !== drawable.bitmap) bitmap.recycle()
+            } else {
                 bitmap.recycle()
             }
             val encoded = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)

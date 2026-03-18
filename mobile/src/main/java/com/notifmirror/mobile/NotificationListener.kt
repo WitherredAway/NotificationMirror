@@ -49,8 +49,10 @@ class NotificationListener : NotificationListenerService() {
         /** Prune pendingActions if it grows too large (keeps memory bounded) */
         private fun pruneActionsIfNeeded() {
             if (pendingActions.size > MAX_PENDING_ACTIONS) {
-                val keysToRemove = pendingActions.keys.take(pendingActions.size - MAX_PENDING_ACTIONS)
-                keysToRemove.forEach { pendingActions.remove(it) }
+                // Use iterator directly instead of creating an intermediate list with .take()
+                val excess = pendingActions.size - MAX_PENDING_ACTIONS
+                val iter = pendingActions.keys.iterator()
+                repeat(excess) { if (iter.hasNext()) { iter.next(); iter.remove() } }
             }
         }
 

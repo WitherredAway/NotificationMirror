@@ -54,7 +54,9 @@ class SettingsManager(context: Context) {
     internal val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    // Cache compiled Regex patterns to avoid re-compiling on every notification
+    // Cache compiled Regex patterns to avoid re-compiling on every notification.
+    // Limited to 100 entries to prevent unbounded memory growth from many unique patterns.
+    private val MAX_REGEX_CACHE_SIZE = 100
     private val regexCache = java.util.concurrent.ConcurrentHashMap<String, Any>()
     private val INVALID_REGEX_SENTINEL = Any()
 
@@ -62,6 +64,11 @@ class SettingsManager(context: Context) {
         val cached = regexCache[pattern]
         if (cached != null) {
             return if (cached === INVALID_REGEX_SENTINEL) null else cached as Regex
+        }
+        // Evict oldest entries if cache is full
+        if (regexCache.size >= MAX_REGEX_CACHE_SIZE) {
+            val iter = regexCache.keys.iterator()
+            if (iter.hasNext()) { iter.next(); iter.remove() }
         }
         return try {
             val regex = Regex(pattern, RegexOption.IGNORE_CASE)
