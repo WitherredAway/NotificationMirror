@@ -293,18 +293,19 @@ object NotificationHandler {
 
             // Find notification keys tracked on watch that are no longer active on phone
             val staleEntries = synchronized(idLock) {
-                val stale = mutableListOf<Triple<String, Int, String>>() // convKey, notifId, packageName
-                // Check all tracked notification keys
+                // Deduplicate by conversation key to avoid double-decrementing counts
+                // when multiple notification keys map to the same conversation
+                val staleMap = mutableMapOf<String, Triple<String, Int, String>>() // convKey -> (convKey, notifId, packageName)
                 for ((notifKey, convKey) in notifKeyToConversationKey) {
-                    if (notifKey !in activeKeys) {
+                    if (notifKey !in activeKeys && convKey !in staleMap) {
                         val notifId = notifIdMap[convKey]
                         if (notifId != null) {
-                            // Derive package from conversation key (format: "package:title" or raw key)
                             val pkg = convKey.substringBefore(":")
-                            stale.add(Triple(convKey, notifId, pkg))
+                            staleMap[convKey] = Triple(convKey, notifId, pkg)
                         }
                     }
                 }
+                val stale = staleMap.values.toList()
                 // Clean up the stale entries
                 for ((convKey, _, _) in stale) {
                     notifIdMap.remove(convKey)

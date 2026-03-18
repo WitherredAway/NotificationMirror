@@ -196,19 +196,7 @@ class NotificationListener : NotificationListenerService() {
             }
         }
 
-        // Skip re-forwarding unchanged notifications.
-        // WhatsApp re-posts ALL unread notifications when any new message arrives;
-        // without this check, unchanged conversations re-alert on the watch.
-        val notifKey = sbn.key
-        val contentHash = (title + "|" + displayText + "|" + conversationTitle + "|" +
-            conversationMessages.joinToString(",") { "${it.first}:${it.second}" }).hashCode()
-        val previousHash = lastContentHash[notifKey]
-        if (previousHash == contentHash) {
-            Log.d(TAG, "Skipping unchanged notification: $title from ${sbn.packageName}")
-            return
-        }
-
-        // Check app whitelist
+        // Check app whitelist first (cheap check before expensive extraction)
         if (!settings.isAppWhitelisted(sbn.packageName)) {
             return
         }
@@ -222,6 +210,18 @@ class NotificationListener : NotificationListenerService() {
         // Check per-app keyword filters
         if (!settings.passesPerAppKeywordFilter(sbn.packageName, title, displayText)) {
             Log.d(TAG, "Notification filtered out by per-app keyword rules: $title (${sbn.packageName})")
+            return
+        }
+
+        // Skip re-forwarding unchanged notifications.
+        // WhatsApp re-posts ALL unread notifications when any new message arrives;
+        // without this check, unchanged conversations re-alert on the watch.
+        val notifKey = sbn.key
+        val contentHash = (title + "|" + displayText + "|" + conversationTitle + "|" +
+            conversationMessages.joinToString(",") { "${it.first}:${it.second}" }).hashCode()
+        val previousHash = lastContentHash[notifKey]
+        if (previousHash == contentHash) {
+            Log.d(TAG, "Skipping unchanged notification: $title from ${sbn.packageName}")
             return
         }
 
