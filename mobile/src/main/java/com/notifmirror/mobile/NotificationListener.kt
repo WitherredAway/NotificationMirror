@@ -392,6 +392,9 @@ class NotificationListener : NotificationListenerService() {
                 }
                 if (plainBytes.size > MAX_PAYLOAD_BYTES) {
                     Log.w(TAG, "Payload still too large after stripping picture (${plainBytes.size} bytes), skipping")
+                    // Store content hash so this oversized notification isn't re-processed on every re-post
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
                     if (settings.isKeepNotificationHistoryEnabled()) {
                         notifLog.addEntry(
                             appPackageName, title, displayText, "SKIPPED",
