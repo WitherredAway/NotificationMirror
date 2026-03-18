@@ -646,6 +646,11 @@ class NotificationListener : NotificationListenerService() {
                             .await()
                     }
                     sentNotificationKeys.add(notifKey)
+                    // Store content hash so subsequent unchanged re-posts are deduplicated
+                    val contentHash = (title + "|" + displayText + "|" + conversationTitle + "|" +
+                        conversationMessages.joinToString(",") { "${it.first}:${it.second}" }).hashCode()
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
                     syncCount++
                     Log.d(TAG, "Synced notification: $title from $appPackageName")
                 }

@@ -183,16 +183,13 @@ class UpdateChecker(private val context: Context) {
     fun downloadWatchApk(watchDownloadUrl: String, callback: (File?) -> Unit) {
         try {
             val fileName = "NotificationMirror-Watch-update.apk"
-            val file = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                fileName
-            )
+            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
             if (file.exists()) file.delete()
 
             val request = DownloadManager.Request(Uri.parse(watchDownloadUrl))
                 .setTitle("Notification Mirror Watch Update")
                 .setDescription("Downloading watch APK...")
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
 
             val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
