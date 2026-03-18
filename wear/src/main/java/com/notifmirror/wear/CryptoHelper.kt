@@ -28,6 +28,7 @@ object CryptoHelper {
     // Reuse SecureRandom instance (thread-safe) instead of creating a new one per encrypt call
     private val secureRandom = SecureRandom()
 
+    @Synchronized
     fun getKey(context: Context): SecretKey? {
         cachedKey?.let { return it }
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -38,12 +39,14 @@ object CryptoHelper {
         return key
     }
 
+    @Synchronized
     fun importKey(context: Context, keyBytes: ByteArray) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_AES, Base64.encodeToString(keyBytes, Base64.NO_WRAP)).apply()
         cachedKey = SecretKeySpec(keyBytes, "AES")
     }
 
+    @Synchronized
     fun hasKey(context: Context): Boolean {
         return cachedKey != null || run {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
