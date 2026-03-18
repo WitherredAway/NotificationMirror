@@ -553,14 +553,16 @@ object NotificationHandler {
                 val hasRemoteInput = actionJson.getBoolean("hasRemoteInput")
 
                 if (hasRemoteInput) {
-                    val replyIntent = Intent(context, ReplyActivity::class.java).apply {
+                    // Use BroadcastReceiver instead of Activity so the app doesn't
+                    // visually open when the user replies via inline RemoteInput
+                    val replyIntent = Intent(context, ReplyBroadcastReceiver::class.java).apply {
+                        action = "com.notifmirror.wear.REPLY"
                         putExtra(EXTRA_NOTIF_KEY, notifKey)
                         putExtra(EXTRA_NOTIFICATION_ID, notifId)
                         putExtra(EXTRA_ACTION_INDEX, actionIndex)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     }
                     val replyRequestCode = (notifKey + actionIndex).hashCode() and 0x7FFFFFFF
-                    val replyPendingIntent = PendingIntent.getActivity(
+                    val replyPendingIntent = PendingIntent.getBroadcast(
                         context,
                         replyRequestCode,
                         replyIntent,
