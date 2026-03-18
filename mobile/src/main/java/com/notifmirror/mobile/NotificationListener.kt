@@ -345,6 +345,7 @@ class NotificationListener : NotificationListenerService() {
         val logConversationKey = if (isMessagingStyle) {
             when {
                 conversationTitle.isNotEmpty() -> "$appPackageName:$conversationTitle"
+                title.isNotEmpty() -> "$appPackageName:$title"
                 else -> notifKey
             }
         } else {

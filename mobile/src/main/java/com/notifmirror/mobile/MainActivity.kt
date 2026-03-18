@@ -300,7 +300,7 @@ class MainActivity : AppCompatActivity() {
                                         updateWatchButton.text = "Downloaded"
                                         Toast.makeText(
                                             this,
-                                            "Watch APK saved to Downloads/${file.name}",
+                                            "Watch APK saved to ${file.absolutePath}",
                                             Toast.LENGTH_LONG
                                         ).show()
                                     } else {
