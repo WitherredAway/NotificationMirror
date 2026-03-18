@@ -486,7 +486,8 @@ class MainActivity : AppCompatActivity() {
         BURST("Burst (Rapid)", "Multiple notifications sent rapidly in sequence"),
         LONG_TEXT("Long Text", "Notification with very long text content (BigTextStyle)"),
         PROGRESS("Progress", "Notification simulating a download/progress update"),
-        CONVERSATION_UPDATE("Conversation Update", "Same conversation with new messages (tests stacking)")
+        CONVERSATION_UPDATE("Conversation Update", "Same conversation with new messages (tests stacking)"),
+        IMAGE("With Image", "Notification with an attached picture (BigPictureStyle)")
     }
 
     private fun showTestNotificationDialog() {
@@ -511,9 +512,23 @@ class MainActivity : AppCompatActivity() {
             appIconView.setImageDrawable(packageManager.getApplicationIcon(packageName))
         } catch (_: Exception) {}
 
-        // Setup type spinner
+        // Setup type spinner with themed styling
         val typeLabels = TestNotifType.values().map { it.label }
-        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, typeLabels)
+        val spinnerAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, typeLabels) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent) as TextView
+                view.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurface))
+                view.textSize = 14f
+                return view
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getDropDownView(position, convertView, parent) as TextView
+                view.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurface))
+                view.textSize = 14f
+                view.setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12))
+                return view
+            }
+        }
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         typeSpinner.adapter = spinnerAdapter
         typeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -589,6 +604,12 @@ class MainActivity : AppCompatActivity() {
                         delayRow.visibility = View.GONE
                         titleInput.setText("Long Article")
                         textInput.setText("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.")
+                    }
+                    TestNotifType.IMAGE -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Photo Shared")
+                        textInput.setText("Check out this picture!")
                     }
                     else -> {
                         countRow.visibility = View.GONE
@@ -878,14 +899,17 @@ class MainActivity : AppCompatActivity() {
             TestNotifType.WITH_ACTIONS -> {
                 val actions = JSONArray().apply {
                     put(JSONObject().apply {
+                        put("index", 0)
                         put("title", "Reply")
                         put("hasRemoteInput", true)
                     })
                     put(JSONObject().apply {
+                        put("index", 1)
                         put("title", "Mark as Read")
                         put("hasRemoteInput", false)
                     })
                     put(JSONObject().apply {
+                        put("index", 2)
                         put("title", "Snooze")
                         put("hasRemoteInput", false)
                     })
@@ -926,6 +950,34 @@ class MainActivity : AppCompatActivity() {
             TestNotifType.LONG_TEXT -> {
                 listOf(buildBaseTestJson(packageName, title, text, "_long").apply {
                     put("bigTextThreshold", 0) // Force BigTextStyle
+                })
+            }
+
+            TestNotifType.IMAGE -> {
+                listOf(buildBaseTestJson(packageName, title, text, "_image").apply {
+                    // Generate a small colored gradient test image as base64
+                    val bmp = android.graphics.Bitmap.createBitmap(200, 150, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bmp)
+                    val paint = android.graphics.Paint()
+                    val gradient = android.graphics.LinearGradient(
+                        0f, 0f, 200f, 150f,
+                        intArrayOf(0xFF6200EE.toInt(), 0xFF03DAC5.toInt(), 0xFFBB86FC.toInt()),
+                        null, android.graphics.Shader.TileMode.CLAMP
+                    )
+                    paint.shader = gradient
+                    canvas.drawRect(0f, 0f, 200f, 150f, paint)
+                    val textPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 40f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    }
+                    canvas.drawText("TEST", 100f, 85f, textPaint)
+                    val stream = java.io.ByteArrayOutputStream()
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    bmp.recycle()
+                    put("picture", android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP))
                 })
             }
 
@@ -1049,6 +1101,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return false
+    }
+
+    private fun resolveThemeColor(attr: Int): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return tv.data
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
     }
 
     // Simple adapter for app selection dialogs (used by test notification and vibration picker)

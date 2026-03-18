@@ -83,6 +83,9 @@ class LogActivity : AppCompatActivity() {
         groupToggleButton = findViewById(R.id.groupToggleButton)
         val clearButton = findViewById<ImageButton>(R.id.clearLogButton)
 
+        // Position arc buttons based on screen geometry for round watches
+        adjustArcButtonSpacing()
+
         val layoutManager = LinearLayoutManager(this)
         recyclerView.layoutManager = layoutManager
 
@@ -391,6 +394,35 @@ class LogActivity : AppCompatActivity() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         startActivity(intent)
+    }
+
+    /**
+     * Adjust bottom-row button spacing based on screen geometry so buttons
+     * follow the round bezel arc. On a circular screen the available horizontal
+     * chord at Y pixels from center is 2·√(R²−Y²). We compute the chord at
+     * the bottom-row Y and spread the two buttons to ~70 % of that width.
+     */
+    private fun adjustArcButtonSpacing() {
+        val dm = resources.displayMetrics
+        val screenW = dm.widthPixels
+        val isRound = resources.configuration.isScreenRound
+
+        if (isRound) {
+            val radius = screenW / 2f
+            // Bottom row sits at ~42dp from screen top → Y offset from center
+            val bottomRowYFromTop = dpToPx(42).toFloat()
+            val yFromCenter = radius - bottomRowYFromTop
+            val chord = 2f * kotlin.math.sqrt(radius * radius - yFromCenter * yFromCenter)
+
+            val buttonSizePx = dpToPx(30)
+            // Target gap: fill ~70% of the chord, minus the two buttons themselves
+            val targetGap = ((chord * 0.70f) - 2 * buttonSizePx).toInt().coerceAtLeast(dpToPx(20))
+
+            val groupBtn = findViewById<ImageButton>(R.id.groupToggleButton)
+            val params = groupBtn.layoutParams as LinearLayout.LayoutParams
+            params.marginEnd = targetGap
+            groupBtn.layoutParams = params
+        }
     }
 
     private fun dpToPx(dp: Int): Int {

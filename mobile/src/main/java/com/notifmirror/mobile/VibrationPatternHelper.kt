@@ -509,9 +509,11 @@ object VibrationPatternHelper {
         val outlineColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOutline)
         val surfaceColor = resolveThemeColor(context, com.google.android.material.R.attr.colorSurfaceVariant)
 
-        val tapTimes = mutableListOf<Long>()
+        data class TapEvent(val downTime: Long, val upTime: Long)
+        val tapEvents = mutableListOf<TapEvent>()
+        var currentDownTime = 0L
         val handler = Handler(Looper.getMainLooper())
-        val BUZZ_MS = 80L
+        val MIN_BUZZ_MS = 50L
         val AUTO_FINISH_DELAY = 2000L
 
         val container = LinearLayout(context).apply {
@@ -520,7 +522,7 @@ object VibrationPatternHelper {
         }
 
         val helpText = TextView(context).apply {
-            text = "Tap the button below rhythmically to record a vibration pattern.\nEach tap becomes a buzz; the timing between taps sets the gaps."
+            text = "Tap the button below rhythmically to record a vibration pattern.\nEach tap becomes a buzz; hold longer for longer vibrations."
             setTextColor(outlineColor)
             textSize = 13f
             setPadding(0, 0, 0, dpToPx(context, 12))
@@ -581,24 +583,28 @@ object VibrationPatternHelper {
             .create()
 
         fun buildPattern(): String {
-            if (tapTimes.size < 1) return ""
-            if (tapTimes.size == 1) return "0,$BUZZ_MS"
+            if (tapEvents.isEmpty()) return ""
+            if (tapEvents.size == 1) {
+                val buzzDuration = (tapEvents[0].upTime - tapEvents[0].downTime).coerceAtLeast(MIN_BUZZ_MS)
+                return "0,$buzzDuration"
+            }
             val parts = mutableListOf<Long>()
             parts.add(0L) // initial delay
-            for (i in tapTimes.indices) {
+            for (i in tapEvents.indices) {
+                val buzzDuration = (tapEvents[i].upTime - tapEvents[i].downTime).coerceAtLeast(MIN_BUZZ_MS)
                 if (i == 0) {
-                    parts.add(BUZZ_MS)
+                    parts.add(buzzDuration)
                 } else {
-                    val gap = tapTimes[i] - tapTimes[i - 1] - BUZZ_MS
+                    val gap = tapEvents[i].downTime - tapEvents[i - 1].upTime
                     parts.add(gap.coerceAtLeast(20L))
-                    parts.add(BUZZ_MS)
+                    parts.add(buzzDuration)
                 }
             }
             return parts.joinToString(",")
         }
 
         fun updateUI() {
-            val count = tapTimes.size
+            val count = tapEvents.size
             statusText.text = when {
                 count == 0 -> "Tap to start..."
                 count == 1 -> "1 tap \u2014 keep tapping!"
@@ -619,7 +625,7 @@ object VibrationPatternHelper {
         }
 
         val autoFinishRunnable = Runnable {
-            if (tapTimes.size >= 2 && dialog.isShowing) {
+            if (tapEvents.size >= 2 && dialog.isShowing) {
                 dialog.dismiss()
                 val pattern = buildPattern()
                 showCustomPatternDialog(context, pattern) { finalPattern ->
@@ -629,20 +635,40 @@ object VibrationPatternHelper {
         }
 
         tapButton.setOnTouchListener { v, event ->
-            if (event.action == MotionEvent.ACTION_DOWN) {
-                tapTimes.add(SystemClock.elapsedRealtime())
-                // Give haptic feedback on each tap
-                vibratePattern(context, "0,$BUZZ_MS")
-                updateUI()
-                // Reset auto-finish timer
-                handler.removeCallbacks(autoFinishRunnable)
-                handler.postDelayed(autoFinishRunnable, AUTO_FINISH_DELAY)
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    currentDownTime = SystemClock.elapsedRealtime()
+                    // Give haptic feedback on press
+                    vibratePattern(context, "0,$MIN_BUZZ_MS")
+                    // Reset auto-finish timer
+                    handler.removeCallbacks(autoFinishRunnable)
+                    // Visual feedback
+                    tapButton.alpha = 0.7f
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val upTime = SystemClock.elapsedRealtime()
+                    if (currentDownTime > 0) {
+                        tapEvents.add(TapEvent(currentDownTime, upTime))
+                        currentDownTime = 0L
+                        updateUI()
+                    }
+                    // Reset auto-finish timer
+                    handler.removeCallbacks(autoFinishRunnable)
+                    handler.postDelayed(autoFinishRunnable, AUTO_FINISH_DELAY)
+                    // Visual feedback
+                    tapButton.alpha = 1.0f
+                }
             }
-            false
+            true
         }
 
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                // If user is still holding, record the final up event
+                if (currentDownTime > 0) {
+                    tapEvents.add(TapEvent(currentDownTime, SystemClock.elapsedRealtime()))
+                    currentDownTime = 0L
+                }
                 handler.removeCallbacks(autoFinishRunnable)
                 dialog.dismiss()
                 val pattern = buildPattern()
