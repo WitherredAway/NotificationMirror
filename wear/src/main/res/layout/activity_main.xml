@@ -1,71 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/mainScrollView" android:layout_width="match_parent" android:layout_height="match_parent" android:background="?android:colorBackground" android:fillViewport="true" android:focusable="true" android:focusableInTouchMode="true">
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp" android:gravity="center_horizontal">
-<ImageView android:layout_width="36dp" android:layout_height="36dp" android:layout_marginTop="20dp" android:src="@mipmap/ic_launcher" android:contentDescription="App icon" />
-<TextView android:id="@+id/titleText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Notification Mirror" android:textSize="14sp" android:textStyle="bold" android:textColor="?colorOnSurface" android:gravity="center" />
-<LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="10dp" android:background="@drawable/bg_status_active">
-<ImageView android:id="@+id/statusIcon" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_check_circle" android:contentDescription="Status" />
-<TextView android:id="@+id/statusText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:text="Connected" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="14dp" android:paddingTop="24dp" android:paddingBottom="28dp" android:gravity="center_horizontal">
+<!-- Compact header -->
+<ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@mipmap/ic_launcher" android:contentDescription="App icon" />
+<TextView android:id="@+id/titleText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Notification Mirror" android:textSize="13sp" android:textStyle="bold" android:textColor="?colorOnSurface" android:gravity="center" />
+<!-- Status + mirroring toggle -->
+<LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="10dp" android:background="@drawable/bg_status_active">
+<ImageView android:id="@+id/statusIcon" android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_check_circle" android:contentDescription="Status" />
+<TextView android:id="@+id/statusText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:text="Connected" android:textSize="11sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/mirroringSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:layout_marginStart="4dp" android:text="NAVIGATE" android:textSize="10sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" android:layout_gravity="start" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
+<!-- Update card (always visible, like phone) -->
+<LinearLayout android:id="@+id/updateCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="vertical" android:padding="8dp" android:background="@drawable/bg_card">
+<TextView android:id="@+id/updateTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Checking for updates..." android:textSize="10sp" android:textStyle="bold" android:textColor="?colorOnSurfaceVariant" android:gravity="center" />
+<TextView android:id="@+id/updateSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="9sp" android:textColor="?colorOnSurfaceVariant" android:gravity="center" android:visibility="gone" />
+<TextView android:id="@+id/githubLink" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="GitHub" android:textSize="9sp" android:textColor="?colorPrimary" android:gravity="center" android:clickable="true" android:focusable="true" />
+</LinearLayout>
+<!-- ACTIONS section -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="ACTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
 <LinearLayout android:id="@+id/syncButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
 <FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_sync" android:contentDescription="Sync" /></FrameLayout>
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="10dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sync Notifications" android:textSize="12sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="Clear and re-sync from phone" android:textSize="10sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Sync Notifications" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
 </LinearLayout>
-<ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Sync" />
-</LinearLayout>
-<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
-<LinearLayout android:id="@+id/notifSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
-<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Settings" /></FrameLayout>
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="10dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="WearOS Notification Settings" android:textSize="12sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="System notification preferences" android:textSize="10sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
-</LinearLayout>
-<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
-<LinearLayout android:id="@+id/phoneSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
-<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Phone Settings" /></FrameLayout>
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="10dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Phone Settings" android:textSize="12sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="Open settings on phone" android:textSize="10sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
-</LinearLayout>
-<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.25" />
 <LinearLayout android:id="@+id/viewLogButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
 <FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_history" android:contentDescription="Log" /></FrameLayout>
-<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="10dp">
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Log" android:textSize="12sp" android:textColor="?colorOnSurface" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="View mirrored notification history" android:textSize="10sp" android:textColor="?colorOutline" />
-</LinearLayout>
-<ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Notification Log" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
 </LinearLayout>
 </LinearLayout>
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:layout_marginStart="4dp" android:text="OPTIONS" android:textSize="10sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" android:layout_gravity="start" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="4dp" android:paddingHorizontal="12dp">
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="horizontal" android:gravity="center_vertical">
-<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Keep History" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<!-- SETTINGS section -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="SETTINGS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
+<LinearLayout android:id="@+id/phoneSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_settings" android:contentDescription="Phone Settings" /></FrameLayout>
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Phone Settings" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
+</LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.25" />
+<LinearLayout android:id="@+id/notifSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_notification" android:contentDescription="Settings" /></FrameLayout>
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="WearOS Notifications" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
+</LinearLayout>
+</LinearLayout>
+<!-- OPTIONS section -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="OPTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="6dp" android:paddingHorizontal="12dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Keep History" android:textSize="11sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/keepHistorySwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="horizontal" android:gravity="center_vertical">
-<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Battery Saver" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="4dp" android:background="?colorOutlineVariant" android:alpha="0.2" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Battery Saver" android:textSize="11sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/batterySaverSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
 <LinearLayout android:id="@+id/batterySaverThresholdLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="horizontal" android:gravity="center_vertical" android:visibility="gone">
-<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Threshold" android:textSize="11sp" android:textColor="?colorOutline" />
-<EditText android:id="@+id/batterySaverThresholdInput" android:layout_width="40dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="11sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="4dp" android:text="15" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="%" android:textSize="11sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Threshold" android:textSize="10sp" android:textColor="?colorOutline" />
+<EditText android:id="@+id/batterySaverThresholdInput" android:layout_width="36dp" android:layout_height="wrap_content" android:inputType="number" android:textSize="10sp" android:textColor="?colorOnSurface" android:gravity="center" android:padding="4dp" android:text="15" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="%" android:textSize="10sp" android:textColor="?colorOutline" />
 </LinearLayout>
 </LinearLayout>
-<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginBottom="20dp" android:orientation="horizontal" android:gravity="center_vertical" android:layout_gravity="center_horizontal">
-<TextView android:id="@+id/versionText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10sp" android:textColor="?colorOutline" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" \u00b7 " android:textSize="10sp" android:textColor="?colorOutline" />
-<TextView android:id="@+id/githubLink" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GitHub" android:textSize="10sp" android:textColor="?colorPrimary" android:clickable="true" android:focusable="true" />
-</LinearLayout>
+<!-- Bridging tip -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:padding="8dp" android:background="@drawable/bg_card" android:text="Tip: Disable built-in notification bridging in WearOS settings to avoid duplicates." android:textSize="9sp" android:textColor="?colorOutline" android:gravity="center" android:lineSpacingExtra="2dp" />
+<!-- Footer -->
+<TextView android:id="@+id/versionText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textSize="9sp" android:textColor="?colorOutline" android:layout_gravity="center_horizontal" />
 </LinearLayout>
 </ScrollView>

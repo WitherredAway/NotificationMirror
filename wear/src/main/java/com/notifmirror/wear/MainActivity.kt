@@ -48,7 +48,8 @@ class MainActivity : AppCompatActivity() {
         scrollView.setOnGenericMotionListener { v, event ->
             if (event.action == MotionEvent.ACTION_SCROLL) {
                 val delta = -event.getAxisValue(MotionEvent.AXIS_SCROLL)
-                v.scrollBy(0, (delta * dpToPx(40)).toInt())
+                val scrollAmount = (delta * dpToPx(64)).toInt()
+                (v as ScrollView).smoothScrollBy(0, scrollAmount)
                 true
             } else {
                 false
@@ -154,6 +155,9 @@ class MainActivity : AppCompatActivity() {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             versionText.text = "v${pInfo.versionName}"
         } catch (_: Exception) {}
+
+        // Check for updates and show indicator
+        checkForUpdates()
 
         findViewById<TextView>(R.id.githubLink).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
@@ -269,6 +273,83 @@ class MainActivity : AppCompatActivity() {
                 Log.e("NotifMirrorWear", "Failed to sync mirroring toggle to phone", e)
             }
         }
+    }
+
+    private fun checkForUpdates() {
+        val updateCard = findViewById<LinearLayout>(R.id.updateCard)
+        val updateTitle = findViewById<TextView>(R.id.updateTitle)
+        val updateSubtitle = findViewById<TextView>(R.id.updateSubtitle)
+
+        val currentVersion = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
+        } catch (_: Exception) { "0.0.0" }
+
+        scope.launch {
+            try {
+                val url = java.net.URL("https://api.github.com/repos/WitherredAway/NotificationMirror/releases/latest")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                if (conn.responseCode == 200) {
+                    val response = conn.inputStream.bufferedReader().readText()
+                    val json = org.json.JSONObject(response)
+                    val tagName = json.getString("tag_name").removePrefix("v")
+
+                    if (isVersionNewer(tagName, currentVersion)) {
+                        val htmlUrl = json.optString("html_url", "")
+                        runOnUiThread {
+                            updateTitle.text = "Update available"
+                            updateTitle.setTextColor(getColorAttr(com.google.android.material.R.attr.colorPrimary))
+                            updateSubtitle.text = "v$currentVersion \u2192 v$tagName"
+                            updateSubtitle.visibility = android.view.View.VISIBLE
+                            // Tap to open GitHub release in browser
+                            if (htmlUrl.isNotEmpty()) {
+                                updateCard.setOnClickListener {
+                                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(htmlUrl)))
+                                }
+                            }
+                        }
+                    } else {
+                        runOnUiThread {
+                            updateTitle.text = "Up to date \u00B7 v$currentVersion"
+                        }
+                    }
+                } else {
+                    runOnUiThread {
+                        updateTitle.text = "Up to date \u00B7 v$currentVersion"
+                    }
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.w("NotifMirrorWear", "Failed to check for updates", e)
+                runOnUiThread {
+                    updateTitle.text = "Up to date \u00B7 v$currentVersion"
+                }
+            }
+        }
+    }
+
+    private fun getColorAttr(attr: Int): Int {
+        val tv = TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return tv.data
+    }
+
+    private fun isVersionNewer(remote: String, local: String): Boolean {
+        try {
+            val remoteParts = remote.split(".").map { it.toIntOrNull() ?: 0 }
+            val localParts = local.split(".").map { it.toIntOrNull() ?: 0 }
+            for (i in 0 until maxOf(remoteParts.size, localParts.size)) {
+                val r = remoteParts.getOrElse(i) { 0 }
+                val l = localParts.getOrElse(i) { 0 }
+                if (r > l) return true
+                if (r < l) return false
+            }
+        } catch (_: Exception) {}
+        return false
     }
 
     private fun pullEncryptionKeyFromDataClient() {

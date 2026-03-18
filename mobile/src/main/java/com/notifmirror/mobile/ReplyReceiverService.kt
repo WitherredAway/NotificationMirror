@@ -1,5 +1,6 @@
 package com.notifmirror.mobile
 
+import android.app.Notification
 import android.app.RemoteInput
 import android.content.Intent
 import android.os.Bundle
@@ -28,6 +29,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/request_key" -> handleKeyRequest()
             "/mirroring_toggle" -> handleMirroringToggle(messageEvent)
             "/request_sync" -> handleRequestSync()
+            "/resend_ongoing" -> handleResendOngoing(messageEvent)
         }
     }
 
@@ -50,6 +52,7 @@ class ReplyReceiverService : WearableListenerService() {
 
             val actionKey = "$notifKey:$actionIndex"
             val action = NotificationListener.pendingActions[actionKey]
+                ?: recoverAction(notifKey, actionIndex)
             if (action == null) {
                 Log.w(TAG, "No pending action found for key: $actionKey")
                 sendActionResult(false, "Notification was dismissed — action no longer available")
@@ -90,6 +93,7 @@ class ReplyReceiverService : WearableListenerService() {
 
             val actionKey = "$notifKey:$actionIndex"
             val action = NotificationListener.pendingActions[actionKey]
+                ?: recoverAction(notifKey, actionIndex)
             if (action == null) {
                 Log.w(TAG, "No pending action found for key: $actionKey")
                 sendActionResult(false, "Notification was dismissed — action no longer available")
@@ -165,6 +169,69 @@ class ReplyReceiverService : WearableListenerService() {
         } else {
             Log.w(TAG, "NotificationListener not active — cannot sync")
         }
+    }
+
+    /**
+     * Handle resend request for an ongoing notification that was dismissed from the watch.
+     * Checks if the notification is still active on the phone and re-triggers forwarding.
+     */
+    private fun handleResendOngoing(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val notifKey = json.getString("key")
+
+            Log.d(TAG, "Watch dismissed ongoing notification, checking if still active: $notifKey")
+
+            val listener = NotificationListener.instance
+            if (listener == null) {
+                Log.w(TAG, "NotificationListener not active — cannot resend ongoing")
+                return
+            }
+
+            // Find the notification in active notifications
+            val activeNotifs = listener.getActiveNotifications() ?: return
+            val sbn = activeNotifs.find { it.key == notifKey }
+            if (sbn == null) {
+                Log.d(TAG, "Notification $notifKey no longer active — not resending")
+                return
+            }
+
+            if (!sbn.isOngoing) {
+                Log.d(TAG, "Notification $notifKey is no longer ongoing — not resending")
+                return
+            }
+
+            // Clear content hash so the resend isn't blocked by dedup
+            // (content hasn't changed, but we need to re-send it)
+            NotificationListener.lastContentHash.remove(notifKey)
+
+            // Re-trigger onNotificationPosted to resend it to the watch
+            Log.d(TAG, "Resending ongoing notification to watch: $notifKey")
+            listener.onNotificationPosted(sbn)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle resend ongoing", e)
+        }
+    }
+
+    /**
+     * Recover a notification action from active notifications when pendingActions
+     * doesn't have it (e.g. after NotificationListener service restart which
+     * clears the in-memory map). Re-populates pendingActions for future use.
+     */
+    private fun recoverAction(notifKey: String, actionIndex: Int): Notification.Action? {
+        val listener = NotificationListener.instance ?: return null
+        val activeNotifs = listener.getActiveNotifications() ?: return null
+        val sbn = activeNotifs.find { it.key == notifKey } ?: return null
+        val actions = sbn.notification?.actions ?: return null
+
+        Log.d(TAG, "Recovering actions from active notification: $notifKey (${actions.size} actions)")
+
+        // Re-populate pendingActions for ALL actions on this notification
+        for ((index, action) in actions.withIndex()) {
+            NotificationListener.pendingActions["$notifKey:$index"] = action
+        }
+
+        return if (actionIndex < actions.size) actions[actionIndex] else null
     }
 
     private fun handleKeyRequest() {

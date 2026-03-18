@@ -53,7 +53,7 @@
         android:inputType="text"
         android:textSize="14sp"
         android:padding="12dp"
-        android:background="@android:drawable/editbox_background"
+        android:background="@drawable/edit_text_bg"
         android:textColor="?colorOnSurface"
         android:textColorHint="?colorOutline" />
 

@@ -25,7 +25,8 @@ class NotificationLog(private val context: Context) {
         status: String,
         detail: String = "",
         notifKey: String = "",
-        actionsJson: String = ""
+        actionsJson: String = "",
+        conversationKey: String = ""
     ) {
         var entries = getEntriesRaw()
         val entry = JSONObject().apply {
@@ -37,6 +38,7 @@ class NotificationLog(private val context: Context) {
             put("detail", detail)
             if (notifKey.isNotEmpty()) put("notifKey", notifKey)
             if (actionsJson.isNotEmpty()) put("actions", actionsJson)
+            if (conversationKey.isNotEmpty()) put("conversationKey", conversationKey)
         }
         entries.put(entry)
         entries = pruneOldEntries(entries)
@@ -59,7 +61,8 @@ class NotificationLog(private val context: Context) {
                     status = obj.getString("status"),
                     detail = obj.optString("detail", ""),
                     notifKey = obj.optString("notifKey", ""),
-                    actionsJson = obj.optString("actions", "")
+                    actionsJson = obj.optString("actions", ""),
+                    conversationKey = obj.optString("conversationKey", "")
                 )
             )
         }
@@ -142,6 +145,7 @@ class NotificationLog(private val context: Context) {
         val status: String,
         val detail: String,
         val notifKey: String = "",
-        val actionsJson: String = ""
+        val actionsJson: String = "",
+        val conversationKey: String = ""
     )
 }

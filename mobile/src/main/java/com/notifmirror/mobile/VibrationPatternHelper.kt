@@ -5,13 +5,18 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -40,6 +45,7 @@ object VibrationPatternHelper {
         VibrationPreset("Ramp Up", "0,50,50,100,50,200", "Getting stronger"),
         VibrationPreset("SOS", "0,100,50,100,50,100,150,300,50,300,50,300,150,100,50,100,50,100", "Morse code SOS"),
         VibrationPreset("Silent", "0,0", "No vibration"),
+        VibrationPreset("Tap to Create", "__tap__", "Tap a rhythm to make a pattern"),
         VibrationPreset("Custom", "", "Enter your own pattern")
     )
 
@@ -95,6 +101,10 @@ object VibrationPatternHelper {
                 dialog.dismiss()
                 if (preset.name == "Use Default") {
                     onSelected(preset, "")
+                } else if (preset.name == "Tap to Create") {
+                    showTapToCreateDialog(context) { tappedPattern ->
+                        onSelected(VibrationPreset("Custom", "", "Enter your own pattern"), tappedPattern)
+                    }
                 } else if (preset.name == "Custom") {
                     showCustomPatternDialog(context, currentPattern) { customPattern ->
                         onSelected(preset, customPattern)
@@ -178,7 +188,7 @@ object VibrationPatternHelper {
         // Visual pattern bar
         val patternToShow = when {
             preset.name == "Custom" && currentPattern.isNotEmpty() && findPresetForPattern(currentPattern) == null -> currentPattern
-            preset.pattern.isNotEmpty() && preset.name != "Silent" -> preset.pattern
+            preset.pattern.isNotEmpty() && preset.name != "Silent" && preset.name != "Tap to Create" -> preset.pattern
             else -> null
         }
         if (patternToShow != null) {
@@ -481,6 +491,218 @@ object VibrationPatternHelper {
             dp.toFloat(),
             context.resources.displayMetrics
         ).toInt()
+    }
+
+    /**
+     * Shows a dialog where the user taps rhythmically on a large button to
+     * create a vibration pattern. The gaps between taps are recorded as
+     * alternating buzz/pause durations. After 2 seconds of inactivity or
+     * pressing "Done", the pattern is finalised and shown in an editable
+     * custom-pattern dialog so the user can fine-tune it.
+     */
+    private fun showTapToCreateDialog(
+        context: Context,
+        onPatternCreated: (String) -> Unit
+    ) {
+        val primaryColor = resolveThemeColor(context, com.google.android.material.R.attr.colorPrimary)
+        val onSurfaceColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOnSurface)
+        val outlineColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOutline)
+        val surfaceColor = resolveThemeColor(context, com.google.android.material.R.attr.colorSurfaceVariant)
+
+        data class TapEvent(val downTime: Long, val upTime: Long)
+        val tapEvents = mutableListOf<TapEvent>()
+        var currentDownTime = 0L
+        val handler = Handler(Looper.getMainLooper())
+        val MIN_BUZZ_MS = 50L
+        val AUTO_FINISH_DELAY = 2000L
+
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(context, 24), dpToPx(context, 16), dpToPx(context, 24), dpToPx(context, 8))
+        }
+
+        val helpText = TextView(context).apply {
+            text = "Tap the button below rhythmically to record a vibration pattern.\nEach tap becomes a buzz; hold longer for longer vibrations."
+            setTextColor(outlineColor)
+            textSize = 13f
+            setPadding(0, 0, 0, dpToPx(context, 12))
+        }
+        container.addView(helpText)
+
+        val statusText = TextView(context).apply {
+            text = "Tap to start..."
+            setTextColor(onSurfaceColor)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dpToPx(context, 12))
+        }
+        container.addView(statusText)
+
+        // Preview bar placeholder
+        val previewContainer = FrameLayout(context).apply {
+            setPadding(0, 0, 0, dpToPx(context, 8))
+        }
+        container.addView(previewContainer, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dpToPx(context, 28)
+        ))
+
+        // Large tap target
+        val tapButton = MaterialButton(
+            context, null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle
+        ).apply {
+            text = "TAP HERE"
+            textSize = 20f
+            isAllCaps = true
+            minimumHeight = dpToPx(context, 120)
+            setBackgroundColor(surfaceColor)
+            setTextColor(primaryColor)
+            strokeColor = android.content.res.ColorStateList.valueOf(primaryColor)
+            strokeWidth = dpToPx(context, 2)
+            cornerRadius = dpToPx(context, 16)
+        }
+        container.addView(tapButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dpToPx(context, 120)
+        ).apply { bottomMargin = dpToPx(context, 12) })
+
+        val patternText = TextView(context).apply {
+            text = ""
+            setTextColor(outlineColor)
+            textSize = 12f
+            gravity = Gravity.CENTER
+        }
+        container.addView(patternText)
+
+        val dialog = AlertDialog.Builder(context)
+            .setTitle("Tap to Create Pattern")
+            .setView(container)
+            .setPositiveButton("Done", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        fun buildPattern(): String {
+            if (tapEvents.isEmpty()) return ""
+            if (tapEvents.size == 1) {
+                val buzzDuration = (tapEvents[0].upTime - tapEvents[0].downTime).coerceAtLeast(MIN_BUZZ_MS)
+                return "0,$buzzDuration"
+            }
+            val parts = mutableListOf<Long>()
+            parts.add(0L) // initial delay
+            for (i in tapEvents.indices) {
+                val buzzDuration = (tapEvents[i].upTime - tapEvents[i].downTime).coerceAtLeast(MIN_BUZZ_MS)
+                if (i == 0) {
+                    parts.add(buzzDuration)
+                } else {
+                    val gap = tapEvents[i].downTime - tapEvents[i - 1].upTime
+                    parts.add(gap.coerceAtLeast(20L))
+                    parts.add(buzzDuration)
+                }
+            }
+            return parts.joinToString(",")
+        }
+
+        fun updateUI() {
+            val count = tapEvents.size
+            statusText.text = when {
+                count == 0 -> "Tap to start..."
+                count == 1 -> "1 tap \u2014 keep tapping!"
+                else -> "$count taps \u2014 keep going or press Done"
+            }
+            val pattern = buildPattern()
+            if (pattern.isNotEmpty()) {
+                patternText.text = "$pattern  \u2022  ${formatPatternDisplay(pattern)}"
+                previewContainer.removeAllViews()
+                previewContainer.addView(
+                    PatternBarView(context, pattern, primaryColor, outlineColor),
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                )
+            }
+        }
+
+        val autoFinishRunnable = Runnable {
+            if (tapEvents.size >= 2 && dialog.isShowing) {
+                dialog.dismiss()
+                val pattern = buildPattern()
+                showCustomPatternDialog(context, pattern) { finalPattern ->
+                    onPatternCreated(finalPattern)
+                }
+            }
+        }
+
+        tapButton.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    currentDownTime = SystemClock.elapsedRealtime()
+                    // Start continuous vibration while held
+                    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                        vm.defaultVibrator
+                    } else {
+                        @Suppress("DEPRECATION")
+                        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    }
+                    vibrator.vibrate(VibrationEffect.createOneShot(10000, VibrationEffect.DEFAULT_AMPLITUDE))
+                    // Reset auto-finish timer
+                    handler.removeCallbacks(autoFinishRunnable)
+                    // Visual feedback
+                    tapButton.alpha = 0.7f
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    // Stop vibration on release
+                    val vibratorUp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                        vm.defaultVibrator
+                    } else {
+                        @Suppress("DEPRECATION")
+                        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    }
+                    vibratorUp.cancel()
+                    val upTime = SystemClock.elapsedRealtime()
+                    if (currentDownTime > 0) {
+                        tapEvents.add(TapEvent(currentDownTime, upTime))
+                        currentDownTime = 0L
+                        updateUI()
+                    }
+                    // Reset auto-finish timer
+                    handler.removeCallbacks(autoFinishRunnable)
+                    handler.postDelayed(autoFinishRunnable, AUTO_FINISH_DELAY)
+                    // Visual feedback
+                    tapButton.alpha = 1.0f
+                }
+            }
+            true
+        }
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                // If user is still holding, record the final up event
+                if (currentDownTime > 0) {
+                    tapEvents.add(TapEvent(currentDownTime, SystemClock.elapsedRealtime()))
+                    currentDownTime = 0L
+                }
+                handler.removeCallbacks(autoFinishRunnable)
+                dialog.dismiss()
+                val pattern = buildPattern()
+                if (pattern.isEmpty()) {
+                    Toast.makeText(context, "No taps recorded", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                showCustomPatternDialog(context, pattern) { finalPattern ->
+                    onPatternCreated(finalPattern)
+                }
+            }
+        }
+
+        dialog.setOnDismissListener {
+            handler.removeCallbacks(autoFinishRunnable)
+        }
+
+        dialog.show()
     }
 
     private fun resolveThemeColor(context: Context, attr: Int): Int {

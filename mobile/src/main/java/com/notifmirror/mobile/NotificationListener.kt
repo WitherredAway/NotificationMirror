@@ -30,13 +30,19 @@ class NotificationListener : NotificationListenerService() {
         private const val TAG = "NotifMirror"
         private const val PATH_NOTIFICATION = "/notification"
         private const val PATH_DISMISS = "/notification_dismiss"
+        private const val PATH_RECONCILE = "/notification_reconcile"
 
         val pendingActions = java.util.concurrent.ConcurrentHashMap<String, Notification.Action>()
         // Track notification keys that were actually sent/queued to the watch
         // so we only send dismiss events for notifications the watch knows about
         private val sentNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        // Track content hash per notification key to skip re-forwarding unchanged notifications.
+        // WhatsApp re-posts ALL unread notifications when a new message arrives;
+        // without this, unchanged conversations re-alert on the watch.
+        val lastContentHash = java.util.concurrent.ConcurrentHashMap<String, Int>()
         private const val MAX_PENDING_ACTIONS = 500
         private const val MAX_SENT_KEYS = 500
+        private const val MAX_CONTENT_HASHES = 500
         var instance: NotificationListener? = null
             private set
 
@@ -56,6 +62,14 @@ class NotificationListener : NotificationListenerService() {
                     val iter = sentNotificationKeys.iterator()
                     repeat(excess) { if (iter.hasNext()) { iter.next(); iter.remove() } }
                 }
+            }
+        }
+
+        /** Prune lastContentHash if it grows too large */
+        private fun pruneContentHashesIfNeeded() {
+            if (lastContentHash.size > MAX_CONTENT_HASHES) {
+                val keysToRemove = lastContentHash.keys.take(lastContentHash.size - MAX_CONTENT_HASHES)
+                keysToRemove.forEach { lastContentHash.remove(it) }
             }
         }
     }
@@ -166,12 +180,23 @@ class NotificationListener : NotificationListenerService() {
 
         // Extract conversation title (stable group/chat name, e.g. "HHH GNG" for WhatsApp groups)
         // This is set by MessagingStyle.setConversationTitle() and is stable across sender changes
-        val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+        var conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
 
         // Extract stacked/conversation messages if available
         val conversationMessages = extractConversationMessages(notification, title, displayText)
 
-        // Check app whitelist
+        // Fallback: if conversationTitle is empty but this looks like a group chat
+        // (multiple distinct senders in messages), try using subText as the group name.
+        // WhatsApp often puts the group name in subText for group notifications.
+        if (conversationTitle.isEmpty() && conversationMessages.size > 1) {
+            val distinctSenders = conversationMessages.map { it.first }.distinct()
+            if (distinctSenders.size > 1 && !subText.isNullOrEmpty()) {
+                conversationTitle = subText
+                Log.d(TAG, "Using subText as conversationTitle fallback: $conversationTitle")
+            }
+        }
+
+        // Check app whitelist first (cheap check before expensive extraction)
         if (!settings.isAppWhitelisted(sbn.packageName)) {
             return
         }
@@ -188,12 +213,27 @@ class NotificationListener : NotificationListenerService() {
             return
         }
 
+        // Skip re-forwarding unchanged notifications.
+        // WhatsApp re-posts ALL unread notifications when any new message arrives;
+        // without this check, unchanged conversations re-alert on the watch.
         val notifKey = sbn.key
+        val contentHash = (title + "|" + displayText + "|" + conversationTitle + "|" +
+            conversationMessages.joinToString(",") { "${it.first}:${it.second}" }).hashCode()
+        val previousHash = lastContentHash[notifKey]
+        if (previousHash == contentHash) {
+            Log.d(TAG, "Skipping unchanged notification: $title from ${sbn.packageName}")
+            return
+        }
+
         val appPackageName = sbn.packageName
         val postTime = sbn.postTime
 
         // Get app icon as base64
         val iconBase64 = getAppIconBase64(appPackageName)
+
+        // Extract notification picture (BigPictureStyle) if available
+        // e.g. WhatsApp photo messages, Instagram posts, etc.
+        val pictureBase64 = extractPictureBase64(extras)
 
         // Process ALL actions and store them
         val actionsJson = JSONArray()
@@ -233,6 +273,9 @@ class NotificationListener : NotificationListenerService() {
             put("actions", actionsJson)
             if (iconBase64 != null) {
                 put("icon", iconBase64)
+            }
+            if (pictureBase64 != null) {
+                put("picture", pictureBase64)
             }
             // Include stacked conversation messages so the watch can render them
             if (conversationMessages.isNotEmpty()) {
@@ -298,6 +341,18 @@ class NotificationListener : NotificationListenerService() {
             }
         }
 
+        // Derive conversation key for log grouping (mirrors watch-side logic)
+        val isMessagingStyle = conversationMessages.isNotEmpty()
+        val logConversationKey = if (isMessagingStyle) {
+            when {
+                conversationTitle.isNotEmpty() -> "$appPackageName:$conversationTitle"
+                title.isNotEmpty() -> "$appPackageName:$title"
+                else -> notifKey
+            }
+        } else {
+            notifKey
+        }
+
         Log.d(TAG, "Forwarding notification: $title from $appPackageName (${actionsJson.length()} actions)")
 
         scope.launch {
@@ -309,30 +364,73 @@ class NotificationListener : NotificationListenerService() {
                     Log.w(TAG, "No connected watch nodes found")
                     // Queue for offline delivery
                     offlineQueue.enqueue(json)
+                    // Store content hash so duplicate notifications aren't queued again
+                    // while the watch is still disconnected (e.g. WhatsApp re-posts all unread)
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
                     if (settings.isKeepNotificationHistoryEnabled()) {
                         notifLog.addEntry(
                             appPackageName, title, displayText, "QUEUED",
                             "Watch disconnected, queued for delivery",
                             notifKey = notifKey,
-                            actionsJson = actionsJson.toString()
+                            actionsJson = actionsJson.toString(),
+                            conversationKey = logConversationKey
+                        )
+                    }
+                    return@launch
+                }
+
+                // Payload size safety check: WearOS MessageClient has ~100KB practical limit.
+                // If payload is too large (e.g. due to big picture), strip the picture and retry.
+                val MAX_PAYLOAD_BYTES = 80_000 // 80KB safety threshold
+                var jsonString = json.toString()
+                var plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                if (plainBytes.size > MAX_PAYLOAD_BYTES && json.has("picture")) {
+                    Log.w(TAG, "Payload too large (${plainBytes.size} bytes), stripping picture")
+                    json.remove("picture")
+                    jsonString = json.toString()
+                    plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                }
+                if (plainBytes.size > MAX_PAYLOAD_BYTES) {
+                    Log.w(TAG, "Payload still too large after stripping picture (${plainBytes.size} bytes), skipping")
+                    // Store content hash so this oversized notification isn't re-processed on every re-post
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
+                    if (settings.isKeepNotificationHistoryEnabled()) {
+                        notifLog.addEntry(
+                            appPackageName, title, displayText, "SKIPPED",
+                            "Payload too large (${plainBytes.size} bytes)",
+                            notifKey = notifKey,
+                            actionsJson = actionsJson.toString(),
+                            conversationKey = logConversationKey
                         )
                     }
                     return@launch
                 }
 
                 // Encrypt notification data before sending
-                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
                 val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
                 val messageBytes = CryptoHelper.encrypt(plainBytes, key)
 
+                var anySendSucceeded = false
                 for (node in nodes) {
-                    Wearable.getMessageClient(this@NotificationListener)
-                        .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
-                        .await()
-                    Log.d(TAG, "Sent to node: ${node.displayName}")
+                    try {
+                        Wearable.getMessageClient(this@NotificationListener)
+                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                            .await()
+                        Log.d(TAG, "Sent to node: ${node.displayName}")
+                        anySendSucceeded = true
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to send to node ${node.displayName}: ${e.message}")
+                    }
                 }
-                sentNotificationKeys.add(notifKey)
-                pruneSentKeysIfNeeded()
+                if (anySendSucceeded) {
+                    sentNotificationKeys.add(notifKey)
+                    pruneSentKeysIfNeeded()
+                    // Store content hash so we skip re-forwarding if content hasn't changed
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
+                }
 
                 // Also flush any queued notifications
                 if (!offlineQueue.isEmpty()) {
@@ -340,11 +438,17 @@ class NotificationListener : NotificationListenerService() {
                 }
 
                 if (settings.isKeepNotificationHistoryEnabled()) {
+                    val sendStatus = if (anySendSucceeded) "SENT" else "SEND_FAILED"
+                    val sendDetail = if (anySendSucceeded)
+                        "${actionsJson.length()} actions, sent to ${nodes.size} node(s)"
+                    else
+                        "${actionsJson.length()} actions, all ${nodes.size} node(s) failed"
                     notifLog.addEntry(
-                        appPackageName, title, displayText, "SENT",
-                        "${actionsJson.length()} actions, sent to ${nodes.size} node(s)",
+                        appPackageName, title, displayText, sendStatus,
+                        sendDetail,
                         notifKey = notifKey,
-                        actionsJson = actionsJson.toString()
+                        actionsJson = actionsJson.toString(),
+                        conversationKey = logConversationKey
                     )
                 }
             } catch (e: Exception) {
@@ -428,10 +532,19 @@ class NotificationListener : NotificationListenerService() {
                     val displayText = bigText ?: text
 
                     // Extract conversation title (stable group/chat name)
-                    val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+                    var conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
 
                     // Extract stacked/conversation messages if available
                     val conversationMessages = extractConversationMessages(notification, title, displayText)
+
+                    // Fallback: use subText as group name when conversationTitle is missing
+                    if (conversationTitle.isEmpty() && conversationMessages.size > 1) {
+                        val distinctSenders = conversationMessages.map { it.first }.distinct()
+                        if (distinctSenders.size > 1 && !subText.isNullOrEmpty()) {
+                            conversationTitle = subText
+                            Log.d(TAG, "Sync: using subText as conversationTitle fallback: $conversationTitle")
+                        }
+                    }
 
                     // App whitelist filter
                     if (!settings.isAppWhitelisted(sbn.packageName)) continue
@@ -447,6 +560,9 @@ class NotificationListener : NotificationListenerService() {
                     val postTime = sbn.postTime
 
                     val iconBase64 = getAppIconBase64(appPackageName)
+
+                    // Extract notification picture (BigPictureStyle) if available
+                    val pictureBase64 = extractPictureBase64(extras)
 
                     val actionsJson = JSONArray()
                     val actions = notification.actions
@@ -497,6 +613,7 @@ class NotificationListener : NotificationListenerService() {
                             put("conversationTitle", conversationTitle)
                         }
                         if (iconBase64 != null) put("icon", iconBase64)
+                        if (pictureBase64 != null) put("picture", pictureBase64)
                         // Send ongoing flag so watch can make persistent notifs persistent
                         if (sbn.isOngoing) {
                             put("isOngoing", true)
@@ -533,17 +650,68 @@ class NotificationListener : NotificationListenerService() {
                         if (complicationApp.isNotEmpty()) put("complicationApp", complicationApp)
                     }
 
-                    val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                    // Payload size safety check (same as onNotificationPosted)
+                    val MAX_SYNC_PAYLOAD_BYTES = 80_000
+                    var jsonString = json.toString()
+                    var plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                    if (plainBytes.size > MAX_SYNC_PAYLOAD_BYTES && json.has("picture")) {
+                        Log.w(TAG, "Sync payload too large (${plainBytes.size} bytes), stripping picture")
+                        json.remove("picture")
+                        jsonString = json.toString()
+                        plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                    }
+                    if (plainBytes.size > MAX_SYNC_PAYLOAD_BYTES) {
+                        Log.w(TAG, "Sync payload still too large (${plainBytes.size} bytes), skipping")
+                        continue
+                    }
                     val messageBytes = CryptoHelper.encrypt(plainBytes, key)
 
                     for (node in nodes) {
-                        Wearable.getMessageClient(this@NotificationListener)
-                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
-                            .await()
+                        try {
+                            Wearable.getMessageClient(this@NotificationListener)
+                                .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                                .await()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to send sync to node ${node.displayName}: ${e.message}")
+                        }
                     }
                     sentNotificationKeys.add(notifKey)
+                    // Store content hash so subsequent unchanged re-posts are deduplicated
+                    val contentHash = (title + "|" + displayText + "|" + conversationTitle + "|" +
+                        conversationMessages.joinToString(",") { "${it.first}:${it.second}" }).hashCode()
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
                     syncCount++
                     Log.d(TAG, "Synced notification: $title from $appPackageName")
+                }
+
+                // Send reconciliation message: tells the watch which notification keys
+                // are currently active so it can remove any stale ones that were missed
+                // (e.g. dismissals lost during service restart)
+                try {
+                    val activeKeys = JSONArray()
+                    for (sbn2 in (getActiveNotifications() ?: emptyArray())) {
+                        activeKeys.put(sbn2.key)
+                    }
+                    val reconcileJson = JSONObject().apply {
+                        put("action", "reconcile")
+                        put("activeKeys", activeKeys)
+                    }
+                    val reconcileBytes = CryptoHelper.encrypt(
+                        reconcileJson.toString().toByteArray(Charsets.UTF_8), key
+                    )
+                    for (node in nodes) {
+                        try {
+                            Wearable.getMessageClient(this@NotificationListener)
+                                .sendMessage(node.id, PATH_RECONCILE, reconcileBytes)
+                                .await()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to send reconcile to node ${node.displayName}: ${e.message}")
+                        }
+                    }
+                    Log.d(TAG, "Sent reconciliation with ${activeKeys.length()} active keys")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to send reconciliation", e)
                 }
 
                 Log.d(TAG, "Sync complete: $syncCount notifications sent")
@@ -556,11 +724,16 @@ class NotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        val keysToRemove = pendingActions.keys.filter { it.startsWith(sbn.key + ":") }
-        keysToRemove.forEach { pendingActions.remove(it) }
+        // Keep pendingActions after dismiss so replies/actions still work from the log.
+        // The PendingIntent inside often remains valid even after the notification is gone
+        // (e.g. WhatsApp keeps them alive). pruneActionsIfNeeded() handles memory bounds.
+        // Clean up content hash so a re-posted notification with the same key is treated as new
+        lastContentHash.remove(sbn.key)
+        sentNotificationKeys.remove(sbn.key)
 
-        // Only send dismiss events for notifications we actually sent to the watch
-        if (!sentNotificationKeys.remove(sbn.key)) return
+        // Always send dismiss to watch — the watch harmlessly ignores unknown keys.
+        // Previously gated on sentNotificationKeys which is in-memory only and lost on
+        // service restart, causing stale notifications to linger on the watch.
         if (!settings.getEffectiveAutoDismissSync(sbn.packageName)) return
 
         val json = JSONObject().apply {
@@ -635,6 +808,40 @@ class NotificationListener : NotificationListenerService() {
         return emptyList()
     }
 
+    /**
+     * Extract the notification picture (BigPictureStyle) as a compressed base64 string.
+     * Returns null if no picture is attached.
+     * Resizes large images to keep the payload within Wear MessageClient limits.
+     */
+    private fun extractPictureBase64(extras: android.os.Bundle): String? {
+        return try {
+            // EXTRA_PICTURE is set by BigPictureStyle notifications (photo messages, etc.)
+            val picture = extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE) ?: return null
+
+            // Scale down if too large — Wear MessageClient has a ~100KB payload limit,
+            // and we're already sending icon + actions + messages in the same payload.
+            // Target max dimension 400px for a good balance of quality vs size on watch.
+            val maxDim = 400
+            val scaled = if (picture.width > maxDim || picture.height > maxDim) {
+                val ratio = minOf(maxDim.toFloat() / picture.width, maxDim.toFloat() / picture.height)
+                val newW = (picture.width * ratio).toInt().coerceAtLeast(1)
+                val newH = (picture.height * ratio).toInt().coerceAtLeast(1)
+                Bitmap.createScaledBitmap(picture, newW, newH, true)
+            } else {
+                picture
+            }
+
+            val baos = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+            val bytes = baos.toByteArray()
+            Log.d(TAG, "Extracted notification picture: ${picture.width}x${picture.height} -> ${scaled.width}x${scaled.height}, ${bytes.size} bytes")
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to extract notification picture", e)
+            null
+        }
+    }
+
     private fun getAppIconBase64(packageName: String): String? {
         return WearSyncHelper.getAppIconBase64(this, packageName)
     }
@@ -646,12 +853,30 @@ class NotificationListener : NotificationListenerService() {
             val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
             for (queuedJson in queued) {
                 try {
-                    val plainBytes = queuedJson.toString().toByteArray(Charsets.UTF_8)
+                    // Payload size safety check — queued notifications may pre-date the
+                    // onNotificationPosted size guard, so re-check here.
+                    val MAX_QUEUE_PAYLOAD_BYTES = 80_000
+                    var queuedJsonString = queuedJson.toString()
+                    var plainBytes = queuedJsonString.toByteArray(Charsets.UTF_8)
+                    if (plainBytes.size > MAX_QUEUE_PAYLOAD_BYTES && queuedJson.has("picture")) {
+                        Log.w(TAG, "Queued payload too large (${plainBytes.size} bytes), stripping picture")
+                        queuedJson.remove("picture")
+                        queuedJsonString = queuedJson.toString()
+                        plainBytes = queuedJsonString.toByteArray(Charsets.UTF_8)
+                    }
+                    if (plainBytes.size > MAX_QUEUE_PAYLOAD_BYTES) {
+                        Log.w(TAG, "Queued payload still too large (${plainBytes.size} bytes), dropping")
+                        continue
+                    }
                     val messageBytes = CryptoHelper.encrypt(plainBytes, key)
                     for (node in nodes) {
-                        Wearable.getMessageClient(this@NotificationListener)
-                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
-                            .await()
+                        try {
+                            Wearable.getMessageClient(this@NotificationListener)
+                                .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                                .await()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to flush to node ${node.displayName}: ${e.message}")
+                        }
                     }
                     val queuedKey = queuedJson.optString("key", "")
                     if (queuedKey.isNotEmpty()) sentNotificationKeys.add(queuedKey)

@@ -52,7 +52,19 @@ object MessageHelper {
                     Log.w(TAG, "Cannot decrypt dismiss — dropping (key not available)")
                 }
             }
+            "/notification_reconcile" -> {
+                val decryptedReconcile = decryptMessageData(context, messageEvent.data)
+                if (decryptedReconcile != null) {
+                    NotificationHandler.handleReconciliation(
+                        context,
+                        NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedReconcile)
+                    )
+                } else {
+                    Log.w(TAG, "Cannot decrypt reconcile — dropping (key not available)")
+                }
+            }
             "/action_result" -> handleActionResult(context, messageEvent)
+            "/request_logcat" -> handleLogcatRequest(context, messageEvent)
         }
     }
 
@@ -84,6 +96,36 @@ object MessageHelper {
                 Log.d(TAG, "Sent /request_key to phone")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to request key from phone", e)
+            }
+        }
+    }
+
+    /**
+     * Handle a logcat request from the phone — capture watch logcat and send it back.
+     */
+    fun handleLogcatRequest(context: Context, messageEvent: MessageEvent) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "2000"))
+                val logcatOutput = process.inputStream.bufferedReader().readText()
+                val responseBytes = logcatOutput.toByteArray(Charsets.UTF_8)
+
+                val nodes = Wearable.getNodeClient(context).connectedNodes.await()
+                for (node in nodes) {
+                    // WearOS MessageClient has ~100KB limit; truncate if needed
+                    val payload = if (responseBytes.size > 80_000) {
+                        val truncated = logcatOutput.takeLast(78_000)
+                        "(Truncated — showing last 78KB of logcat)\n$truncated".toByteArray(Charsets.UTF_8)
+                    } else {
+                        responseBytes
+                    }
+                    Wearable.getMessageClient(context)
+                        .sendMessage(node.id, "/logcat_response", payload)
+                        .await()
+                }
+                Log.d(TAG, "Sent logcat response (${responseBytes.size} bytes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send logcat response", e)
             }
         }
     }

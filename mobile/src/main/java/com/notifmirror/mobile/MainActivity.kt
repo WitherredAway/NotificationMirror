@@ -24,7 +24,10 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +70,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updateTitle: TextView
     private lateinit var updateSubtitle: TextView
     private lateinit var updateButton: com.google.android.material.button.MaterialButton
+    private lateinit var updateWatchButton: com.google.android.material.button.MaterialButton
+    private lateinit var updateButtonsRow: LinearLayout
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
@@ -145,11 +150,9 @@ class MainActivity : AppCompatActivity() {
             syncCurrentNotifications()
         }
 
-        val versionText = findViewById<TextView>(R.id.versionText)
-        try {
-            val pInfo = packageManager.getPackageInfo(packageName, 0)
-            versionText.text = "v${pInfo.versionName}"
-        } catch (_: Exception) {}
+        findViewById<LinearLayout>(R.id.exportLogsButton).setOnClickListener {
+            exportDebugLogs()
+        }
 
         findViewById<TextView>(R.id.githubLink).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
@@ -160,6 +163,16 @@ class MainActivity : AppCompatActivity() {
         updateTitle = findViewById(R.id.updateTitle)
         updateSubtitle = findViewById(R.id.updateSubtitle)
         updateButton = findViewById(R.id.updateButton)
+        updateWatchButton = findViewById(R.id.updateWatchButton)
+        updateButtonsRow = findViewById(R.id.updateButtonsRow)
+
+        // Show current version in the banner immediately
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            updateTitle.text = "v${pInfo.versionName} — Checking for updates..."
+        } catch (_: Exception) {
+            updateTitle.text = "Checking for updates..."
+        }
 
         checkForUpdates()
         checkAndRequestPermissions()
@@ -260,9 +273,13 @@ class MainActivity : AppCompatActivity() {
         checker.checkForUpdate { info ->
             runOnUiThread {
                 if (info != null && info.isUpdateAvailable) {
-                    updateBanner.visibility = View.VISIBLE
                     updateTitle.text = "Update available"
-                    updateSubtitle.text = "v${info.currentVersion} → v${info.latestVersion}"
+                    updateTitle.setTextColor(getColor(com.google.android.material.R.color.design_default_color_primary))
+                    updateSubtitle.visibility = View.VISIBLE
+                    updateSubtitle.text = "v${info.currentVersion} \u2192 v${info.latestVersion}"
+                    updateButtonsRow.visibility = View.VISIBLE
+
+                    // Phone APK manual download button
                     updateButton.setOnClickListener {
                         if (info.downloadUrl.isNotEmpty()) {
                             checker.downloadAndInstall(info.downloadUrl)
@@ -271,14 +288,173 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    // Auto-update if enabled
+                    // Watch APK manual download button
+                    if (info.watchDownloadUrl.isNotEmpty()) {
+                        updateWatchButton.visibility = View.VISIBLE
+                        updateWatchButton.setOnClickListener {
+                            updateWatchButton.isEnabled = false
+                            updateWatchButton.text = "Downloading..."
+                            checker.downloadWatchApk(info.watchDownloadUrl) { file ->
+                                runOnUiThread {
+                                    if (file != null) {
+                                        updateWatchButton.text = "Downloaded"
+                                        Toast.makeText(
+                                            this,
+                                            "Watch APK saved to ${file.absolutePath}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } else {
+                                        updateWatchButton.isEnabled = true
+                                        updateWatchButton.text = "Watch APK"
+                                        Toast.makeText(
+                                            this,
+                                            "Failed to download watch APK",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        updateWatchButton.visibility = View.GONE
+                    }
+
+                    // Auto-update: automatically download and install phone APK only
                     if (settingsManager.isAutoUpdateEnabled() && info.downloadUrl.isNotEmpty()) {
                         checker.downloadAndInstall(info.downloadUrl)
                         updateButton.isEnabled = false
                         updateButton.text = "Downloading..."
                     }
+                } else if (info != null) {
+                    // Up to date — show version
+                    val versionName = info.currentVersion.ifEmpty {
+                        try {
+                            packageManager.getPackageInfo(packageName, 0).versionName
+                        } catch (_: Exception) { "?" }
+                    }
+                    updateTitle.text = "Up to date \u2014 v$versionName"
+                    val tv = android.util.TypedValue()
+                    theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, tv, true)
+                    updateTitle.setTextColor(tv.data)
+                    updateSubtitle.visibility = View.GONE
+                    updateButtonsRow.visibility = View.GONE
                 } else {
-                    updateBanner.visibility = View.GONE
+                    // Check failed (no internet, API error, etc.)
+                    val versionName = try {
+                        packageManager.getPackageInfo(packageName, 0).versionName
+                    } catch (_: Exception) { "?" }
+                    updateTitle.text = "v$versionName \u2014 could not check for updates"
+                    val tv = android.util.TypedValue()
+                    theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, tv, true)
+                    updateTitle.setTextColor(tv.data)
+                    updateSubtitle.visibility = View.GONE
+                    updateButtonsRow.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    private fun exportDebugLogs() {
+        Toast.makeText(this, "Collecting logcat logs...", Toast.LENGTH_SHORT).show()
+        scope.launch {
+            try {
+                val sb = StringBuilder()
+                sb.appendLine("=== NotificationMirror Debug Logs ===")
+                sb.appendLine("Exported: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())}")
+                sb.appendLine()
+
+                // Device info
+                sb.appendLine("=== DEVICE INFO ===")
+                sb.appendLine("Phone: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+                sb.appendLine("Android: ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
+                try {
+                    val pInfo = packageManager.getPackageInfo(packageName, 0)
+                    sb.appendLine("App version: ${pInfo.versionName} (code ${pInfo.longVersionCode})")
+                } catch (_: Exception) {}
+                sb.appendLine("Mirroring enabled: ${settingsManager.isMirroringEnabled()}")
+                sb.appendLine("Whitelisted apps: ${settingsManager.getWhitelistedApps().size}")
+                sb.appendLine()
+
+                // Phone logcat — capture logs from this app's process
+                sb.appendLine("=== PHONE LOGCAT ===")
+                try {
+                    val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "2000", "--pid=${android.os.Process.myPid()}"))
+                    val logcatOutput = process.inputStream.bufferedReader().readText()
+                    sb.appendLine(logcatOutput)
+                } catch (e: Exception) {
+                    sb.appendLine("(Failed to capture phone logcat: ${e.message})")
+                }
+                sb.appendLine()
+
+                // Request watch logcat via MessageClient
+                sb.appendLine("=== WATCH LOGCAT ===")
+                try {
+                    val nodeClient = Wearable.getNodeClient(this@MainActivity)
+                    val nodes = nodeClient.connectedNodes.await()
+                    if (nodes.isNotEmpty()) {
+                        // Register listener BEFORE sending the request to avoid race condition
+                        val latch = java.util.concurrent.CountDownLatch(1)
+                        var watchLogcat = "(Watch did not respond within timeout)"
+                        val listener = com.google.android.gms.wearable.MessageClient.OnMessageReceivedListener { messageEvent ->
+                            if (messageEvent.path == "/logcat_response") {
+                                watchLogcat = String(messageEvent.data, Charsets.UTF_8)
+                                latch.countDown()
+                            }
+                        }
+                        Wearable.getMessageClient(this@MainActivity).addListener(listener).await()
+                        // Now send the request
+                        for (node in nodes) {
+                            Wearable.getMessageClient(this@MainActivity)
+                                .sendMessage(node.id, "/request_logcat", ByteArray(0))
+                                .await()
+                        }
+                        latch.await(15, java.util.concurrent.TimeUnit.SECONDS)
+                        Wearable.getMessageClient(this@MainActivity).removeListener(listener)
+                        sb.appendLine(watchLogcat)
+                    } else {
+                        sb.appendLine("(No watch connected)")
+                    }
+                } catch (e: Exception) {
+                    sb.appendLine("(Failed to request watch logcat: ${e.message})")
+                }
+
+                // Save to Downloads
+                val fileName = "NotifMirror-Logcat-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.txt"
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    // API 29+: use MediaStore.Downloads
+                    val resolver = contentResolver
+                    val contentValues = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
+                        put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
+                        put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                    }
+                    val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    if (uri != null) {
+                        resolver.openOutputStream(uri)?.use { it.write(sb.toString().toByteArray()) }
+                        contentValues.clear()
+                        contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                        resolver.update(uri, contentValues, null, null)
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Logcat saved to Downloads/$fileName", Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Failed to create log file", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    // API 28: fallback to app-specific external files directory
+                    val dir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS)
+                    val file = java.io.File(dir, fileName)
+                    file.writeText(sb.toString())
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Logcat saved to ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to export debug logs", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -298,6 +474,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private enum class TestNotifType(val label: String, val description: String) {
+        SIMPLE("Simple", "Basic notification with title and message"),
+        CONVERSATION("Conversation (Group)", "Multi-message conversation like WhatsApp group chat"),
+        DUPLICATE("Duplicate", "Same notification sent twice to test content-hash dedup"),
+        PERSISTENT("Persistent (Ongoing)", "Ongoing notification like music player — stays after dismiss"),
+        WITH_ACTIONS("With Actions", "Notification with Reply and custom action buttons"),
+        SILENT("Silent", "Notification with no sound or vibration"),
+        HIGH_PRIORITY("High Priority", "High-importance notification that demands attention"),
+        LOW_PRIORITY("Low Priority", "Low-importance notification, minimal interruption"),
+        BURST("Burst (Rapid)", "Multiple notifications sent rapidly in sequence"),
+        LONG_TEXT("Long Text", "Notification with very long text content (BigTextStyle)"),
+        PROGRESS("Progress", "Notification simulating a download/progress update"),
+        CONVERSATION_UPDATE("Conversation Update", "Same conversation with new messages (tests stacking)"),
+        IMAGE("With Image", "Notification with an attached picture (BigPictureStyle)")
+    }
+
     private fun showTestNotificationDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_test_notification, null)
         val appIconView = dialogView.findViewById<ImageView>(R.id.testAppIcon)
@@ -305,12 +497,130 @@ class MainActivity : AppCompatActivity() {
         val titleInput = dialogView.findViewById<EditText>(R.id.testTitleInput)
         val textInput = dialogView.findViewById<EditText>(R.id.testTextInput)
         val selectAppButton = dialogView.findViewById<Button>(R.id.selectAppButton)
+        val typeSpinner = dialogView.findViewById<Spinner>(R.id.testTypeSpinner)
+        val typeDescription = dialogView.findViewById<TextView>(R.id.testTypeDescription)
+        val countRow = dialogView.findViewById<LinearLayout>(R.id.testCountRow)
+        val countInput = dialogView.findViewById<EditText>(R.id.testCountInput)
+        val countLabel = dialogView.findViewById<TextView>(R.id.testCountLabel)
+        val delayRow = dialogView.findViewById<LinearLayout>(R.id.testDelayRow)
+        val delayInput = dialogView.findViewById<EditText>(R.id.testDelayInput)
 
         var selectedPackage = packageName
+        var selectedType = TestNotifType.SIMPLE
         appNameView.text = "Notification Mirror"
         try {
             appIconView.setImageDrawable(packageManager.getApplicationIcon(packageName))
         } catch (_: Exception) {}
+
+        // Setup type spinner with themed styling
+        val typeLabels = TestNotifType.values().map { it.label }
+        val spinnerAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, typeLabels) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent) as TextView
+                view.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurface))
+                view.textSize = 14f
+                return view
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getDropDownView(position, convertView, parent) as TextView
+                view.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurface))
+                view.textSize = 14f
+                view.setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12))
+                return view
+            }
+        }
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        typeSpinner.adapter = spinnerAdapter
+        typeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                selectedType = TestNotifType.values()[position]
+                typeDescription.text = selectedType.description
+
+                // Show/hide count and delay rows based on type
+                when (selectedType) {
+                    TestNotifType.CONVERSATION, TestNotifType.CONVERSATION_UPDATE -> {
+                        countRow.visibility = View.VISIBLE
+                        countLabel.text = "Messages:"
+                        countInput.setText("4")
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Family Group")
+                        textInput.setText("Hey everyone!")
+                    }
+                    TestNotifType.BURST -> {
+                        countRow.visibility = View.VISIBLE
+                        countLabel.text = "Count:"
+                        countInput.setText("5")
+                        delayRow.visibility = View.VISIBLE
+                        titleInput.setText("Burst Test")
+                        textInput.setText("Rapid notification")
+                    }
+                    TestNotifType.PROGRESS -> {
+                        countRow.visibility = View.VISIBLE
+                        countLabel.text = "Steps:"
+                        countInput.setText("5")
+                        delayRow.visibility = View.VISIBLE
+                        delayInput.setText("1000")
+                        titleInput.setText("Downloading file.zip")
+                        textInput.setText("Download in progress...")
+                    }
+                    TestNotifType.PERSISTENT -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Now Playing")
+                        textInput.setText("Artist - Song Title")
+                    }
+                    TestNotifType.WITH_ACTIONS -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("New Message")
+                        textInput.setText("Hey, are you free tonight?")
+                    }
+                    TestNotifType.SILENT -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Background Sync")
+                        textInput.setText("3 items synced successfully")
+                    }
+                    TestNotifType.HIGH_PRIORITY -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("URGENT")
+                        textInput.setText("Incoming call from John")
+                    }
+                    TestNotifType.LOW_PRIORITY -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Weather")
+                        textInput.setText("Sunny, 72\u00b0F today")
+                    }
+                    TestNotifType.DUPLICATE -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Test Notification")
+                        textInput.setText("This exact message will be sent twice")
+                    }
+                    TestNotifType.LONG_TEXT -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Long Article")
+                        textInput.setText("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.")
+                    }
+                    TestNotifType.IMAGE -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Photo Shared")
+                        textInput.setText("Check out this picture!")
+                    }
+                    else -> {
+                        countRow.visibility = View.GONE
+                        delayRow.visibility = View.GONE
+                        titleInput.setText("Test Notification")
+                        textInput.setText("This is a test notification from Notification Mirror")
+                    }
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
 
         selectAppButton.setOnClickListener {
             showAppSelectionDialog { pkg, label, icon ->
@@ -325,8 +635,10 @@ class MainActivity : AppCompatActivity() {
             .setView(dialogView)
             .setPositiveButton("Send") { _, _ ->
                 val title = titleInput.text.toString().ifEmpty { "Test Notification" }
-                val text = textInput.text.toString().ifEmpty { "This is a test notification from Notification Mirror" }
-                sendTestNotification(selectedPackage, title, text)
+                val text = textInput.text.toString().ifEmpty { "This is a test" }
+                val count = countInput.text.toString().toIntOrNull() ?: 5
+                val delay = delayInput.text.toString().toLongOrNull() ?: 500L
+                sendTestNotification(selectedPackage, title, text, selectedType, count, delay)
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -403,11 +715,10 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun sendTestNotification(packageName: String, title: String, text: String) {
+    private fun buildBaseTestJson(packageName: String, title: String, text: String, keySuffix: String = ""): JSONObject {
         val iconBase64 = getAppIconBase64(packageName)
-
-        val json = JSONObject().apply {
-            put("key", "test_${System.currentTimeMillis()}")
+        return JSONObject().apply {
+            put("key", "test_${System.currentTimeMillis()}$keySuffix")
             put("package", packageName)
             put("title", title)
             put("text", text)
@@ -417,7 +728,6 @@ class MainActivity : AppCompatActivity() {
             if (iconBase64 != null) {
                 put("icon", iconBase64)
             }
-            // Use per-app effective settings so test notifications respect the selected app's config
             put("muteDuration", settingsManager.getEffectiveMuteDuration(packageName))
             put("notifPriority", settingsManager.getEffectivePriority(packageName))
             put("bigTextThreshold", settingsManager.getEffectiveBigTextThreshold(packageName))
@@ -436,14 +746,22 @@ class MainActivity : AppCompatActivity() {
             if (effectiveVib.isNotEmpty()) {
                 put("vibrationPattern", effectiveVib)
             }
-            // Resolve app label for the selected package
             val appLabel = try {
                 val ai = this@MainActivity.packageManager.getApplicationInfo(packageName, 0)
                 this@MainActivity.packageManager.getApplicationLabel(ai).toString()
             } catch (_: Exception) { packageName }
             put("appLabel", appLabel)
         }
+    }
 
+    private fun sendTestNotification(
+        packageName: String,
+        title: String,
+        text: String,
+        type: TestNotifType = TestNotifType.SIMPLE,
+        count: Int = 5,
+        delayMs: Long = 500L
+    ) {
         scope.launch {
             try {
                 val nodeClient = Wearable.getNodeClient(this@MainActivity)
@@ -456,25 +774,226 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                // Encrypt test notification data just like real notifications
-                val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
-                val key = CryptoHelper.getOrCreateKey(this@MainActivity)
-                val messageBytes = CryptoHelper.encrypt(plainBytes, key)
+                val cryptoKey = CryptoHelper.getOrCreateKey(this@MainActivity)
+                val testMessages = buildTestMessages(packageName, title, text, type, count)
 
-                for (node in nodes) {
-                    Wearable.getMessageClient(this@MainActivity)
-                        .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
-                        .await()
+                runOnUiThread {
+                    val typeLabel = type.label
+                    val msgCount = testMessages.size
+                    Toast.makeText(this@MainActivity, "Sending $msgCount $typeLabel test notification(s)...", Toast.LENGTH_SHORT).show()
+                }
+
+                for ((index, json) in testMessages.withIndex()) {
+                    val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                    val messageBytes = CryptoHelper.encrypt(plainBytes, cryptoKey)
+
+                    for (node in nodes) {
+                        Wearable.getMessageClient(this@MainActivity)
+                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                            .await()
+                    }
+
+                    // Delay between messages for burst/progress/conversation types
+                    if (index < testMessages.size - 1 && testMessages.size > 1) {
+                        kotlinx.coroutines.delay(delayMs)
+                    }
                 }
 
                 runOnUiThread {
-                    Toast.makeText(this@MainActivity, "Test notification sent to ${nodes.size} watch(es)", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "${testMessages.size} test notification(s) sent to ${nodes.size} watch(es)", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send test notification", e)
                 runOnUiThread {
                     Toast.makeText(this@MainActivity, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
+            }
+        }
+    }
+
+    private fun buildTestMessages(
+        packageName: String,
+        title: String,
+        text: String,
+        type: TestNotifType,
+        count: Int
+    ): List<JSONObject> {
+        val senders = listOf("Alice", "Bob", "Charlie", "Diana", "Eve")
+        val conversationMsgs = listOf(
+            "Hey everyone!", "What's the plan for tonight?",
+            "Let's meet at 7pm", "Sounds good!",
+            "I'll bring snacks", "See you there!",
+            "Running 5 mins late", "No worries!"
+        )
+
+        return when (type) {
+            TestNotifType.SIMPLE -> {
+                listOf(buildBaseTestJson(packageName, title, text))
+            }
+
+            TestNotifType.CONVERSATION -> {
+                // Single notification with conversationMessages array (simulates WhatsApp group)
+                val convKey = "test_conv_${System.currentTimeMillis()}"
+                val msgCount = count.coerceIn(2, 8)
+                val json = buildBaseTestJson(packageName, title, conversationMsgs[0], "_conv").apply {
+                    put("key", convKey)
+                    put("isMessagingStyle", true)
+                    put("conversationTitle", title)
+                    val msgsArray = JSONArray()
+                    for (i in 0 until msgCount) {
+                        val msgObj = JSONObject()
+                        msgObj.put("sender", senders[i % senders.size])
+                        msgObj.put("text", if (i == 0) text else conversationMsgs[i % conversationMsgs.size])
+                        msgsArray.put(msgObj)
+                    }
+                    put("conversationMessages", msgsArray)
+                }
+                listOf(json)
+            }
+
+            TestNotifType.CONVERSATION_UPDATE -> {
+                // Send conversation messages one at a time to test stacking
+                val convKey = "test_conv_stack_${System.currentTimeMillis()}"
+                val msgCount = count.coerceIn(2, 8)
+                val messages = mutableListOf<JSONObject>()
+                for (i in 0 until msgCount) {
+                    val msgsArray = JSONArray()
+                    // Each update includes all messages up to this point
+                    for (j in 0..i) {
+                        val msgObj = JSONObject()
+                        msgObj.put("sender", senders[j % senders.size])
+                        msgObj.put("text", if (j == 0) text else conversationMsgs[j % conversationMsgs.size])
+                        msgsArray.put(msgObj)
+                    }
+                    val json = buildBaseTestJson(packageName, senders[i % senders.size], conversationMsgs[i % conversationMsgs.size], "_convupd_$i").apply {
+                        put("key", convKey)
+                        put("isMessagingStyle", true)
+                        put("conversationTitle", title)
+                        put("conversationMessages", msgsArray)
+                        if (i > 0) put("muteContinuation", true)
+                    }
+                    messages.add(json)
+                }
+                messages
+            }
+
+            TestNotifType.DUPLICATE -> {
+                // Same key + same content twice to test dedup
+                val dupKey = "test_dup_${System.currentTimeMillis()}"
+                val json1 = buildBaseTestJson(packageName, title, text, "_dup1").apply {
+                    put("key", dupKey)
+                }
+                val json2 = buildBaseTestJson(packageName, title, text, "_dup2").apply {
+                    put("key", dupKey)
+                }
+                listOf(json1, json2)
+            }
+
+            TestNotifType.PERSISTENT -> {
+                listOf(buildBaseTestJson(packageName, title, text, "_ongoing").apply {
+                    put("isOngoing", true)
+                    put("autoCancel", false)
+                })
+            }
+
+            TestNotifType.WITH_ACTIONS -> {
+                val actions = JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("index", 0)
+                        put("title", "Reply")
+                        put("hasRemoteInput", true)
+                    })
+                    put(JSONObject().apply {
+                        put("index", 1)
+                        put("title", "Mark as Read")
+                        put("hasRemoteInput", false)
+                    })
+                    put(JSONObject().apply {
+                        put("index", 2)
+                        put("title", "Snooze")
+                        put("hasRemoteInput", false)
+                    })
+                }
+                listOf(buildBaseTestJson(packageName, title, text, "_actions").apply {
+                    put("actions", actions)
+                })
+            }
+
+            TestNotifType.SILENT -> {
+                listOf(buildBaseTestJson(packageName, title, text, "_silent").apply {
+                    put("silent", true)
+                    put("notifPriority", -1)
+                })
+            }
+
+            TestNotifType.HIGH_PRIORITY -> {
+                listOf(buildBaseTestJson(packageName, title, text, "_high").apply {
+                    put("notifPriority", 2)
+                })
+            }
+
+            TestNotifType.LOW_PRIORITY -> {
+                listOf(buildBaseTestJson(packageName, title, text, "_low").apply {
+                    put("notifPriority", -1)
+                })
+            }
+
+            TestNotifType.BURST -> {
+                val messages = mutableListOf<JSONObject>()
+                val burstCount = count.coerceIn(2, 20)
+                for (i in 1..burstCount) {
+                    messages.add(buildBaseTestJson(packageName, "$title #$i", "$text ($i of $burstCount)", "_burst_$i"))
+                }
+                messages
+            }
+
+            TestNotifType.LONG_TEXT -> {
+                listOf(buildBaseTestJson(packageName, title, text, "_long").apply {
+                    put("bigTextThreshold", 0) // Force BigTextStyle
+                })
+            }
+
+            TestNotifType.IMAGE -> {
+                listOf(buildBaseTestJson(packageName, title, text, "_image").apply {
+                    // Generate a small colored gradient test image as base64
+                    val bmp = android.graphics.Bitmap.createBitmap(200, 150, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bmp)
+                    val paint = android.graphics.Paint()
+                    val gradient = android.graphics.LinearGradient(
+                        0f, 0f, 200f, 150f,
+                        intArrayOf(0xFF6200EE.toInt(), 0xFF03DAC5.toInt(), 0xFFBB86FC.toInt()),
+                        null, android.graphics.Shader.TileMode.CLAMP
+                    )
+                    paint.shader = gradient
+                    canvas.drawRect(0f, 0f, 200f, 150f, paint)
+                    val textPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 40f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    }
+                    canvas.drawText("TEST", 100f, 85f, textPaint)
+                    val stream = java.io.ByteArrayOutputStream()
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    bmp.recycle()
+                    put("picture", android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP))
+                })
+            }
+
+            TestNotifType.PROGRESS -> {
+                val messages = mutableListOf<JSONObject>()
+                val steps = count.coerceIn(2, 10)
+                val progressKey = "test_progress_${System.currentTimeMillis()}"
+                for (i in 1..steps) {
+                    val pct = (i * 100) / steps
+                    messages.add(buildBaseTestJson(packageName, title, "$pct% complete", "_prog_$i").apply {
+                        put("key", progressKey)
+                        if (i > 1) put("muteContinuation", true)
+                        if (i < steps) put("isOngoing", true)
+                    })
+                }
+                messages
             }
         }
     }
@@ -582,6 +1101,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return false
+    }
+
+    private fun resolveThemeColor(attr: Int): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return tv.data
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
     }
 
     // Simple adapter for app selection dialogs (used by test notification and vibration picker)

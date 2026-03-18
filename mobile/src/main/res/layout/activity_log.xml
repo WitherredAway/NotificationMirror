@@ -27,10 +27,21 @@
             android:textColor="?colorOnSurface" />
 
         <ImageButton
+            android:id="@+id/groupToggleButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_group_view"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:scaleType="centerInside"
+            android:padding="8dp"
+            android:contentDescription="Toggle grouping"
+            android:tint="?colorOnSurfaceVariant" />
+
+        <ImageButton
             android:id="@+id/filterButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_sort_by_size"
+            android:src="@drawable/ic_grid"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:scaleType="centerInside"
             android:padding="8dp"
@@ -41,7 +52,7 @@
             android:id="@+id/exportLogButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_share"
+            android:src="@drawable/ic_export"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:scaleType="centerInside"
             android:padding="8dp"
@@ -52,7 +63,7 @@
             android:id="@+id/clearLogButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_delete"
+            android:src="@drawable/ic_delete"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:scaleType="centerInside"
             android:padding="8dp"

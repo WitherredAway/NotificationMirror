@@ -14,6 +14,8 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -48,7 +50,7 @@ object NotificationHandler {
 
     // Track recently replied conversation keys to suppress re-alert when app updates with your reply
     private val recentReplies = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    private const val REPLY_SILENCE_WINDOW_MS = 15000L // 15 seconds
+    private const val REPLY_SILENCE_WINDOW_MS = 5000L // 5 seconds
 
     /** Called by ReplyActivity after sending a reply to mark the conversation as recently replied */
     fun markReplied(notifKey: String) {
@@ -73,6 +75,7 @@ object NotificationHandler {
             val subText = json.optString("subText", "")
             val actionsArray = json.optJSONArray("actions")
             val iconBase64 = json.optString("icon", "")
+            val pictureBase64 = json.optString("picture", "")
             val appLabel = json.optString("appLabel", "")
 
             val notifPriority = json.optInt("notifPriority", 1)
@@ -200,7 +203,8 @@ object NotificationHandler {
                 notifLog.addEntry(
                     packageName, title, text, "RECEIVED", "$actionCount actions",
                     notifKey = key,
-                    actionsJson = actionsArray?.toString() ?: ""
+                    actionsJson = actionsArray?.toString() ?: "",
+                    conversationKey = conversationKey
                 )
             }
 
@@ -210,6 +214,16 @@ object NotificationHandler {
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to decode icon", e)
+                    null
+                }
+            } else null
+
+            val pictureBitmap = if (pictureBase64.isNotEmpty()) {
+                try {
+                    val bytes = Base64.decode(pictureBase64, Base64.NO_WRAP)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to decode picture", e)
                     null
                 }
             } else null
@@ -233,10 +247,14 @@ object NotificationHandler {
                 hideContent = hideContent, silentUpdate = (isUpdate && muteContinuation) || isReplyUpdate,
                 conversationHistory = messages,
                 vibrateOnly = vibrateOnly,
-                conversationTitle = conversationTitle
+                conversationTitle = conversationTitle,
+                pictureBitmap = pictureBitmap
             )
 
-            if (!isUpdate) NotificationTileService.incrementCount(context, packageName)
+            if (!isUpdate) {
+                NotificationTileService.incrementCount(context, packageName)
+                NotificationComplicationService.incrementActiveCount(context)
+            }
 
             // Sync complication settings from phone to watch
             val complicationSource = json.optString("complicationSource", "")
@@ -253,6 +271,76 @@ object NotificationHandler {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle notification", e)
             notifLog.addEntry("unknown", "Error", "", "ERROR", e.message ?: "Parse error")
+        }
+    }
+
+    /**
+     * Handle reconciliation message from phone after a full sync.
+     * Removes any watch-side notifications whose keys are NOT in the phone's
+     * active notification list — cleans up stale notifications that were missed
+     * (e.g. dismissals lost during service restart).
+     */
+    fun handleReconciliation(context: Context, messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val activeKeysArray = json.getJSONArray("activeKeys")
+            val activeKeys = mutableSetOf<String>()
+            for (i in 0 until activeKeysArray.length()) {
+                activeKeys.add(activeKeysArray.getString(i))
+            }
+
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Find notification keys tracked on watch that are no longer active on phone
+            val staleEntries = synchronized(idLock) {
+                // Deduplicate by conversation key to avoid double-decrementing counts
+                // when multiple notification keys map to the same conversation
+                val staleMap = mutableMapOf<String, Triple<String, Int, String>>() // convKey -> (convKey, notifId, packageName)
+                for ((notifKey, convKey) in notifKeyToConversationKey) {
+                    if (notifKey !in activeKeys && convKey !in staleMap) {
+                        val notifId = notifIdMap[convKey]
+                        if (notifId != null) {
+                            val pkg = convKey.substringBefore(":")
+                            staleMap[convKey] = Triple(convKey, notifId, pkg)
+                        }
+                    }
+                }
+                val stale = staleMap.values.toList()
+                // Clean up the stale entries
+                for ((convKey, _, _) in stale) {
+                    notifIdMap.remove(convKey)
+                    conversationMessages.remove(convKey)
+                }
+                // Remove stale notifKey → convKey mappings
+                notifKeyToConversationKey.entries.removeAll { it.key !in activeKeys }
+                stale
+            }
+
+            for ((convKey, notifId, packageName) in staleEntries) {
+                nm.cancel(notifId)
+                if (packageName.isNotEmpty()) {
+                    NotificationTileService.decrementCount(context, packageName)
+                    NotificationComplicationService.decrementActiveCount(context)
+                }
+                Log.d(TAG, "Reconciliation: removed stale notification $notifId (convKey=$convKey)")
+            }
+
+            // Clean up orphaned summaries
+            if (staleEntries.isNotEmpty()) {
+                val packagesToCheck = staleEntries.map { it.third }.distinct()
+                for (pkg in packagesToCheck) {
+                    val hasOtherNotifs = synchronized(idLock) {
+                        notifIdMap.keys.any { k -> k == pkg || k.startsWith("$pkg:") }
+                    }
+                    if (!hasOtherNotifs) {
+                        nm.cancel(pkg.hashCode() + SUMMARY_ID_OFFSET)
+                    }
+                }
+            }
+
+            Log.d(TAG, "Reconciliation complete: removed ${staleEntries.size} stale notifications, ${activeKeys.size} active on phone")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle reconciliation", e)
         }
     }
 
@@ -285,6 +373,7 @@ object NotificationHandler {
             }
             if (packageName.isNotEmpty()) {
                 NotificationTileService.decrementCount(context, packageName)
+                NotificationComplicationService.decrementActiveCount(context)
             }
 
             Log.d(TAG, "Dismissed notification $notifId for key: $key")
@@ -320,7 +409,8 @@ object NotificationHandler {
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList(),
         vibrateOnly: Boolean = false,
-        conversationTitle: String = ""
+        conversationTitle: String = "",
+        pictureBitmap: Bitmap? = null
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -374,7 +464,9 @@ object NotificationHandler {
             else -> NotificationCompat.PRIORITY_HIGH
         }
 
-        val displayTitle = if (hideContent) appLabel else "$appLabel: $title"
+        // Show just the notification title (not "AppLabel: Title") — app identity
+        // is conveyed via subText and the per-app notification channel/group
+        val displayTitle = if (hideContent) appLabel else title
         val displayText = if (hideContent) "Notification content hidden (phone locked)" else text
 
         // For mute-continuation: keep the SAME channel but suppress alerts via
@@ -391,17 +483,31 @@ object NotificationHandler {
             .setOnlyAlertOnce(silentUpdate)
             .setSilent(isSilent || vibrateOnly || silentUpdate)
 
+        // For ongoing notifications: set a DeleteIntent so we know when the user
+        // dismisses it from the watch. This triggers a resend from the phone if
+        // the notification is still active there.
+        if (isOngoing) {
+            val dismissIntent = Intent(context, OngoingDismissReceiver::class.java).apply {
+                action = "com.notifmirror.wear.ONGOING_DISMISSED"
+                putExtra(OngoingDismissReceiver.EXTRA_NOTIF_KEY, notifKey)
+            }
+            val dismissRequestCode = (notifKey + "ongoing_dismiss").hashCode() and 0x7FFFFFFF
+            val dismissPendingIntent = PendingIntent.getBroadcast(
+                context,
+                dismissRequestCode,
+                dismissIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setDeleteIntent(dismissPendingIntent)
+        }
+
         if (iconBitmap != null) {
             builder.setLargeIcon(iconBitmap)
         }
 
-        if (hideContent) {
-            builder.setSubText(appLabel)
-        } else if (subText.isNotEmpty()) {
-            builder.setSubText(subText)
-        } else {
-            builder.setSubText(appLabel)
-        }
+        // Always show app label in subText so users know which app the notification
+        // is from (title no longer includes "AppLabel: " prefix)
+        builder.setSubText(appLabel)
 
         // Stack conversation messages using MessagingStyle for better WearOS rendering
         if (!hideContent && conversationHistory.size > 1) {
@@ -427,6 +533,13 @@ object NotificationHandler {
             // app label in subText, so WearOS doesn't show "AppLabel: Title" redundantly
             builder.setContentTitle(if (conversationTitle.isNotEmpty()) conversationTitle else title)
             builder.setSubText(appLabel)
+        } else if (!hideContent && pictureBitmap != null) {
+            // BigPictureStyle for notifications with attached images (e.g. photo messages)
+            builder.setStyle(
+                NotificationCompat.BigPictureStyle()
+                    .bigPicture(pictureBitmap)
+                    .setSummaryText(text)
+            )
         } else if (!hideContent && text.length > bigTextThreshold) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
         }
@@ -548,10 +661,14 @@ object NotificationHandler {
 
         // Manually vibrate if not a silent update, not isSilent, and not low priority
         // vibrateOnly mode: suppress sound (via low-priority notification) but still vibrate
-        if (!silentUpdate && !isSilent && notifPriority != -1) {
-            vibrateManually(context, vibrationPattern)
-        } else if (vibrateOnly && !silentUpdate) {
-            vibrateManually(context, vibrationPattern)
+        // Post with a short delay so the system finishes processing the notification
+        // before we trigger our own vibration (avoids the OS canceling it).
+        val shouldVibrate = (!silentUpdate && !isSilent && notifPriority != -1) ||
+            (vibrateOnly && !silentUpdate)
+        if (shouldVibrate) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                vibrateManually(context, vibrationPattern)
+            }, 150)
         }
 
         // Create/update summary notification for the per-app group
@@ -573,9 +690,12 @@ object NotificationHandler {
     /**
      * Manually vibrate the watch using Vibrator API.
      * This bypasses the notification channel vibration which Android caches.
+     * Uses AudioAttributes so the vibration is routed correctly on WearOS
+     * and isn't suppressed by DND / notification-priority filters.
      */
     private fun vibrateManually(context: Context, pattern: LongArray) {
         try {
+            if (pattern.all { it == 0L }) return
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
                 vm.defaultVibrator
@@ -583,7 +703,13 @@ object NotificationHandler {
                 @Suppress("DEPRECATION")
                 context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             }
-            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            val effect = VibrationEffect.createWaveform(pattern, -1)
+            val attrs = android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            vibrator.vibrate(effect, attrs)
+            Log.d(TAG, "Vibrated with pattern: ${pattern.joinToString(",")}")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to vibrate manually", e)
         }

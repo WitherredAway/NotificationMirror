@@ -59,6 +59,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".OngoingDismissReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.notifmirror.wear.ONGOING_DISMISSED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".NotificationReceiverService"
             android:exported="true">
@@ -71,6 +79,14 @@
                 <data
                     android:host="*"
                     android:pathPrefix="/action_result"
+                    android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/notification_dismiss"
+                    android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/request_logcat"
                     android:scheme="wear" />
             </intent-filter>
             <intent-filter>
@@ -108,6 +124,8 @@
         <service
             android:name=".NotificationComplicationService"
             android:exported="true"
+            android:directBootAware="true"
+            android:icon="@drawable/ic_notification"
             android:label="Latest Notification"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
@@ -115,7 +133,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT,LONG_TEXT" />
+                android:value="SHORT_TEXT,LONG_TEXT,RANGED_VALUE,ICON,SMALL_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="0" />

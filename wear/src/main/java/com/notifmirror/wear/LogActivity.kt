@@ -14,6 +14,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -47,14 +48,25 @@ class LogActivity : AppCompatActivity() {
     private lateinit var countText: TextView
     private lateinit var emptyText: TextView
     private lateinit var filterButton: ImageButton
+    private lateinit var groupToggleButton: ImageButton
     private var allEntries: List<NotificationLog.LogEntry> = emptyList()
     private var filteredEntries: List<NotificationLog.LogEntry> = emptyList()
     private var displayedCount = 0
     private val displayedItems = mutableListOf<NotificationLog.LogEntry>()
     private var logAdapter: LogEntryAdapter? = null
+    private var groupAdapter: GroupedLogAdapter? = null
     private var appList: List<String> = emptyList()
     private var selectedApp: String = "All Apps"
     private var searchQuery: String = ""
+    private var isGrouped: Boolean = true
+
+    data class ConversationGroup(
+        val conversationKey: String,
+        val packageName: String,
+        val conversationTitle: String,
+        val entries: List<NotificationLog.LogEntry>,
+        val latestTime: Long
+    )
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -68,7 +80,11 @@ class LogActivity : AppCompatActivity() {
         emptyText = findViewById(R.id.emptyText)
         val searchButton = findViewById<ImageButton>(R.id.searchButton)
         filterButton = findViewById(R.id.filterButton)
+        groupToggleButton = findViewById(R.id.groupToggleButton)
         val clearButton = findViewById<ImageButton>(R.id.clearLogButton)
+
+        // Position arc buttons based on screen geometry for round watches
+        adjustArcButtonSpacing()
 
         val layoutManager = LinearLayoutManager(this)
         recyclerView.layoutManager = layoutManager
@@ -94,7 +110,8 @@ class LogActivity : AppCompatActivity() {
         recyclerView.setOnGenericMotionListener { v, event ->
             if (event.action == MotionEvent.ACTION_SCROLL) {
                 val delta = -event.getAxisValue(MotionEvent.AXIS_SCROLL)
-                v.scrollBy(0, (delta * dpToPx(40)).toInt())
+                val scrollAmount = (delta * dpToPx(64)).toInt()
+                (v as RecyclerView).smoothScrollBy(0, scrollAmount)
                 true
             } else {
                 false
@@ -122,6 +139,13 @@ class LogActivity : AppCompatActivity() {
             showFilterDialog()
         }
 
+        groupToggleButton.setOnClickListener {
+            isGrouped = !isGrouped
+            updateGroupIcon()
+            displayFiltered()
+        }
+        updateGroupIcon()
+
         loadEntries()
         displayFiltered()
     }
@@ -130,6 +154,16 @@ class LogActivity : AppCompatActivity() {
         super.onResume()
         loadEntries()
         displayFiltered()
+    }
+
+    private fun updateGroupIcon() {
+        if (isGrouped) {
+            val typedValue = TypedValue()
+            theme.resolveAttribute(com.google.android.material.R.attr.colorPrimary, typedValue, true)
+            groupToggleButton.setColorFilter(typedValue.data)
+        } else {
+            groupToggleButton.clearColorFilter()
+        }
     }
 
     private fun showSearchDialog() {
@@ -271,14 +305,56 @@ class LogActivity : AppCompatActivity() {
         emptyText.visibility = View.GONE
         recyclerView.visibility = View.VISIBLE
         filteredEntries = filtered
+
+        if (isGrouped) {
+            displayGrouped(filtered)
+        } else {
+            displayFlat(filtered)
+        }
+    }
+
+    private fun displayFlat(filtered: List<NotificationLog.LogEntry>) {
         displayedCount = minOf(PAGE_SIZE, filtered.size)
         displayedItems.clear()
         displayedItems.addAll(filtered.subList(0, displayedCount))
         logAdapter = LogEntryAdapter(displayedItems)
+        groupAdapter = null
         recyclerView.adapter = logAdapter
     }
 
+    private fun displayGrouped(filtered: List<NotificationLog.LogEntry>) {
+        val groups = buildConversationGroups(filtered)
+        groupAdapter = GroupedLogAdapter(groups)
+        logAdapter = null
+        recyclerView.adapter = groupAdapter
+    }
+
+    private fun buildConversationGroups(entries: List<NotificationLog.LogEntry>): List<ConversationGroup> {
+        val groupMap = linkedMapOf<String, MutableList<NotificationLog.LogEntry>>()
+        for (entry in entries) {
+            val key = deriveGroupKey(entry)
+            groupMap.getOrPut(key) { mutableListOf() }.add(entry)
+        }
+        return groupMap.map { (key, groupEntries) ->
+            val latest = groupEntries.first()
+            val convTitle = if (key.contains(":")) key.substringAfter(":") else ""
+            ConversationGroup(
+                conversationKey = key,
+                packageName = latest.packageName,
+                conversationTitle = convTitle,
+                entries = groupEntries,
+                latestTime = latest.time
+            )
+        }.sortedByDescending { it.latestTime }
+    }
+
+    private fun deriveGroupKey(entry: NotificationLog.LogEntry): String {
+        if (entry.conversationKey.isNotEmpty()) return entry.conversationKey
+        return "${entry.packageName}:${entry.title}"
+    }
+
     private fun loadMore() {
+        if (isGrouped) return
         if (displayedCount >= filteredEntries.size) return
         val oldCount = displayedCount
         val newCount = minOf(displayedCount + PAGE_SIZE, filteredEntries.size)
@@ -318,6 +394,35 @@ class LogActivity : AppCompatActivity() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         startActivity(intent)
+    }
+
+    /**
+     * Adjust bottom-row button spacing based on screen geometry so buttons
+     * follow the round bezel arc. On a circular screen the available horizontal
+     * chord at Y pixels from center is 2·√(R²−Y²). We compute the chord at
+     * the bottom-row Y and spread the two buttons to ~70 % of that width.
+     */
+    private fun adjustArcButtonSpacing() {
+        val dm = resources.displayMetrics
+        val screenW = dm.widthPixels
+        val isRound = resources.configuration.isScreenRound
+
+        if (isRound) {
+            val radius = screenW / 2f
+            // Bottom row sits at ~42dp from screen top → Y offset from center
+            val bottomRowYFromTop = dpToPx(42).toFloat()
+            val yFromCenter = radius - bottomRowYFromTop
+            val chord = 2f * kotlin.math.sqrt(radius * radius - yFromCenter * yFromCenter)
+
+            val buttonSizePx = dpToPx(30)
+            // Target gap: fill ~70% of the chord, minus the two buttons themselves
+            val targetGap = ((chord * 0.70f) - 2 * buttonSizePx).toInt().coerceAtLeast(dpToPx(20))
+
+            val groupBtn = findViewById<ImageButton>(R.id.groupToggleButton)
+            val params = groupBtn.layoutParams as LinearLayout.LayoutParams
+            params.marginEnd = targetGap
+            groupBtn.layoutParams = params
+        }
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -420,6 +525,159 @@ class LogActivity : AppCompatActivity() {
         }
 
         override fun getItemCount() = entries.size
+    }
+
+    // ── Grouped view adapter ───────────────────────────────────────────
+
+    private inner class GroupedLogAdapter(private val groups: List<ConversationGroup>) :
+        RecyclerView.Adapter<GroupedLogAdapter.ViewHolder>() {
+
+        private val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        private val expandedPositions = mutableSetOf<Int>()
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val appName: TextView = view.findViewById(R.id.logAppName)
+            val groupCount: TextView = view.findViewById(R.id.logGroupCount)
+            val time: TextView = view.findViewById(R.id.logTime)
+            val conversationTitle: TextView = view.findViewById(R.id.logConversationTitle)
+            val messagesContainer: LinearLayout = view.findViewById(R.id.logMessagesContainer)
+            val actionsContainer: ChipGroup = view.findViewById(R.id.logActionsContainer)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_log_group, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val group = groups[position]
+            val latestEntry = group.entries.first()
+
+            holder.appName.text = getAppLabel(group.packageName)
+            holder.time.text = sdf.format(Date(group.latestTime))
+            holder.groupCount.text = "(${group.entries.size})"
+
+            if (group.conversationTitle.isNotEmpty()) {
+                holder.conversationTitle.text = group.conversationTitle
+                holder.conversationTitle.visibility = View.VISIBLE
+            } else {
+                holder.conversationTitle.visibility = View.GONE
+            }
+
+            holder.messagesContainer.removeAllViews()
+            val isExpanded = expandedPositions.contains(position)
+            val entriesToShow = if (isExpanded) {
+                group.entries.reversed()
+            } else {
+                group.entries.take(3).reversed()
+            }
+
+            for (entry in entriesToShow) {
+                val msgView = TextView(holder.itemView.context).apply {
+                    val prefix = if (entry.title.isNotEmpty() && group.conversationTitle.isNotEmpty()) {
+                        "${entry.title}: "
+                    } else if (entry.title.isNotEmpty()) {
+                        "${entry.title}: "
+                    } else {
+                        ""
+                    }
+                    text = "$prefix${entry.text}"
+                    textSize = 12f
+                    val tv = TypedValue()
+                    context.theme.resolveAttribute(
+                        com.google.android.material.R.attr.colorOnSurfaceVariant, tv, true
+                    )
+                    setTextColor(tv.data)
+                    setPadding(0, 2, 0, 2)
+                    maxLines = 3
+                }
+                holder.messagesContainer.addView(msgView)
+            }
+
+            if (!isExpanded && group.entries.size > 3) {
+                val moreView = TextView(holder.itemView.context).apply {
+                    text = "\u25BE ${group.entries.size - 3} more"
+                    textSize = 10f
+                    val tv = TypedValue()
+                    context.theme.resolveAttribute(
+                        com.google.android.material.R.attr.colorPrimary, tv, true
+                    )
+                    setTextColor(tv.data)
+                    setPadding(0, 4, 0, 0)
+                }
+                holder.messagesContainer.addView(moreView)
+            } else if (isExpanded && group.entries.size > 3) {
+                val lessView = TextView(holder.itemView.context).apply {
+                    text = "\u25B4 Less"
+                    textSize = 10f
+                    val tv = TypedValue()
+                    context.theme.resolveAttribute(
+                        com.google.android.material.R.attr.colorPrimary, tv, true
+                    )
+                    setTextColor(tv.data)
+                    setPadding(0, 4, 0, 0)
+                }
+                holder.messagesContainer.addView(lessView)
+            }
+
+            holder.itemView.setOnClickListener {
+                val adapterPosition = holder.adapterPosition
+                if (adapterPosition == RecyclerView.NO_POSITION) return@setOnClickListener
+                if (expandedPositions.contains(adapterPosition)) {
+                    expandedPositions.remove(adapterPosition)
+                } else {
+                    expandedPositions.add(adapterPosition)
+                }
+                notifyItemChanged(adapterPosition)
+            }
+
+            holder.actionsContainer.removeAllViews()
+            if (latestEntry.actionsJson.isNotEmpty() && latestEntry.notifKey.isNotEmpty()) {
+                try {
+                    val actions = JSONArray(latestEntry.actionsJson)
+                    if (actions.length() > 0) {
+                        holder.actionsContainer.visibility = View.VISIBLE
+                        for (i in 0 until actions.length()) {
+                            val actionObj = actions.getJSONObject(i)
+                            val actionTitle = actionObj.getString("title")
+                            val actionIndex = actionObj.getInt("index")
+                            val hasRemoteInput = actionObj.getBoolean("hasRemoteInput")
+
+                            val chip = Chip(holder.itemView.context).apply {
+                                text = actionTitle
+                                textSize = 10f
+                                isCheckable = false
+                                isClickable = true
+                                chipMinHeight = dpToPx(28).toFloat()
+                                ensureAccessibleTouchTarget(0)
+                                setEnsureMinTouchTargetSize(false)
+                                chipStartPadding = dpToPx(6).toFloat()
+                                chipEndPadding = dpToPx(6).toFloat()
+                            }
+
+                            chip.setOnClickListener {
+                                if (hasRemoteInput) {
+                                    openReplyForEntry(latestEntry.notifKey, actionIndex)
+                                } else {
+                                    triggerAction(latestEntry.notifKey, actionIndex)
+                                }
+                            }
+
+                            holder.actionsContainer.addView(chip)
+                        }
+                    } else {
+                        holder.actionsContainer.visibility = View.GONE
+                    }
+                } catch (_: Exception) {
+                    holder.actionsContainer.visibility = View.GONE
+                }
+            } else {
+                holder.actionsContainer.visibility = View.GONE
+            }
+        }
+
+        override fun getItemCount() = groups.size
     }
 
     /**
