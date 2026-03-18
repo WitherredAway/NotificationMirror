@@ -52,6 +52,17 @@ object MessageHelper {
                     Log.w(TAG, "Cannot decrypt dismiss — dropping (key not available)")
                 }
             }
+            "/notification_reconcile" -> {
+                val decryptedReconcile = decryptMessageData(context, messageEvent.data)
+                if (decryptedReconcile != null) {
+                    NotificationHandler.handleReconciliation(
+                        context,
+                        NotificationReceiverService.DecryptedMessageEvent(messageEvent.path, decryptedReconcile)
+                    )
+                } else {
+                    Log.w(TAG, "Cannot decrypt reconcile — dropping (key not available)")
+                }
+            }
             "/action_result" -> handleActionResult(context, messageEvent)
             "/request_logcat" -> handleLogcatRequest(context, messageEvent)
         }

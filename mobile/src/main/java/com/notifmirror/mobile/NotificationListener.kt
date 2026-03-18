@@ -30,6 +30,7 @@ class NotificationListener : NotificationListenerService() {
         private const val TAG = "NotifMirror"
         private const val PATH_NOTIFICATION = "/notification"
         private const val PATH_DISMISS = "/notification_dismiss"
+        private const val PATH_RECONCILE = "/notification_reconcile"
 
         val pendingActions = java.util.concurrent.ConcurrentHashMap<String, Notification.Action>()
         // Track notification keys that were actually sent/queued to the watch
@@ -684,6 +685,35 @@ class NotificationListener : NotificationListenerService() {
                     Log.d(TAG, "Synced notification: $title from $appPackageName")
                 }
 
+                // Send reconciliation message: tells the watch which notification keys
+                // are currently active so it can remove any stale ones that were missed
+                // (e.g. dismissals lost during service restart)
+                try {
+                    val activeKeys = JSONArray()
+                    for (sbn2 in (getActiveNotifications() ?: emptyArray())) {
+                        activeKeys.put(sbn2.key)
+                    }
+                    val reconcileJson = JSONObject().apply {
+                        put("action", "reconcile")
+                        put("activeKeys", activeKeys)
+                    }
+                    val reconcileBytes = CryptoHelper.encrypt(
+                        reconcileJson.toString().toByteArray(Charsets.UTF_8), key
+                    )
+                    for (node in nodes) {
+                        try {
+                            Wearable.getMessageClient(this@NotificationListener)
+                                .sendMessage(node.id, PATH_RECONCILE, reconcileBytes)
+                                .await()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to send reconcile to node ${node.displayName}: ${e.message}")
+                        }
+                    }
+                    Log.d(TAG, "Sent reconciliation with ${activeKeys.length()} active keys")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to send reconciliation", e)
+                }
+
                 Log.d(TAG, "Sync complete: $syncCount notifications sent")
                 onComplete?.invoke(syncCount)
             } catch (e: Exception) {
@@ -699,9 +729,11 @@ class NotificationListener : NotificationListenerService() {
         // (e.g. WhatsApp keeps them alive). pruneActionsIfNeeded() handles memory bounds.
         // Clean up content hash so a re-posted notification with the same key is treated as new
         lastContentHash.remove(sbn.key)
+        sentNotificationKeys.remove(sbn.key)
 
-        // Only send dismiss events for notifications we actually sent to the watch
-        if (!sentNotificationKeys.remove(sbn.key)) return
+        // Always send dismiss to watch — the watch harmlessly ignores unknown keys.
+        // Previously gated on sentNotificationKeys which is in-memory only and lost on
+        // service restart, causing stale notifications to linger on the watch.
         if (!settings.getEffectiveAutoDismissSync(sbn.packageName)) return
 
         val json = JSONObject().apply {

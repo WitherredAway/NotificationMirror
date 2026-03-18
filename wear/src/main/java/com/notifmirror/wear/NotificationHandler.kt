@@ -274,6 +274,75 @@ object NotificationHandler {
         }
     }
 
+    /**
+     * Handle reconciliation message from phone after a full sync.
+     * Removes any watch-side notifications whose keys are NOT in the phone's
+     * active notification list — cleans up stale notifications that were missed
+     * (e.g. dismissals lost during service restart).
+     */
+    fun handleReconciliation(context: Context, messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val activeKeysArray = json.getJSONArray("activeKeys")
+            val activeKeys = mutableSetOf<String>()
+            for (i in 0 until activeKeysArray.length()) {
+                activeKeys.add(activeKeysArray.getString(i))
+            }
+
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Find notification keys tracked on watch that are no longer active on phone
+            val staleEntries = synchronized(idLock) {
+                val stale = mutableListOf<Triple<String, Int, String>>() // convKey, notifId, packageName
+                // Check all tracked notification keys
+                for ((notifKey, convKey) in notifKeyToConversationKey) {
+                    if (notifKey !in activeKeys) {
+                        val notifId = notifIdMap[convKey]
+                        if (notifId != null) {
+                            // Derive package from conversation key (format: "package:title" or raw key)
+                            val pkg = convKey.substringBefore(":")
+                            stale.add(Triple(convKey, notifId, pkg))
+                        }
+                    }
+                }
+                // Clean up the stale entries
+                for ((convKey, _, _) in stale) {
+                    notifIdMap.remove(convKey)
+                    conversationMessages.remove(convKey)
+                }
+                // Remove stale notifKey → convKey mappings
+                notifKeyToConversationKey.entries.removeAll { it.key !in activeKeys }
+                stale
+            }
+
+            for ((convKey, notifId, packageName) in staleEntries) {
+                nm.cancel(notifId)
+                if (packageName.isNotEmpty()) {
+                    NotificationTileService.decrementCount(context, packageName)
+                    NotificationComplicationService.decrementActiveCount(context)
+                }
+                Log.d(TAG, "Reconciliation: removed stale notification $notifId (convKey=$convKey)")
+            }
+
+            // Clean up orphaned summaries
+            if (staleEntries.isNotEmpty()) {
+                val packagesToCheck = staleEntries.map { it.third }.distinct()
+                for (pkg in packagesToCheck) {
+                    val hasOtherNotifs = synchronized(idLock) {
+                        notifIdMap.keys.any { k -> k == pkg || k.startsWith("$pkg:") }
+                    }
+                    if (!hasOtherNotifs) {
+                        nm.cancel(pkg.hashCode() + SUMMARY_ID_OFFSET)
+                    }
+                }
+            }
+
+            Log.d(TAG, "Reconciliation complete: removed ${staleEntries.size} stale notifications, ${activeKeys.size} active on phone")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle reconciliation", e)
+        }
+    }
+
     fun handleDismissal(context: Context, messageEvent: MessageEvent) {
         try {
             val json = JSONObject(String(messageEvent.data))
