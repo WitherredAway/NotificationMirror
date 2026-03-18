@@ -557,6 +557,9 @@ class NotificationListener : NotificationListenerService() {
 
                     val iconBase64 = getAppIconBase64(appPackageName)
 
+                    // Extract notification picture (BigPictureStyle) if available
+                    val pictureBase64 = extractPictureBase64(extras)
+
                     val actionsJson = JSONArray()
                     val actions = notification.actions
                     if (actions != null) {
@@ -606,6 +609,7 @@ class NotificationListener : NotificationListenerService() {
                             put("conversationTitle", conversationTitle)
                         }
                         if (iconBase64 != null) put("icon", iconBase64)
+                        if (pictureBase64 != null) put("picture", pictureBase64)
                         // Send ongoing flag so watch can make persistent notifs persistent
                         if (sbn.isOngoing) {
                             put("isOngoing", true)
@@ -814,12 +818,30 @@ class NotificationListener : NotificationListenerService() {
             val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
             for (queuedJson in queued) {
                 try {
-                    val plainBytes = queuedJson.toString().toByteArray(Charsets.UTF_8)
+                    // Payload size safety check — queued notifications may pre-date the
+                    // onNotificationPosted size guard, so re-check here.
+                    val MAX_QUEUE_PAYLOAD_BYTES = 80_000
+                    var queuedJsonString = queuedJson.toString()
+                    var plainBytes = queuedJsonString.toByteArray(Charsets.UTF_8)
+                    if (plainBytes.size > MAX_QUEUE_PAYLOAD_BYTES && queuedJson.has("picture")) {
+                        Log.w(TAG, "Queued payload too large (${plainBytes.size} bytes), stripping picture")
+                        queuedJson.remove("picture")
+                        queuedJsonString = queuedJson.toString()
+                        plainBytes = queuedJsonString.toByteArray(Charsets.UTF_8)
+                    }
+                    if (plainBytes.size > MAX_QUEUE_PAYLOAD_BYTES) {
+                        Log.w(TAG, "Queued payload still too large (${plainBytes.size} bytes), dropping")
+                        continue
+                    }
                     val messageBytes = CryptoHelper.encrypt(plainBytes, key)
                     for (node in nodes) {
-                        Wearable.getMessageClient(this@NotificationListener)
-                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
-                            .await()
+                        try {
+                            Wearable.getMessageClient(this@NotificationListener)
+                                .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                                .await()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to flush to node ${node.displayName}: ${e.message}")
+                        }
                     }
                     val queuedKey = queuedJson.optString("key", "")
                     if (queuedKey.isNotEmpty()) sentNotificationKeys.add(queuedKey)
