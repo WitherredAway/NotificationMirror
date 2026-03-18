@@ -38,7 +38,8 @@ object NotificationHandler {
     // Track notification ID per conversation key (reuse for stacking)
     private val notifIdMap = java.util.concurrent.ConcurrentHashMap<String, Int>()
     // Track message history per conversation key for stacking
-    private val conversationMessages = java.util.concurrent.ConcurrentHashMap<String, MutableList<Pair<String, String>>>()
+    // Use ArrayDeque for O(1) head removal when capping at 50 messages
+    private val conversationMessages = java.util.concurrent.ConcurrentHashMap<String, ArrayDeque<Pair<String, String>>>()
     private val nextId = java.util.concurrent.atomic.AtomicInteger(1000)
     private val idLock = Any()
     private const val SUMMARY_ID_OFFSET = 500000
@@ -165,7 +166,7 @@ object NotificationHandler {
                 val id = notifIdMap.getOrPut(conversationKey) { nextId.getAndIncrement() }
 
                 // Track conversation messages for stacking (cap at 50 to avoid unbounded memory growth)
-                val msgList = conversationMessages.getOrPut(conversationKey) { mutableListOf() }
+                val msgList = conversationMessages.getOrPut(conversationKey) { ArrayDeque() }
 
                 // If the phone sent pre-extracted conversation messages, use them as the
                 // authoritative history (replaces any local state for this conversation).
@@ -179,17 +180,17 @@ object NotificationHandler {
                         val sender = msgObj.optString("sender", title)
                         val msgText = msgObj.optString("text", "")
                         if (msgText.isNotEmpty()) {
-                            msgList.add(Pair(sender, msgText))
+                            msgList.addLast(Pair(sender, msgText))
                         }
                     }
                 } else {
                     // Non-messaging app: append current message
                     val lastMsg = msgList.lastOrNull()
                     if (lastMsg == null || lastMsg.first != title || lastMsg.second != text) {
-                        msgList.add(Pair(title, text))
+                        msgList.addLast(Pair(title, text))
                     }
                 }
-                while (msgList.size > 50) { msgList.removeAt(0) }
+                while (msgList.size > 50) { msgList.removeFirst() }
 
                 // Take a snapshot of messages for use outside the lock
                 Triple(existing, id, ArrayList(msgList))
@@ -589,14 +590,17 @@ object NotificationHandler {
         }
     }
 
+    // Cache parsed vibration patterns to avoid re-parsing the same string on every notification
+    private val vibrationPatternCache = java.util.concurrent.ConcurrentHashMap<String, LongArray>()
+
     private fun getVibrationPattern(
         customPattern: String = "",
         defaultPattern: String = "0,200,100,200"
     ): LongArray {
-        if (customPattern.isNotEmpty()) {
-            return parseVibrationPattern(customPattern) ?: DEFAULT_VIBRATION
+        val patternStr = if (customPattern.isNotEmpty()) customPattern else defaultPattern
+        return vibrationPatternCache.getOrPut(patternStr) {
+            parseVibrationPattern(patternStr) ?: DEFAULT_VIBRATION
         }
-        return parseVibrationPattern(defaultPattern) ?: DEFAULT_VIBRATION
     }
 
     private fun parseVibrationPattern(pattern: String): LongArray? {

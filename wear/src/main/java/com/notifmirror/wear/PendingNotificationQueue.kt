@@ -13,13 +13,14 @@ object PendingNotificationQueue {
     private const val TAG = "NotifMirrorPendingQ"
     private const val MAX_PENDING = 20
 
-    private val pendingMessages = mutableListOf<ByteArray>()
+    // Use ArrayDeque for O(1) head removal instead of ArrayList's O(n) removeAt(0)
+    private val pendingMessages = ArrayDeque<ByteArray>()
 
     fun enqueue(encryptedData: ByteArray) {
         synchronized(pendingMessages) {
-            pendingMessages.add(encryptedData.copyOf())
+            pendingMessages.addLast(encryptedData.copyOf())
             while (pendingMessages.size > MAX_PENDING) {
-                pendingMessages.removeAt(0)
+                pendingMessages.removeFirst()
             }
             Log.d(TAG, "Queued encrypted notification for retry (${pendingMessages.size} pending)")
         }
