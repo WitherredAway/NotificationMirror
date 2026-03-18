@@ -362,6 +362,10 @@ class NotificationListener : NotificationListenerService() {
                     Log.w(TAG, "No connected watch nodes found")
                     // Queue for offline delivery
                     offlineQueue.enqueue(json)
+                    // Store content hash so duplicate notifications aren't queued again
+                    // while the watch is still disconnected (e.g. WhatsApp re-posts all unread)
+                    lastContentHash[notifKey] = contentHash
+                    pruneContentHashesIfNeeded()
                     if (settings.isKeepNotificationHistoryEnabled()) {
                         notifLog.addEntry(
                             appPackageName, title, displayText, "QUEUED",
@@ -637,13 +641,30 @@ class NotificationListener : NotificationListenerService() {
                         if (complicationApp.isNotEmpty()) put("complicationApp", complicationApp)
                     }
 
-                    val plainBytes = json.toString().toByteArray(Charsets.UTF_8)
+                    // Payload size safety check (same as onNotificationPosted)
+                    val MAX_SYNC_PAYLOAD_BYTES = 80_000
+                    var jsonString = json.toString()
+                    var plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                    if (plainBytes.size > MAX_SYNC_PAYLOAD_BYTES && json.has("picture")) {
+                        Log.w(TAG, "Sync payload too large (${plainBytes.size} bytes), stripping picture")
+                        json.remove("picture")
+                        jsonString = json.toString()
+                        plainBytes = jsonString.toByteArray(Charsets.UTF_8)
+                    }
+                    if (plainBytes.size > MAX_SYNC_PAYLOAD_BYTES) {
+                        Log.w(TAG, "Sync payload still too large (${plainBytes.size} bytes), skipping")
+                        continue
+                    }
                     val messageBytes = CryptoHelper.encrypt(plainBytes, key)
 
                     for (node in nodes) {
-                        Wearable.getMessageClient(this@NotificationListener)
-                            .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
-                            .await()
+                        try {
+                            Wearable.getMessageClient(this@NotificationListener)
+                                .sendMessage(node.id, PATH_NOTIFICATION, messageBytes)
+                                .await()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to send sync to node ${node.displayName}: ${e.message}")
+                        }
                     }
                     sentNotificationKeys.add(notifKey)
                     // Store content hash so subsequent unchanged re-posts are deduplicated
@@ -763,8 +784,8 @@ class NotificationListener : NotificationListenerService() {
             val maxDim = 400
             val scaled = if (picture.width > maxDim || picture.height > maxDim) {
                 val ratio = minOf(maxDim.toFloat() / picture.width, maxDim.toFloat() / picture.height)
-                val newW = (picture.width * ratio).toInt()
-                val newH = (picture.height * ratio).toInt()
+                val newW = (picture.width * ratio).toInt().coerceAtLeast(1)
+                val newH = (picture.height * ratio).toInt().coerceAtLeast(1)
                 Bitmap.createScaledBitmap(picture, newW, newH, true)
             } else {
                 picture
