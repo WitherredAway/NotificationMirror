@@ -14,6 +14,7 @@
 <LinearLayout android:id="@+id/updateCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="vertical" android:padding="8dp" android:background="@drawable/bg_card">
 <TextView android:id="@+id/updateTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Checking for updates..." android:textSize="10sp" android:textStyle="bold" android:textColor="?colorOnSurfaceVariant" android:gravity="center" />
 <TextView android:id="@+id/updateSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="9sp" android:textColor="?colorOnSurfaceVariant" android:gravity="center" android:visibility="gone" />
+<TextView android:id="@+id/githubLink" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="GitHub" android:textSize="9sp" android:textColor="?colorPrimary" android:gravity="center" android:clickable="true" android:focusable="true" />
 </LinearLayout>
 <!-- ACTIONS section -->
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="ACTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
@@ -66,10 +67,6 @@
 <!-- Bridging tip -->
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:padding="8dp" android:background="@drawable/bg_card" android:text="Tip: Disable built-in notification bridging in WearOS settings to avoid duplicates." android:textSize="9sp" android:textColor="?colorOutline" android:gravity="center" android:lineSpacingExtra="2dp" />
 <!-- Footer -->
-<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal" android:gravity="center_vertical" android:layout_gravity="center_horizontal">
-<TextView android:id="@+id/versionText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="9sp" android:textColor="?colorOutline" />
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" · " android:textSize="9sp" android:textColor="?colorOutline" />
-<TextView android:id="@+id/githubLink" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GitHub" android:textSize="9sp" android:textColor="?colorPrimary" android:clickable="true" android:focusable="true" />
-</LinearLayout>
+<TextView android:id="@+id/versionText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textSize="9sp" android:textColor="?colorOutline" android:layout_gravity="center_horizontal" />
 </LinearLayout>
 </ScrollView>

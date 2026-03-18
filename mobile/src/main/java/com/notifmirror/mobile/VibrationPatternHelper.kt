@@ -188,7 +188,7 @@ object VibrationPatternHelper {
         // Visual pattern bar
         val patternToShow = when {
             preset.name == "Custom" && currentPattern.isNotEmpty() && findPresetForPattern(currentPattern) == null -> currentPattern
-            preset.pattern.isNotEmpty() && preset.name != "Silent" -> preset.pattern
+            preset.pattern.isNotEmpty() && preset.name != "Silent" && preset.name != "Tap to Create" -> preset.pattern
             else -> null
         }
         if (patternToShow != null) {
@@ -638,14 +638,30 @@ object VibrationPatternHelper {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     currentDownTime = SystemClock.elapsedRealtime()
-                    // Give haptic feedback on press
-                    vibratePattern(context, "0,$MIN_BUZZ_MS")
+                    // Start continuous vibration while held
+                    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                        vm.defaultVibrator
+                    } else {
+                        @Suppress("DEPRECATION")
+                        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    }
+                    vibrator.vibrate(VibrationEffect.createOneShot(10000, VibrationEffect.DEFAULT_AMPLITUDE))
                     // Reset auto-finish timer
                     handler.removeCallbacks(autoFinishRunnable)
                     // Visual feedback
                     tapButton.alpha = 0.7f
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    // Stop vibration on release
+                    val vibratorUp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                        vm.defaultVibrator
+                    } else {
+                        @Suppress("DEPRECATION")
+                        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    }
+                    vibratorUp.cancel()
                     val upTime = SystemClock.elapsedRealtime()
                     if (currentDownTime > 0) {
                         tapEvents.add(TapEvent(currentDownTime, upTime))
