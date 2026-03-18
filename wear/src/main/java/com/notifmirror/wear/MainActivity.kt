@@ -279,6 +279,11 @@ class MainActivity : AppCompatActivity() {
         val updateCard = findViewById<LinearLayout>(R.id.updateCard)
         val updateTitle = findViewById<TextView>(R.id.updateTitle)
         val updateSubtitle = findViewById<TextView>(R.id.updateSubtitle)
+
+        val currentVersion = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
+        } catch (_: Exception) { "0.0.0" }
+
         scope.launch {
             try {
                 val url = java.net.URL("https://api.github.com/repos/WitherredAway/NotificationMirror/releases/latest")
@@ -293,17 +298,13 @@ class MainActivity : AppCompatActivity() {
                     val json = org.json.JSONObject(response)
                     val tagName = json.getString("tag_name").removePrefix("v")
 
-                    val currentVersion = try {
-                        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
-                    } catch (_: Exception) { "0.0.0" }
-
                     if (isVersionNewer(tagName, currentVersion)) {
                         val htmlUrl = json.optString("html_url", "")
                         runOnUiThread {
                             updateTitle.text = "Update available"
+                            updateTitle.setTextColor(getColorAttr(com.google.android.material.R.attr.colorPrimary))
                             updateSubtitle.text = "v$currentVersion \u2192 v$tagName"
                             updateSubtitle.visibility = android.view.View.VISIBLE
-                            updateCard.visibility = android.view.View.VISIBLE
                             // Tap to open GitHub release in browser
                             if (htmlUrl.isNotEmpty()) {
                                 updateCard.setOnClickListener {
@@ -311,13 +312,30 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                         }
+                    } else {
+                        runOnUiThread {
+                            updateTitle.text = "Up to date \u00B7 v$currentVersion"
+                        }
+                    }
+                } else {
+                    runOnUiThread {
+                        updateTitle.text = "Up to date \u00B7 v$currentVersion"
                     }
                 }
                 conn.disconnect()
             } catch (e: Exception) {
                 Log.w("NotifMirrorWear", "Failed to check for updates", e)
+                runOnUiThread {
+                    updateTitle.text = "Up to date \u00B7 v$currentVersion"
+                }
             }
         }
+    }
+
+    private fun getColorAttr(attr: Int): Int {
+        val tv = TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return tv.data
     }
 
     private fun isVersionNewer(remote: String, local: String): Boolean {
