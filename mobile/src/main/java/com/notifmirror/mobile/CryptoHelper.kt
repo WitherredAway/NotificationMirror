@@ -48,6 +48,7 @@ object CryptoHelper {
         return key
     }
 
+    @Synchronized
     fun importKey(context: Context, keyBytes: ByteArray) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_AES, Base64.encodeToString(keyBytes, Base64.NO_WRAP)).apply()
