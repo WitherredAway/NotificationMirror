@@ -10,8 +10,11 @@
 <TextView android:id="@+id/statusText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:text="Connected" android:textSize="11sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/mirroringSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
-<!-- Update available (hidden by default) -->
-<TextView android:id="@+id/updateAvailableText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:padding="6dp" android:background="@drawable/bg_card" android:textSize="10sp" android:textColor="?colorPrimary" android:gravity="center" android:visibility="gone" />
+<!-- Update card (hidden by default) -->
+<LinearLayout android:id="@+id/updateCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="vertical" android:padding="8dp" android:background="@drawable/bg_card" android:visibility="gone">
+<TextView android:id="@+id/updateTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="10sp" android:textStyle="bold" android:textColor="?colorPrimary" android:gravity="center" />
+<TextView android:id="@+id/updateSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="9sp" android:textColor="?colorOnSurfaceVariant" android:gravity="center" android:visibility="gone" />
+</LinearLayout>
 <!-- ACTIONS section -->
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="ACTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">

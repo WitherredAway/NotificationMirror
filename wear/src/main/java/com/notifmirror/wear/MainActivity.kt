@@ -276,7 +276,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkForUpdates() {
-        val updateText = findViewById<TextView>(R.id.updateAvailableText)
+        val updateCard = findViewById<LinearLayout>(R.id.updateCard)
+        val updateTitle = findViewById<TextView>(R.id.updateTitle)
+        val updateSubtitle = findViewById<TextView>(R.id.updateSubtitle)
         scope.launch {
             try {
                 val url = java.net.URL("https://api.github.com/repos/WitherredAway/NotificationMirror/releases/latest")
@@ -296,9 +298,18 @@ class MainActivity : AppCompatActivity() {
                     } catch (_: Exception) { "0.0.0" }
 
                     if (isVersionNewer(tagName, currentVersion)) {
+                        val htmlUrl = json.optString("html_url", "")
                         runOnUiThread {
-                            updateText.text = "Update available: v$tagName"
-                            updateText.visibility = android.view.View.VISIBLE
+                            updateTitle.text = "Update available"
+                            updateSubtitle.text = "v$currentVersion \u2192 v$tagName"
+                            updateSubtitle.visibility = android.view.View.VISIBLE
+                            updateCard.visibility = android.view.View.VISIBLE
+                            // Tap to open GitHub release in browser
+                            if (htmlUrl.isNotEmpty()) {
+                                updateCard.setOnClickListener {
+                                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(htmlUrl)))
+                                }
+                            }
                         }
                     }
                 }
