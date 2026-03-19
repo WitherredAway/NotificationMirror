@@ -26,6 +26,8 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "NotifMirrorReply"
+        private const val MAX_RETRIES = 2
+        private const val RETRY_DELAY_MS = 1500L
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -57,29 +59,58 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
         scope.launch {
-            try {
-                val nodeClient = Wearable.getNodeClient(context)
-                val nodes = nodeClient.connectedNodes.await()
-                for (node in nodes) {
-                    Wearable.getMessageClient(context)
-                        .sendMessage(node.id, "/reply", json.toString().toByteArray())
-                        .await()
-                    Log.d(TAG, "Reply sent to phone via node: ${node.displayName}")
-                }
+            var sent = false
+            var lastError: Exception? = null
 
-                // Dismiss the notification after reply
+            for (attempt in 0..MAX_RETRIES) {
+                try {
+                    if (attempt > 0) {
+                        Log.d(TAG, "Retry attempt $attempt for reply to $notifKey")
+                        kotlinx.coroutines.delay(RETRY_DELAY_MS)
+                    }
+
+                    val nodeClient = Wearable.getNodeClient(context)
+                    val nodes = nodeClient.connectedNodes.await()
+
+                    if (nodes.isEmpty()) {
+                        Log.w(TAG, "No connected nodes — phone may be out of range")
+                        lastError = Exception("Phone not connected")
+                        continue
+                    }
+
+                    for (node in nodes) {
+                        Wearable.getMessageClient(context)
+                            .sendMessage(node.id, "/reply", json.toString().toByteArray())
+                            .await()
+                        Log.d(TAG, "Reply sent to phone via node: ${node.displayName}")
+                    }
+
+                    sent = true
+                    break
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to send reply (attempt $attempt)", e)
+                    lastError = e
+                }
+            }
+
+            if (sent) {
+                // Dismiss the notification after successful send
                 if (notifId >= 0) {
                     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(notifId)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to send reply", e)
+            } else {
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(context, "Failed to send reply", Toast.LENGTH_SHORT).show()
+                    val msg = if (lastError?.message?.contains("not connected") == true) {
+                        "Phone not connected — reply not sent"
+                    } else {
+                        "Failed to send reply"
+                    }
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 }
-            } finally {
-                pendingResult.finish()
             }
+
+            pendingResult.finish()
         }
     }
 }

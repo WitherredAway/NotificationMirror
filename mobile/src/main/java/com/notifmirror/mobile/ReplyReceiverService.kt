@@ -55,17 +55,42 @@ class ReplyReceiverService : WearableListenerService() {
                 ?: recoverAction(notifKey, actionIndex)
             if (action == null) {
                 Log.w(TAG, "No pending action found for key: $actionKey")
-                sendActionResult(false, "Notification was dismissed — action no longer available")
+                sendActionResult(false, "Notification expired — reply not sent")
                 return
             }
 
-            val remoteInputs = action.remoteInputs
-            if (remoteInputs == null || remoteInputs.isEmpty()) {
-                Log.w(TAG, "No remote inputs found for action")
-                sendActionResult(false, "Reply input not available")
-                return
+            // Try sending the reply, with fresh-action retry on CanceledException
+            if (!trySendReply(action, replyText, actionKey)) {
+                // Stored PendingIntent was stale — try recovering a fresh one
+                Log.d(TAG, "PendingIntent stale for $actionKey, attempting fresh recovery")
+                NotificationListener.pendingActions.remove(actionKey)
+                val freshAction = recoverAction(notifKey, actionIndex)
+                if (freshAction != null && trySendReply(freshAction, replyText, actionKey)) {
+                    return // success on retry
+                }
+                sendActionResult(false, "Notification expired — reply not sent")
             }
 
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle reply", e)
+            sendActionResult(false, "Reply failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Attempt to send a reply using the given action's PendingIntent + RemoteInput.
+     * Returns true on success. Returns false if the PendingIntent is cancelled/stale.
+     * Throws on unexpected errors.
+     */
+    private fun trySendReply(action: Notification.Action, replyText: String, actionKey: String): Boolean {
+        val remoteInputs = action.remoteInputs
+        if (remoteInputs == null || remoteInputs.isEmpty()) {
+            Log.w(TAG, "No remote inputs found for action $actionKey")
+            sendActionResult(false, "Reply input not available")
+            return true // not a retryable error, treat as handled
+        }
+
+        return try {
             val intent = Intent()
             val bundle = Bundle()
             for (ri in remoteInputs) {
@@ -76,10 +101,10 @@ class ReplyReceiverService : WearableListenerService() {
 
             Log.d(TAG, "Reply sent successfully for $actionKey")
             sendActionResult(true, "Reply sent")
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to handle reply", e)
-            sendActionResult(false, "Failed: ${e.message}")
+            true
+        } catch (e: android.app.PendingIntent.CanceledException) {
+            Log.w(TAG, "PendingIntent cancelled for $actionKey", e)
+            false
         }
     }
 
