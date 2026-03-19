@@ -59,58 +59,62 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
         scope.launch {
-            var sent = false
-            var lastError: Exception? = null
+            try {
+                var sent = false
+                var lastError: Exception? = null
 
-            for (attempt in 0..MAX_RETRIES) {
-                try {
-                    if (attempt > 0) {
-                        Log.d(TAG, "Retry attempt $attempt for reply to $notifKey")
-                        kotlinx.coroutines.delay(RETRY_DELAY_MS)
+                for (attempt in 0..MAX_RETRIES) {
+                    try {
+                        if (attempt > 0) {
+                            Log.d(TAG, "Retry attempt $attempt for reply to $notifKey")
+                            kotlinx.coroutines.delay(RETRY_DELAY_MS)
+                        }
+
+                        val nodeClient = Wearable.getNodeClient(context)
+                        val nodes = nodeClient.connectedNodes.await()
+
+                        if (nodes.isEmpty()) {
+                            Log.w(TAG, "No connected nodes — phone may be out of range")
+                            lastError = Exception("Phone not connected")
+                            continue
+                        }
+
+                        for (node in nodes) {
+                            Wearable.getMessageClient(context)
+                                .sendMessage(node.id, "/reply", json.toString().toByteArray())
+                                .await()
+                            Log.d(TAG, "Reply sent to phone via node: ${node.displayName}")
+                        }
+
+                        sent = true
+                        break
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to send reply (attempt $attempt)", e)
+                        lastError = e
                     }
-
-                    val nodeClient = Wearable.getNodeClient(context)
-                    val nodes = nodeClient.connectedNodes.await()
-
-                    if (nodes.isEmpty()) {
-                        Log.w(TAG, "No connected nodes — phone may be out of range")
-                        lastError = Exception("Phone not connected")
-                        continue
-                    }
-
-                    for (node in nodes) {
-                        Wearable.getMessageClient(context)
-                            .sendMessage(node.id, "/reply", json.toString().toByteArray())
-                            .await()
-                        Log.d(TAG, "Reply sent to phone via node: ${node.displayName}")
-                    }
-
-                    sent = true
-                    break
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to send reply (attempt $attempt)", e)
-                    lastError = e
                 }
-            }
 
-            if (sent) {
-                // Dismiss the notification after successful send
+                // Always cancel the notification to clear the RemoteInput progress spinner.
+                // After submitting inline reply, Android shows a spinner that only clears
+                // when the notification is cancelled or re-posted.
                 if (notifId >= 0) {
                     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(notifId)
                 }
-            } else {
-                Handler(Looper.getMainLooper()).post {
-                    val msg = if (lastError?.message?.contains("not connected") == true) {
-                        "Phone not connected — reply not sent"
-                    } else {
-                        "Failed to send reply"
-                    }
-                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                }
-            }
 
-            pendingResult.finish()
+                if (!sent) {
+                    Handler(Looper.getMainLooper()).post {
+                        val msg = if (lastError?.message?.contains("not connected") == true) {
+                            "Phone not connected — reply not sent"
+                        } else {
+                            "Failed to send reply"
+                        }
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                    }
+                }
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 }
