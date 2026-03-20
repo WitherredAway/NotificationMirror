@@ -31,12 +31,19 @@ class MainActivity : AppCompatActivity() {
     private var connectedNodeName: String? = null
     private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
+    private var permissionCard: LinearLayout? = null
+    private var permissionIcon: ImageView? = null
     private var permissionStatusView: TextView? = null
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        permissionStatusView?.let { updatePermissionStatus(it) }
+        val card = permissionCard
+        val icon = permissionIcon
+        val status = permissionStatusView
+        if (card != null && icon != null && status != null) {
+            updatePermissionCard(card, icon, status)
+        }
         if (granted) {
             Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show()
         }
@@ -208,11 +215,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Notification permission toggle
+        // Notification permission card (status-card style, like phone's notification access banner)
+        val notifPermissionCard = findViewById<LinearLayout>(R.id.notifPermissionCard)
+        val notifPermissionIcon = findViewById<ImageView>(R.id.notifPermissionIcon)
         val notifPermissionStatus = findViewById<TextView>(R.id.notifPermissionStatus)
-        updatePermissionStatus(notifPermissionStatus)
-        findViewById<LinearLayout>(R.id.notifPermissionButton).setOnClickListener {
-            requestNotificationPermission(notifPermissionStatus)
+        updatePermissionCard(notifPermissionCard, notifPermissionIcon, notifPermissionStatus)
+        notifPermissionCard.setOnClickListener {
+            requestNotificationPermission(notifPermissionCard, notifPermissionIcon, notifPermissionStatus)
         }
 
         // Proactively pull encryption key from DataClient on app launch
@@ -233,8 +242,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Refresh permission status when returning from system settings
-        findViewById<TextView>(R.id.notifPermissionStatus)?.let { updatePermissionStatus(it) }
+        // Refresh permission card when returning from system settings
+        val card = findViewById<LinearLayout>(R.id.notifPermissionCard)
+        val icon = findViewById<ImageView>(R.id.notifPermissionIcon)
+        val status = findViewById<TextView>(R.id.notifPermissionStatus)
+        if (card != null && icon != null && status != null) {
+            updatePermissionCard(card, icon, status)
+        }
     }
 
     override fun onDestroy() {
@@ -431,28 +445,29 @@ class MainActivity : AppCompatActivity() {
         ).toInt()
     }
 
-    private fun updatePermissionStatus(statusView: TextView) {
+    private fun updatePermissionCard(card: LinearLayout, icon: ImageView, statusView: TextView) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
                 android.content.pm.PackageManager.PERMISSION_GRANTED
-            statusView.text = if (granted) "Granted" else "Not granted"
-            statusView.setTextColor(getColorAttr(
-                if (granted) com.google.android.material.R.attr.colorPrimary
-                else com.google.android.material.R.attr.colorError
-            ))
+            card.setBackgroundResource(if (granted) R.drawable.bg_status_active else R.drawable.bg_status_inactive)
+            icon.setImageResource(if (granted) R.drawable.ic_check_circle else R.drawable.ic_error_circle)
+            statusView.text = if (granted) "Notifications allowed" else "Notifications not allowed"
         } else {
-            statusView.text = "Granted"
-            statusView.setTextColor(getColorAttr(com.google.android.material.R.attr.colorPrimary))
+            card.setBackgroundResource(R.drawable.bg_status_active)
+            icon.setImageResource(R.drawable.ic_check_circle)
+            statusView.text = "Notifications allowed"
         }
     }
 
-    private fun requestNotificationPermission(statusView: TextView) {
+    private fun requestNotificationPermission(card: LinearLayout, icon: ImageView, statusView: TextView) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val notifPerm = android.Manifest.permission.POST_NOTIFICATIONS
             if (checkSelfPermission(notifPerm) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Already granted", Toast.LENGTH_SHORT).show()
                 return
             }
+            permissionCard = card
+            permissionIcon = icon
             permissionStatusView = statusView
             if (shouldShowRequestPermissionRationale(notifPerm)) {
                 AlertDialog.Builder(this)
