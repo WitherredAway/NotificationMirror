@@ -670,7 +670,7 @@ object NotificationHandler {
         // before we trigger our own vibration (avoids the OS canceling it).
         // alertMode: 0=sound (vibrate+sound), 1=vibrate only, 2=mute (no vibrate, no sound)
         val shouldVibrate = ((!silentUpdate && !isSilent && notifPriority != -1 && alertMode != 2) ||
-            (vibrateOnly && !silentUpdate) ||
+            (vibrateOnly && !silentUpdate && alertMode != 2) ||
             (alertMode == 1 && !silentUpdate))
         if (shouldVibrate) {
             Handler(Looper.getMainLooper()).postDelayed({

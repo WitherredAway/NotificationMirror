@@ -502,8 +502,8 @@ class NotificationListener : NotificationListenerService() {
                         }
                     }
 
-                    // DND filter — block on any DND mode (only FILTER_ALL allows forwarding)
-                    if (settings.isDndSyncEnabled()) {
+                    // DND filter — per-app with global fallback
+                    if (settings.getEffectiveDndSync(sbn.packageName)) {
                         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         val interruptionFilter = nm.currentInterruptionFilter
                         if (interruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
@@ -640,10 +640,11 @@ class NotificationListener : NotificationListenerService() {
                             put("vibrateOnly", true)
                         }
                         val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        if (settings.isHideWhenLockedEnabled() && km.isKeyguardLocked) {
+                        if (settings.getEffectiveHideWhenLocked(appPackageName) && km.isKeyguardLocked) {
                             put("hideContent", true)
                         }
                         put("muteContinuation", settings.getEffectiveMuteContinuation(appPackageName))
+                        put("alertMode", settings.getEffectiveAlertMode(appPackageName))
                         put("batterySaverEnabled", settings.isBatterySaverEnabled())
                         put("batterySaverThreshold", settings.getBatterySaverThreshold())
                         val effectiveVib = settings.getEffectiveVibrationPattern(appPackageName)
