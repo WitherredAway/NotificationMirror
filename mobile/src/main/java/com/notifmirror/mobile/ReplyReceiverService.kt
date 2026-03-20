@@ -25,6 +25,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/reply" -> handleReply(messageEvent)
             "/action" -> handleAction(messageEvent)
             "/open_settings" -> handleOpenSettings()
+            "/open_url" -> handleOpenUrl(messageEvent)
             "/snooze" -> handleSnooze(messageEvent)
             "/request_key" -> handleKeyRequest()
             "/mirroring_toggle" -> handleMirroringToggle(messageEvent)
@@ -39,6 +40,19 @@ class ReplyReceiverService : WearableListenerService() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         startActivity(intent)
+    }
+
+    private fun handleOpenUrl(messageEvent: MessageEvent) {
+        try {
+            val url = String(messageEvent.data, Charsets.UTF_8)
+            Log.d(TAG, "Received request to open URL from watch: $url")
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open URL from watch", e)
+        }
     }
 
     private fun handleReply(messageEvent: MessageEvent) {

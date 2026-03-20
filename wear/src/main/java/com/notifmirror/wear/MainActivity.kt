@@ -159,8 +159,12 @@ class MainActivity : AppCompatActivity() {
         // Check for updates and show indicator
         checkForUpdates()
 
-        findViewById<TextView>(R.id.githubLink).setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
+        findViewById<LinearLayout>(R.id.githubButton).setOnClickListener {
+            openUrlOnPhone("https://github.com/WitherredAway/NotificationMirror")
+        }
+
+        findViewById<LinearLayout>(R.id.discordButton).setOnClickListener {
+            openUrlOnPhone("https://discord.gg/qUYayXyQX")
         }
 
         // Keep History toggle
@@ -372,6 +376,33 @@ class MainActivity : AppCompatActivity() {
                 dataItems.release()
             } catch (e: Exception) {
                 Log.w("NotifMirrorWear", "Failed to pull encryption key from DataClient", e)
+            }
+        }
+    }
+
+    private fun openUrlOnPhone(url: String) {
+        scope.launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
+                if (nodes.isEmpty()) {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "No phone connected", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@MainActivity)
+                        .sendMessage(node.id, "/open_url", url.toByteArray())
+                        .await()
+                }
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Opening on phone", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("NotifMirrorWear", "Failed to open URL on phone", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Failed to reach phone", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

@@ -57,13 +57,13 @@
     android:textColor="?colorOutline"
     android:layout_marginBottom="4dp" />
 
-<!-- ==================== BEHAVIOR ==================== -->
+<!-- ==================== MIRRORING ==================== -->
 <TextView
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_marginTop="20dp"
     android:layout_marginStart="4dp"
-    android:text="BEHAVIOR"
+    android:text="MIRRORING"
     android:textSize="12sp"
     android:textStyle="bold"
     android:textColor="?colorPrimary"
@@ -77,23 +77,7 @@
     android:background="@drawable/settings_card_bg"
     android:padding="16dp">
 
-    <!-- Background Notifications Mode -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-        <CheckBox android:id="@+id/overrideOngoingMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Background Notifications" android:textSize="15sp" android:textColor="?colorOnSurface" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Control mirroring of ongoing and persistent notifications" android:textSize="12sp" android:textColor="?colorOutline" />
-        </LinearLayout>
-    </LinearLayout>
-    <RadioGroup android:id="@+id/perAppOngoingModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginStart="40dp" android:orientation="vertical">
-        <RadioButton android:id="@+id/perAppOngoingNone" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="None \u2014 skip all ongoing/persistent" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-        <RadioButton android:id="@+id/perAppOngoingOnly" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Ongoing only \u2014 music, timers, navigation" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-        <RadioButton android:id="@+id/perAppOngoingAll" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="All persistent \u2014 includes foreground services" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
-    </RadioGroup>
-
-    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
-
-    <!-- Screen-Off Mode -->
+    <!-- Screen-Off Mode (matches global order: 1st) -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
         <CheckBox android:id="@+id/overrideScreenOffMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
@@ -110,19 +94,35 @@
 
     <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
 
-    <!-- Mute Continuation -->
+    <!-- DND Sync (matches global order: 2nd) -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-        <CheckBox android:id="@+id/overrideMuteContinuation" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <CheckBox android:id="@+id/overrideDndSync" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mute Continuation Alerts" android:textSize="15sp" android:textColor="?colorOnSurface" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Silence follow-up messages in an active conversation" android:textSize="12sp" android:textColor="?colorOutline" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DND Sync" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Skip mirroring when phone is in Do Not Disturb mode" android:textSize="12sp" android:textColor="?colorOutline" />
         </LinearLayout>
-        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppMuteContinuation" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppDndSync" android:layout_width="wrap_content" android:layout_height="wrap_content" />
     </LinearLayout>
 
     <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
 
-    <!-- Auto-Dismiss -->
+    <!-- Background Notifications Mode (matches global order: 3rd) -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <CheckBox android:id="@+id/overrideOngoingMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Background Notifications" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Control mirroring of ongoing and persistent notifications" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+    </LinearLayout>
+    <RadioGroup android:id="@+id/perAppOngoingModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginStart="40dp" android:orientation="vertical">
+        <RadioButton android:id="@+id/perAppOngoingNone" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="None \u2014 skip all ongoing/persistent" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/perAppOngoingOnly" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Ongoing only \u2014 music, timers, navigation" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/perAppOngoingAll" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="All persistent \u2014 includes foreground services" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+    </RadioGroup>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <!-- Auto-Dismiss (matches global order: 4th) -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
         <CheckBox android:id="@+id/overrideAutoDismiss" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
@@ -130,6 +130,30 @@
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Dismiss watch notification when dismissed on phone" android:textSize="12sp" android:textColor="?colorOutline" />
         </LinearLayout>
         <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppAutoDismiss" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <!-- Hide Content When Locked (matches global order: 5th) -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <CheckBox android:id="@+id/overrideHideWhenLocked" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hide Content When Locked" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Hide notification text on watch when phone is locked" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppHideWhenLocked" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <!-- Mute Continuation (matches global order: 6th) -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <CheckBox android:id="@+id/overrideMuteContinuation" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mute Continuation Alerts" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Silence follow-up messages in an active conversation" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppMuteContinuation" android:layout_width="wrap_content" android:layout_height="wrap_content" />
     </LinearLayout>
 
 </LinearLayout>
@@ -166,6 +190,22 @@
         <RadioButton android:id="@+id/perAppPriorityHigh" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="High (heads-up, sound, vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
         <RadioButton android:id="@+id/perAppPriorityDefault" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Default (no heads-up, sound + vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
         <RadioButton android:id="@+id/perAppPriorityLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Low (silent, no vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+    </RadioGroup>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+
+    <!-- Alert Mode -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <CheckBox android:id="@+id/overrideAlertMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Alert Mode" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Controls sound and vibration behavior on watch" android:textSize="12sp" android:textColor="?colorOutline" />
+        </LinearLayout>
+    </LinearLayout>
+    <RadioGroup android:id="@+id/perAppAlertModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginStart="40dp" android:orientation="vertical">
+        <RadioButton android:id="@+id/perAppAlertSound" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Sound (play sound + vibrate)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/perAppAlertVibrate" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Vibrate (vibrate only, no sound)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/perAppAlertMute" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Mute (silent, no sound or vibration)" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
     </RadioGroup>
 
     <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />

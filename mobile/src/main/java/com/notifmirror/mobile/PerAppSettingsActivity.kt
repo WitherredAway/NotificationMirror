@@ -60,7 +60,10 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val overrideBigText = findViewById<CheckBox>(R.id.overrideBigText)
         val overrideMuteDuration = findViewById<CheckBox>(R.id.overrideMuteDuration)
         val overrideScreenOffMode = findViewById<CheckBox>(R.id.overrideScreenOffMode)
+        val overrideDndSync = findViewById<CheckBox>(R.id.overrideDndSync)
+        val overrideHideWhenLocked = findViewById<CheckBox>(R.id.overrideHideWhenLocked)
         val overrideMuteContinuation = findViewById<CheckBox>(R.id.overrideMuteContinuation)
+        val overrideAlertMode = findViewById<CheckBox>(R.id.overrideAlertMode)
         val overrideShowSnooze = findViewById<CheckBox>(R.id.overrideShowSnooze)
         val overrideSnoozeDuration = findViewById<CheckBox>(R.id.overrideSnoozeDuration)
         // Value controls
@@ -82,6 +85,9 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val keywordWhitelistInput = findViewById<EditText>(R.id.perAppKeywordWhitelist)
         val keywordBlacklistInput = findViewById<EditText>(R.id.perAppKeywordBlacklist)
         val perAppScreenModeGroup = findViewById<RadioGroup>(R.id.perAppScreenModeGroup)
+        val dndSyncSwitch = findViewById<SwitchMaterial>(R.id.perAppDndSync)
+        val hideWhenLockedSwitch = findViewById<SwitchMaterial>(R.id.perAppHideWhenLocked)
+        val perAppAlertModeGroup = findViewById<RadioGroup>(R.id.perAppAlertModeGroup)
         // Floating save button — hidden until changes are made (matches global settings pattern)
         val saveButton = findViewById<MaterialButton>(R.id.perAppSaveButton)
         val showSave = { saveButton.visibility = View.VISIBLE }
@@ -139,6 +145,22 @@ class PerAppSettingsActivity : AppCompatActivity() {
         snoozeDurationInput.setText(settings.getEffectiveSnoozeDuration(packageName).toString())
         snoozeDurationInput.isEnabled = overrideSnoozeDuration.isChecked
 
+        overrideDndSync.isChecked = settings.isPerAppBooleanCustomized("dnd_sync", packageName)
+        dndSyncSwitch.isChecked = settings.getEffectiveDndSync(packageName)
+        dndSyncSwitch.isEnabled = overrideDndSync.isChecked
+
+        overrideHideWhenLocked.isChecked = settings.isPerAppBooleanCustomized("hide_when_locked", packageName)
+        hideWhenLockedSwitch.isChecked = settings.getEffectiveHideWhenLocked(packageName)
+        hideWhenLockedSwitch.isEnabled = overrideHideWhenLocked.isChecked
+
+        overrideAlertMode.isChecked = settings.isPerAppIntCustomized("alert_mode", packageName)
+        when (settings.getEffectiveAlertMode(packageName)) {
+            SettingsManager.ALERT_SOUND -> perAppAlertModeGroup.check(R.id.perAppAlertSound)
+            SettingsManager.ALERT_VIBRATE -> perAppAlertModeGroup.check(R.id.perAppAlertVibrate)
+            SettingsManager.ALERT_MUTE -> perAppAlertModeGroup.check(R.id.perAppAlertMute)
+        }
+        SettingsUIHelper.setRadioGroupEnabled(perAppAlertModeGroup, overrideAlertMode.isChecked)
+
         overrideScreenOffMode.isChecked = settings.isPerAppIntCustomized("screen_off_mode", packageName)
         when (settings.getEffectiveScreenOffMode(packageName)) {
             SettingsManager.SCREEN_MODE_ALWAYS -> perAppScreenModeGroup.check(R.id.perAppRadioAlways)
@@ -183,17 +205,21 @@ class PerAppSettingsActivity : AppCompatActivity() {
         SettingsUIHelper.wireOverrideCheckbox(overrideShowMute, showMuteSwitch, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideBigText, bigTextInput, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideMuteDuration, muteDurationInput, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideDndSync, dndSyncSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckbox(overrideHideWhenLocked, hideWhenLockedSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideAlertMode, perAppAlertModeGroup, showSave)
         SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideScreenOffMode, perAppScreenModeGroup, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideShowSnooze, showSnoozeSwitch, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideSnoozeDuration, snoozeDurationInput, showSave)
         // Show save button when switches, radio groups, or text inputs change
         SettingsUIHelper.wireSwitchesToShowSave(
             listOf(muteContinuationSwitch, autoDismissSwitch, autoCancelSwitch,
-                showOpenSwitch, showMuteSwitch, showSnoozeSwitch),
+                showOpenSwitch, showMuteSwitch, showSnoozeSwitch,
+                dndSyncSwitch, hideWhenLockedSwitch),
             showSave
         )
         SettingsUIHelper.wireRadioGroupsToShowSave(
-            listOf(perAppOngoingModeGroup, priorityGroup, perAppScreenModeGroup),
+            listOf(perAppOngoingModeGroup, priorityGroup, perAppScreenModeGroup, perAppAlertModeGroup),
             showSave
         )
         SettingsUIHelper.wireEditTextsToShowSave(
@@ -293,6 +319,29 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 settings.setPerAppInt("snooze_duration", packageName, snoozeDur)
             } else {
                 settings.clearPerAppInt("snooze_duration", packageName)
+            }
+
+            if (overrideDndSync.isChecked) {
+                settings.setPerAppBoolean("dnd_sync", packageName, dndSyncSwitch.isChecked)
+            } else {
+                settings.clearPerAppBoolean("dnd_sync", packageName)
+            }
+
+            if (overrideHideWhenLocked.isChecked) {
+                settings.setPerAppBoolean("hide_when_locked", packageName, hideWhenLockedSwitch.isChecked)
+            } else {
+                settings.clearPerAppBoolean("hide_when_locked", packageName)
+            }
+
+            if (overrideAlertMode.isChecked) {
+                val alertMode = when (perAppAlertModeGroup.checkedRadioButtonId) {
+                    R.id.perAppAlertVibrate -> SettingsManager.ALERT_VIBRATE
+                    R.id.perAppAlertMute -> SettingsManager.ALERT_MUTE
+                    else -> SettingsManager.ALERT_SOUND
+                }
+                settings.setPerAppInt("alert_mode", packageName, alertMode)
+            } else {
+                settings.clearPerAppInt("alert_mode", packageName)
             }
 
             if (overrideScreenOffMode.isChecked) {

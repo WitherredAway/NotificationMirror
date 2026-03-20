@@ -10,11 +10,24 @@
 <TextView android:id="@+id/statusText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:text="Connected" android:textSize="11sp" android:textColor="?colorOnSurface" />
 <androidx.appcompat.widget.SwitchCompat android:id="@+id/mirroringSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
-<!-- Update card (always visible, like phone) -->
-<LinearLayout android:id="@+id/updateCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="vertical" android:padding="8dp" android:background="@drawable/bg_card">
-<TextView android:id="@+id/updateTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Checking for updates..." android:textSize="10sp" android:textStyle="bold" android:textColor="?colorOnSurfaceVariant" android:gravity="center" />
-<TextView android:id="@+id/updateSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="9sp" android:textColor="?colorOnSurfaceVariant" android:gravity="center" android:visibility="gone" />
-<TextView android:id="@+id/githubLink" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="GitHub" android:textSize="9sp" android:textColor="?colorPrimary" android:gravity="center" android:clickable="true" android:focusable="true" />
+<!-- SUPPORT section -->
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginStart="2dp" android:text="SUPPORT" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />
+<LinearLayout android:id="@+id/updateCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" android:background="@drawable/bg_card" android:paddingVertical="2dp">
+<LinearLayout android:id="@+id/githubButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_github" android:contentDescription="GitHub" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="10dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GitHub" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<TextView android:id="@+id/updateTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Checking..." android:textSize="9sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
+</LinearLayout>
+<TextView android:id="@+id/updateSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="50dp" android:textSize="9sp" android:textColor="?colorPrimary" android:gravity="center" android:visibility="gone" />
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.25" />
+<LinearLayout android:id="@+id/discordButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_discord" android:contentDescription="Discord" /></FrameLayout>
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Discord" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
+</LinearLayout>
 </LinearLayout>
 <!-- ACTIONS section -->
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="ACTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />

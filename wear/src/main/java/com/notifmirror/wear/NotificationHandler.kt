@@ -94,6 +94,7 @@ object NotificationHandler {
             val hideContent = json.optBoolean("hideContent", false)
             val muteContinuation = json.optBoolean("muteContinuation", false)
             val vibrateOnly = json.optBoolean("vibrateOnly", false)
+            val alertMode = json.optInt("alertMode", 0) // 0=sound, 1=vibrate, 2=mute
             // Single SharedPreferences lookup for all watch-side settings
             val watchSettings = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
 
@@ -247,7 +248,7 @@ object NotificationHandler {
                 isSilent = isSilent, isOngoing = isOngoing,
                 hideContent = hideContent, silentUpdate = (isUpdate && muteContinuation) || isReplyUpdate,
                 conversationHistory = messages,
-                vibrateOnly = vibrateOnly,
+                vibrateOnly = vibrateOnly, alertMode = alertMode,
                 conversationTitle = conversationTitle,
                 pictureBitmap = pictureBitmap
             )
@@ -410,6 +411,7 @@ object NotificationHandler {
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList(),
         vibrateOnly: Boolean = false,
+        alertMode: Int = 0, // 0=sound, 1=vibrate, 2=mute
         conversationTitle: String = "",
         pictureBitmap: Bitmap? = null
     ) {
@@ -476,13 +478,13 @@ object NotificationHandler {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(displayTitle)
             .setContentText(displayText)
-            .setPriority(if (isSilent || vibrateOnly || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
+            .setPriority(if (isSilent || vibrateOnly || silentUpdate || alertMode == 1 || alertMode == 2) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(if (isOngoing) false else autoCancel)
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
-            .setSilent(isSilent || vibrateOnly || silentUpdate)
+            .setSilent(isSilent || vibrateOnly || silentUpdate || alertMode == 1 || alertMode == 2)
 
         // For ongoing notifications: set a DeleteIntent so we know when the user
         // dismisses it from the watch. This triggers a resend from the phone if
@@ -666,8 +668,10 @@ object NotificationHandler {
         // vibrateOnly mode: suppress sound (via low-priority notification) but still vibrate
         // Post with a short delay so the system finishes processing the notification
         // before we trigger our own vibration (avoids the OS canceling it).
-        val shouldVibrate = (!silentUpdate && !isSilent && notifPriority != -1) ||
-            (vibrateOnly && !silentUpdate)
+        // alertMode: 0=sound (vibrate+sound), 1=vibrate only, 2=mute (no vibrate, no sound)
+        val shouldVibrate = ((!silentUpdate && !isSilent && notifPriority != -1 && alertMode != 2) ||
+            (vibrateOnly && !silentUpdate) ||
+            (alertMode == 1 && !silentUpdate))
         if (shouldVibrate) {
             Handler(Looper.getMainLooper()).postDelayed({
                 vibrateManually(context, vibrationPattern)

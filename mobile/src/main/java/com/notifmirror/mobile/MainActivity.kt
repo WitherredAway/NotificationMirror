@@ -154,8 +154,12 @@ class MainActivity : AppCompatActivity() {
             exportDebugLogs()
         }
 
-        findViewById<TextView>(R.id.githubLink).setOnClickListener {
+        findViewById<LinearLayout>(R.id.githubButton).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
+        }
+
+        findViewById<LinearLayout>(R.id.discordButton).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/qUYayXyQX")))
         }
 
         // Update banner

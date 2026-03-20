@@ -94,12 +94,12 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
                     }
                 }
 
-                // Always cancel the notification to clear the RemoteInput progress spinner.
-                // After submitting inline reply, Android shows a spinner that only clears
-                // when the notification is cancelled or re-posted.
-                if (notifId >= 0) {
-                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    nm.cancel(notifId)
+                if (sent) {
+                    // Only dismiss the notification after successful send
+                    if (notifId >= 0) {
+                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        nm.cancel(notifId)
+                    }
                 }
 
                 if (!sent) {
