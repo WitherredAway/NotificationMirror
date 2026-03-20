@@ -619,6 +619,19 @@ object NotificationHandler {
         }
 
         if (showOpenButton) {
+            // "Open on Watch" — launches the app directly on watch if installed
+            val launchIntent = getCompanionLaunchIntent(context, packageName)
+            if (launchIntent != null) {
+                val openRequestCode = (notifKey + "open").hashCode() and 0x7FFFFFFF
+                val openPendingIntent = PendingIntent.getActivity(
+                    context,
+                    openRequestCode,
+                    launchIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                builder.addAction(R.drawable.ic_action, "Open on Watch", openPendingIntent)
+            }
+
             // "Open on Phone" — sends /open_app to phone which fires stored contentIntent
             // This opens the specific conversation/screen, works even if app isn't on watch
             if (hasContentIntent) {
@@ -636,19 +649,24 @@ object NotificationHandler {
                 )
                 builder.addAction(R.drawable.ic_action, "Open on Phone", openPhonePendingIntent)
             }
+        }
 
-            // "Open on Watch" — launches the app directly on watch if installed
-            val launchIntent = getCompanionLaunchIntent(context, packageName)
-            if (launchIntent != null) {
-                val openRequestCode = (notifKey + "open").hashCode() and 0x7FFFFFFF
-                val openPendingIntent = PendingIntent.getActivity(
-                    context,
-                    openRequestCode,
-                    launchIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                builder.addAction(R.drawable.ic_action, "Open on Watch", openPendingIntent)
+        if (showMuteButton) {
+            val muteIntent = Intent(context, MuteBroadcastReceiver::class.java).apply {
+                action = "com.notifmirror.wear.MUTE"
+                putExtra(MuteBroadcastReceiver.EXTRA_PACKAGE_NAME, packageName)
+                putExtra(MuteBroadcastReceiver.EXTRA_DURATION, muteDuration)
+                putExtra(MuteBroadcastReceiver.EXTRA_NOTIFICATION_ID, notifId)
             }
+            val muteRequestCode = (notifKey + "mute").hashCode() and 0x7FFFFFFF
+            val mutePendingIntent = PendingIntent.getBroadcast(
+                context,
+                muteRequestCode,
+                muteIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val muteLabel = "Mute ${muteDuration}min"
+            builder.addAction(R.drawable.ic_action, muteLabel, mutePendingIntent)
         }
 
         if (showSnoozeButton) {
@@ -668,24 +686,6 @@ object NotificationHandler {
             )
             val snoozeLabel = "Snooze ${snoozeDuration}min"
             builder.addAction(R.drawable.ic_action, snoozeLabel, snoozePendingIntent)
-        }
-
-        if (showMuteButton) {
-            val muteIntent = Intent(context, MuteBroadcastReceiver::class.java).apply {
-                action = "com.notifmirror.wear.MUTE"
-                putExtra(MuteBroadcastReceiver.EXTRA_PACKAGE_NAME, packageName)
-                putExtra(MuteBroadcastReceiver.EXTRA_DURATION, muteDuration)
-                putExtra(MuteBroadcastReceiver.EXTRA_NOTIFICATION_ID, notifId)
-            }
-            val muteRequestCode = (notifKey + "mute").hashCode() and 0x7FFFFFFF
-            val mutePendingIntent = PendingIntent.getBroadcast(
-                context,
-                muteRequestCode,
-                muteIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val muteLabel = "Mute ${muteDuration}min"
-            builder.addAction(R.drawable.ic_action, muteLabel, mutePendingIntent)
         }
 
         nm.notify(notifId, builder.build())
