@@ -4,6 +4,9 @@
 
 Made with help from [Devin AI](https://devin.ai).
 
+---
+### ❤️ Support Me At https://ko-fi.com/wthrr ❤️
+---
 <p align="center">
   <img src="screenshots/phone_main.jpg" width="260" alt="Phone app main screen" />
   <img src="screenshots/watch_notifications.png" width="180" alt="Watch notifications" />
