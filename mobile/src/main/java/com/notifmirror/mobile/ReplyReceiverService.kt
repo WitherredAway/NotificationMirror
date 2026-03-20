@@ -1,8 +1,11 @@
 package com.notifmirror.mobile
 
+import android.app.ActivityOptions
 import android.app.Notification
+import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import com.google.android.gms.wearable.MessageEvent
@@ -54,10 +57,10 @@ class ReplyReceiverService : WearableListenerService() {
             val contentIntent = NotificationListener.pendingContentIntents[notifKey]
             if (contentIntent != null) {
                 try {
-                    contentIntent.send()
+                    sendPendingIntentWithBackgroundStart(contentIntent)
                     Log.d(TAG, "Opened app via contentIntent for $notifKey")
                     return
-                } catch (e: android.app.PendingIntent.CanceledException) {
+                } catch (e: PendingIntent.CanceledException) {
                     Log.w(TAG, "ContentIntent cancelled for $notifKey, trying fallback", e)
                     NotificationListener.pendingContentIntents.remove(notifKey)
                 }
@@ -70,7 +73,7 @@ class ReplyReceiverService : WearableListenerService() {
                 val sbn = activeNotifs?.find { it.key == notifKey }
                 val freshIntent = sbn?.notification?.contentIntent
                 if (freshIntent != null) {
-                    freshIntent.send()
+                    sendPendingIntentWithBackgroundStart(freshIntent)
                     Log.d(TAG, "Opened app via recovered contentIntent for $notifKey")
                     return
                 }
@@ -348,6 +351,24 @@ class ReplyReceiverService : WearableListenerService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to re-sync encryption key", e)
             }
+        }
+    }
+
+    /**
+     * Send a PendingIntent with background activity start permission.
+     * On Android 14+ (API 34+), uses ActivityOptions to explicitly allow
+     * background activity starts, which is required when firing intents
+     * from a WearableListenerService (background context).
+     */
+    private fun sendPendingIntentWithBackgroundStart(pendingIntent: PendingIntent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val options = ActivityOptions.makeBasic()
+            options.setPendingIntentBackgroundActivityStartMode(
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+            )
+            pendingIntent.send(this, 0, null, null, null, null, options.toBundle())
+        } else {
+            pendingIntent.send()
         }
     }
 
