@@ -162,12 +162,6 @@ class MainActivity : AppCompatActivity() {
             syncFromPhone()
         }
 
-        val versionText = findViewById<TextView>(R.id.versionText)
-        try {
-            val pInfo = packageManager.getPackageInfo(packageName, 0)
-            versionText.text = "v${pInfo.versionName}"
-        } catch (_: Exception) {}
-
         // Check for updates and show indicator
         checkForUpdates()
 
