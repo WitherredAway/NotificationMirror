@@ -124,7 +124,11 @@ So that's why this app exists! It basically lets you have the watch app installe
 1. Download the phone and watch APKs from the [releases page](https://github.com/WitherredAway/NotificationMirror/releases) (or build the APKs yourself, scroll down for that)
 
 ### Install
-You'll have to sideload the watch APK, e.g. using [WearLoad](https://wearload.github.io/index_en.html) ([Play Store](https://play.google.com/store/apps/details?id=com.camope.wearload) · [XDA](https://xdaforums.com/t/app-wear-os-wearload-install-apk-apks-zip-without-debug-mode-and-adb.4766128/)), [Wear Installer 2](https://play.google.com/store/apps/details?id=org.freepoc.wearinstaller2&hl=en_IN), [Geminiman WearOS Manager](https://play.google.com/store/apps/details?id=com.geminiman.wearosmanager&hl=en_IN), or adb.
+You'll have to sideload the watch APK using one of these tools:
+- [Wear Installer 2](https://play.google.com/store/apps/details?id=org.freepoc.wearinstaller2) ([Website](https://freepoc.org/wear-installer-2-help-page/)) — simple ADB-based installer over Wi-Fi
+- [WearLoad](https://play.google.com/store/apps/details?id=com.camope.wearload) ([Website](https://wearload.github.io/index_en.html) · [XDA](https://xdaforums.com/t/app-wear-os-wearload-install-apk-apks-zip-without-debug-mode-and-adb.4766128/)) — install APKs without debug mode or ADB
+- [GeminiMan WearOS Manager](https://play.google.com/store/apps/details?id=com.geminiman.wearosmanager) — full-featured watch manager with app installer
+- Or use `adb` directly from a computer
 
 If Google Play prevents you from installing the phone APK, please use [Install With Options](https://github.com/zacharee/InstallWithOptions) to install it.
 
