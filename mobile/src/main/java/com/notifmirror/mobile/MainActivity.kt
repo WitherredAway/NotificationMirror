@@ -750,6 +750,12 @@ class MainActivity : AppCompatActivity() {
             if (effectiveVib.isNotEmpty()) {
                 put("vibrationPattern", effectiveVib)
             }
+            put("alertMode", settingsManager.getEffectiveAlertMode(packageName))
+            put("complicationSource", settingsManager.getComplicationSource())
+            val complicationApp = settingsManager.getComplicationApp()
+            if (complicationApp.isNotEmpty()) {
+                put("complicationApp", complicationApp)
+            }
             val appLabel = try {
                 val ai = this@MainActivity.packageManager.getApplicationInfo(packageName, 0)
                 this@MainActivity.packageManager.getApplicationLabel(ai).toString()
