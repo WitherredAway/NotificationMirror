@@ -179,6 +179,10 @@ class MainActivity : AppCompatActivity() {
             openUrlOnPhone("https://discord.gg/gK6wQywwzb")
         }
 
+        findViewById<LinearLayout>(R.id.kofiButton).setOnClickListener {
+            openUrlOnPhone("https://ko-fi.com/wthrr")
+        }
+
         // Keep History toggle
         val historyPrefs = getSharedPreferences("notif_mirror_settings", MODE_PRIVATE)
         val keepHistorySwitch = findViewById<SwitchCompat>(R.id.keepHistorySwitch)

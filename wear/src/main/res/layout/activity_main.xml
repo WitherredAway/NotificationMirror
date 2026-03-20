@@ -33,6 +33,12 @@
 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Discord" android:textSize="12sp" android:textColor="?colorOnSurface" />
 <ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
 </LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="50dp" android:layout_marginEnd="12dp" android:background="?colorOutlineVariant" android:alpha="0.25" />
+<LinearLayout android:id="@+id/kofiButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:paddingVertical="10dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="28dp" android:layout_height="28dp"><View android:layout_width="28dp" android:layout_height="28dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="14dp" android:layout_height="14dp" android:layout_gravity="center" android:src="@drawable/ic_kofi" android:contentDescription="Ko-fi" /></FrameLayout>
+<TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:text="Ko-fi" android:textSize="12sp" android:textColor="?colorOnSurface" />
+<ImageView android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Go" />
+</LinearLayout>
 </LinearLayout>
 <!-- ACTIONS section -->
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:layout_marginStart="2dp" android:text="ACTIONS" android:textSize="9sp" android:textStyle="bold" android:textColor="?colorPrimary" android:letterSpacing="0.1" />

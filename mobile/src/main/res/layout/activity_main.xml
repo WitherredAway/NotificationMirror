@@ -33,6 +33,16 @@
 </LinearLayout>
 <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
 </LinearLayout>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginStart="70dp" android:layout_marginEnd="16dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
+<!-- Ko-fi -->
+<LinearLayout android:id="@+id/kofiButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:clickable="true" android:focusable="true" android:background="?selectableItemBackground">
+<FrameLayout android:layout_width="40dp" android:layout_height="40dp"><View android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/bg_icon_circle" /><ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_kofi" android:contentDescription="Ko-fi" /></FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="14dp">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ko-fi" android:textSize="15sp" android:textColor="?colorOnSurface" />
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Support the developer" android:textSize="12sp" android:textColor="?colorOutline" />
+</LinearLayout>
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
+</LinearLayout>
 </LinearLayout>
 <LinearLayout android:id="@+id/statusCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:background="@drawable/bg_status_active">
 <ImageView android:id="@+id/statusIcon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_check_circle" android:contentDescription="Status" />

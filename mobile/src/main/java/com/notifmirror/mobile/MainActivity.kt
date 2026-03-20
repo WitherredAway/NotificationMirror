@@ -162,6 +162,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/gK6wQywwzb")))
         }
 
+        findViewById<LinearLayout>(R.id.kofiButton).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/wthrr")))
+        }
+
         // Update banner
         updateBanner = findViewById(R.id.updateBanner)
         updateTitle = findViewById(R.id.updateTitle)
