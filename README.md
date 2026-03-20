@@ -13,8 +13,8 @@ Made with help from [Devin AI](https://devin.ai).
 
 <p align="center">
   <img src="screenshots/phone_main.jpg" width="260" alt="Phone app main screen" />
-  <img src="screenshots/watch_notifications.png" width="180" alt="Watch notifications" />
-  <img src="screenshots/watch_reply.png" width="180" alt="Watch reply" />
+  <img src="screenshots/watch_main.png" width="180" alt="Watch main screen" />
+  <img src="screenshots/watch_settings.png" width="180" alt="Watch settings" />
 </p>
 
 ---
