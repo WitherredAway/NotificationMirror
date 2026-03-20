@@ -91,5 +91,6 @@
 <!-- Tips -->
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:padding="8dp" android:background="@drawable/bg_card" android:text="Tip: Disable built-in notification bridging in WearOS settings to avoid duplicates." android:textSize="9sp" android:textColor="?colorOutline" android:gravity="center" android:lineSpacingExtra="2dp" />
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:padding="8dp" android:background="@drawable/bg_card" android:text="Make sure the companion app is also installed on your phone." android:textSize="9sp" android:textColor="?colorOutline" android:gravity="center" android:lineSpacingExtra="2dp" />
+<TextView android:id="@+id/lastUpdatedText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:gravity="center" android:textSize="8sp" android:textColor="?colorOutline" />
 </LinearLayout>
 </ScrollView>

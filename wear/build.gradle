@@ -13,6 +13,7 @@ android {
         targetSdk 34
         versionCode 9
         versionName "1.6.0"
+        buildConfigField "String", "BUILD_TIMESTAMP", "\"${new Date().format('yyyy-MM-dd HH:mm z', TimeZone.getTimeZone('UTC'))}\""
     }
 
     signingConfigs {
@@ -43,6 +44,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 }
 

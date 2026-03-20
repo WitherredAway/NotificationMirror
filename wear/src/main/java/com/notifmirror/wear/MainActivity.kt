@@ -162,6 +162,9 @@ class MainActivity : AppCompatActivity() {
             syncFromPhone()
         }
 
+        // Show build timestamp
+        findViewById<TextView>(R.id.lastUpdatedText).text = "Last updated: ${BuildConfig.BUILD_TIMESTAMP}"
+
         // Check for updates and show indicator
         checkForUpdates()
 
