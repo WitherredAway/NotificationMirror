@@ -156,6 +156,7 @@
 <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:contentDescription="Open" />
 </LinearLayout>
 </LinearLayout>
-<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:layout_marginBottom="8dp" android:gravity="center" android:text="Make sure the companion app is also installed on your Wear OS watch." android:textSize="12sp" android:textColor="?colorOutline" />
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:gravity="center" android:text="Make sure the companion app is also installed on your Wear OS watch." android:textSize="12sp" android:textColor="?colorOutline" />
+<TextView android:id="@+id/lastUpdatedText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:layout_marginBottom="8dp" android:gravity="center" android:textSize="11sp" android:textColor="?colorOutline" />
 </LinearLayout>
 </ScrollView>

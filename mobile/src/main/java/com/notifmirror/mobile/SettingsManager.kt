@@ -11,6 +11,7 @@ class SettingsManager(context: Context) {
         private const val KEY_KEYWORD_WHITELIST = "keyword_whitelist"
         private const val KEY_KEYWORD_BLACKLIST = "keyword_blacklist"
         private const val KEY_DND_SYNC = "dnd_sync_enabled"
+        private const val KEY_DND_MODE = "dnd_mode"
         private const val KEY_SCREEN_OFF_MODE = "screen_off_mode"
         private const val KEY_MUTE_DURATION = "mute_duration_minutes"
         private const val KEY_VIBRATION_PREFIX = "vibration_"
@@ -44,6 +45,11 @@ class SettingsManager(context: Context) {
         const val ALERT_SOUND = 0
         const val ALERT_VIBRATE = 1
         const val ALERT_MUTE = 2
+
+        // DND modes
+        const val DND_OFF = 0
+        const val DND_BLOCK = 1
+        const val DND_SILENT = 2
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
@@ -130,6 +136,24 @@ class SettingsManager(context: Context) {
 
     fun setDndSyncEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_DND_SYNC, enabled).apply()
+    }
+
+    // --- DND Mode (Off / Block / Silent) ---
+
+    fun getDndMode(): Int {
+        // Migration: if old boolean key exists but new mode key doesn't,
+        // convert old value to new mode
+        if (!prefs.contains(KEY_DND_MODE) && prefs.contains(KEY_DND_SYNC)) {
+            val oldEnabled = prefs.getBoolean(KEY_DND_SYNC, true)
+            val mode = if (oldEnabled) DND_BLOCK else DND_OFF
+            prefs.edit().putInt(KEY_DND_MODE, mode).apply()
+            return mode
+        }
+        return prefs.getInt(KEY_DND_MODE, DND_BLOCK)
+    }
+
+    fun setDndMode(mode: Int) {
+        prefs.edit().putInt(KEY_DND_MODE, mode).apply()
     }
 
     // --- Screen Off Mode ---
@@ -460,6 +484,10 @@ class SettingsManager(context: Context) {
         return getPerAppBoolean("dnd_sync", packageName, isDndSyncEnabled())
     }
 
+    fun getEffectiveDndMode(packageName: String): Int {
+        return getPerAppInt("dnd_mode", packageName, getDndMode())
+    }
+
     fun getEffectiveVibrationPattern(packageName: String): String {
         val custom = getVibrationPattern(packageName)
         return if (custom.isNotEmpty()) custom else getDefaultVibrationPattern()
@@ -522,7 +550,7 @@ class SettingsManager(context: Context) {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
             "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration",
-            "alert_mode", "hide_when_locked", "dnd_sync")
+            "alert_mode", "hide_when_locked", "dnd_sync", "dnd_mode")
         for (s in settings) {
             if (prefs.getBoolean(perAppEnabledKey(s, packageName), false)) return true
         }
@@ -537,7 +565,7 @@ class SettingsManager(context: Context) {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
             "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration",
-            "alert_mode", "hide_when_locked", "dnd_sync")
+            "alert_mode", "hide_when_locked", "dnd_sync", "dnd_mode")
         val editor = prefs.edit()
         for (s in settings) {
             editor.remove(perAppEnabledKey(s, packageName))

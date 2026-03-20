@@ -84,6 +84,7 @@ object NotificationHandler {
             val bigTextThreshold = json.optInt("bigTextThreshold", 40)
             val autoCancel = json.optBoolean("autoCancel", true)
             val showOpenButton = json.optBoolean("showOpenButton", true)
+            val hasContentIntent = json.optBoolean("hasContentIntent", false)
             val showMuteButton = json.optBoolean("showMuteButton", true)
             val showSnoozeButton = json.optBoolean("showSnoozeButton", true)
             val snoozeDuration = json.optInt("snoozeDuration", 5)
@@ -243,7 +244,8 @@ object NotificationHandler {
 
             showNotification(
                 context, notifId, key, packageName, resolvedAppLabel, title, text, subText, actionsArray, iconBitmap,
-                notifPriority, bigTextThreshold, autoCancel, showOpenButton, showMuteButton,
+                notifPriority, bigTextThreshold, autoCancel, showOpenButton,
+                hasContentIntent = hasContentIntent, showMuteButton = showMuteButton,
                 muteDuration = muteDuration, showSnoozeButton = showSnoozeButton, snoozeDuration = snoozeDuration,
                 defaultVibration = defaultVibration, customVibrationPattern = customVibrationPattern,
                 isSilent = isSilent, isOngoing = isOngoing,
@@ -401,6 +403,7 @@ object NotificationHandler {
         bigTextThreshold: Int = 40,
         autoCancel: Boolean = true,
         showOpenButton: Boolean = true,
+        hasContentIntent: Boolean = false,
         showMuteButton: Boolean = true,
         muteDuration: Int = 30,
         showSnoozeButton: Boolean = true,
@@ -616,6 +619,25 @@ object NotificationHandler {
         }
 
         if (showOpenButton) {
+            // "Open on Phone" — sends /open_app to phone which fires stored contentIntent
+            // This opens the specific conversation/screen, works even if app isn't on watch
+            if (hasContentIntent) {
+                val openPhoneIntent = Intent(context, OpenOnPhoneBroadcastReceiver::class.java).apply {
+                    action = "com.notifmirror.wear.OPEN_ON_PHONE"
+                    putExtra(OpenOnPhoneBroadcastReceiver.EXTRA_NOTIF_KEY, notifKey)
+                    putExtra(OpenOnPhoneBroadcastReceiver.EXTRA_PACKAGE_NAME, packageName)
+                }
+                val openPhoneRequestCode = (notifKey + "openphone").hashCode() and 0x7FFFFFFF
+                val openPhonePendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    openPhoneRequestCode,
+                    openPhoneIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                builder.addAction(R.drawable.ic_action, "Open on Phone", openPhonePendingIntent)
+            }
+
+            // "Open on Watch" — launches the app directly on watch if installed
             val launchIntent = getCompanionLaunchIntent(context, packageName)
             if (launchIntent != null) {
                 val openRequestCode = (notifKey + "open").hashCode() and 0x7FFFFFFF
@@ -674,7 +696,7 @@ object NotificationHandler {
         // before we trigger our own vibration (avoids the OS canceling it).
         // alertMode: 0=sound (vibrate+sound), 1=vibrate only, 2=mute (no vibrate, no sound)
         val shouldVibrate = ((!silentUpdate && !isSilent && notifPriority != -1 && alertMode != 2) ||
-            (vibrateOnly && !silentUpdate && alertMode != 2) ||
+            (vibrateOnly && !silentUpdate && !isSilent && alertMode != 2) ||
             (alertMode == 1 && !silentUpdate && !isSilent && notifPriority != -1))
         if (shouldVibrate) {
             Handler(Looper.getMainLooper()).postDelayed({

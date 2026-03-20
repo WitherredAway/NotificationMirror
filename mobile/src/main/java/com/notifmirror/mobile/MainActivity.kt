@@ -182,6 +182,9 @@ class MainActivity : AppCompatActivity() {
             updateTitle.text = "Checking for updates..."
         }
 
+        // Show build timestamp
+        findViewById<TextView>(R.id.lastUpdatedText).text = "Last updated: ${BuildConfig.BUILD_TIMESTAMP}"
+
         checkForUpdates()
         checkAndRequestPermissions()
 
