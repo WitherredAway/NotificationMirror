@@ -116,6 +116,15 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
                 }
 
                 if (!sent) {
+                    // Re-post the notification to clear the RemoteInput spinner
+                    if (notifId >= 0) {
+                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        val existing = nm.activeNotifications.find { it.id == notifId }
+                        if (existing != null) {
+                            existing.notification.flags = existing.notification.flags or android.app.Notification.FLAG_ONLY_ALERT_ONCE
+                            nm.notify(notifId, existing.notification)
+                        }
+                    }
                     Handler(Looper.getMainLooper()).post {
                         val msg = if (lastError?.message?.contains("not connected") == true) {
                             "Phone not connected — reply not sent"
