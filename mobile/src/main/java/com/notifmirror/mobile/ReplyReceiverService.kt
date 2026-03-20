@@ -194,7 +194,7 @@ class ReplyReceiverService : WearableListenerService() {
                 return
             }
 
-            action.actionIntent.send()
+            sendPendingIntentWithBackgroundStart(action.actionIntent)
 
             Log.d(TAG, "Action executed successfully for $actionKey")
             sendActionResult(true, "Action executed")
