@@ -54,6 +54,7 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Snooze button** — snooze individual notifications for a configurable duration (per-app)
 - **Per-app custom sounds** — set a custom notification sound for any app via the watch notification channel
 - **Vibration patterns** — 12 built-in presets (Default, Short Buzz, Long Buzz, Double Tap, Triple Tap, Gentle, Strong, Heartbeat, Pulse, Ramp Up, SOS, Silent) + custom pattern support, configurable globally and per-app
+- **Alert mode** — sound, vibrate, or mute per notification, configurable globally and per-app
 - **Notification priority** — configurable (High / Default / Low), per-app
 - **Auto-cancel on tap** — configurable, per-app
 - **BigText threshold** — configurable character count before expanded text kicks in, per-app
@@ -87,8 +88,9 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Wear Tile** — quick-glance tile showing notification counts per app, with action buttons for Pause/Resume mirroring, Mute/Unmute all, and connection info
 - **Notification settings shortcut** — button to open WearOS granular notification settings
 - **Mirroring toggle** — pause/resume mirroring directly from the watch (synced to phone)
+- **Support section** — GitHub (with version/update status) and Discord buttons that open links on your phone
 - **Bezel/rotary scrolling** — native rotary input support for scrolling through the watch UI
-- **Auto permission requests** — watch app asks for required permissions on first launch
+- **Auto permission requests** — watch app asks for required permissions on first launch, with a status card showing permission state
 
 ### Phone App
 - **Dashboard** — at-a-glance status showing mirroring state, watch connection, app/filter/log counts
@@ -98,7 +100,8 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Auto-update** — automatically check for and install updates from GitHub releases
 - **Battery optimization prompt** — reminds you to allow unrestricted battery for reliable background operation
 - **Auto permission requests** — phone app asks for notification access and unrestricted battery on launch
-- **GitHub link** — quick link to the project repo
+- **GitHub link** — quick link to the project repo with version and update status
+- **Discord link** — quick link to the [Discord server](https://discord.gg/gK6wQywwzb)
 
 ### Security
 - **End-to-end encryption** — all notification data between phone and watch is encrypted with AES-256-GCM
