@@ -104,6 +104,8 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
                             // can appear in the conversation
                             val existing = nm.activeNotifications.find { it.id == notifId }
                             if (existing != null) {
+                                // Set FLAG_ONLY_ALERT_ONCE to prevent re-alerting (sound/vibration)
+                                existing.notification.flags = existing.notification.flags or android.app.Notification.FLAG_ONLY_ALERT_ONCE
                                 nm.notify(notifId, existing.notification)
                             }
                         } else {
