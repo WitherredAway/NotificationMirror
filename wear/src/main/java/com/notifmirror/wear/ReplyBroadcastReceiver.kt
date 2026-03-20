@@ -95,10 +95,14 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
                 }
 
                 if (sent) {
-                    // Only dismiss the notification after successful send
+                    // Re-post the notification to clear the RemoteInput spinner
+                    // without dismissing it, so the user can continue the conversation
                     if (notifId >= 0) {
                         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                        nm.cancel(notifId)
+                        val existing = nm.activeNotifications.find { it.id == notifId }
+                        if (existing != null) {
+                            nm.notify(notifId, existing.notification)
+                        }
                     }
                 }
 
