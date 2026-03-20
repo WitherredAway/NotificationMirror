@@ -31,10 +31,15 @@ class MainActivity : AppCompatActivity() {
     private var connectedNodeName: String? = null
     private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
+    private var permissionStatusView: TextView? = null
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        // Permission result received, continue
+    ) { granted ->
+        permissionStatusView?.let { updatePermissionStatus(it) }
+        if (granted) {
+            Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -203,7 +208,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        checkAndRequestPermissions()
+        // Notification permission toggle
+        val notifPermissionStatus = findViewById<TextView>(R.id.notifPermissionStatus)
+        updatePermissionStatus(notifPermissionStatus)
+        findViewById<LinearLayout>(R.id.notifPermissionButton).setOnClickListener {
+            requestNotificationPermission(notifPermissionStatus)
+        }
 
         // Proactively pull encryption key from DataClient on app launch
         pullEncryptionKeyFromDataClient()
@@ -219,6 +229,12 @@ class MainActivity : AppCompatActivity() {
         }
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
 
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh permission status when returning from system settings
+        findViewById<TextView>(R.id.notifPermissionStatus)?.let { updatePermissionStatus(it) }
     }
 
     override fun onDestroy() {
@@ -415,23 +431,43 @@ class MainActivity : AppCompatActivity() {
         ).toInt()
     }
 
-    private fun checkAndRequestPermissions() {
+    private fun updatePermissionStatus(statusView: TextView) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            statusView.text = if (granted) "Granted" else "Not granted"
+            statusView.setTextColor(getColorAttr(
+                if (granted) com.google.android.material.R.attr.colorPrimary
+                else com.google.android.material.R.attr.colorError
+            ))
+        } else {
+            statusView.text = "Granted"
+            statusView.setTextColor(getColorAttr(com.google.android.material.R.attr.colorPrimary))
+        }
+    }
+
+    private fun requestNotificationPermission(statusView: TextView) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val notifPerm = android.Manifest.permission.POST_NOTIFICATIONS
-            if (checkSelfPermission(notifPerm) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                if (shouldShowRequestPermissionRationale(notifPerm)) {
-                    AlertDialog.Builder(this)
-                        .setTitle("Notification Permission Required")
-                        .setMessage("This app needs notification permission to display mirrored notifications from your phone.")
-                        .setPositiveButton("Grant") { _, _ ->
-                            notificationPermissionLauncher.launch(notifPerm)
-                        }
-                        .setNegativeButton("Later", null)
-                        .show()
-                } else {
-                    notificationPermissionLauncher.launch(notifPerm)
-                }
+            if (checkSelfPermission(notifPerm) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Already granted", Toast.LENGTH_SHORT).show()
+                return
             }
+            permissionStatusView = statusView
+            if (shouldShowRequestPermissionRationale(notifPerm)) {
+                AlertDialog.Builder(this)
+                    .setTitle("Notification Permission")
+                    .setMessage("This app needs notification permission to display mirrored notifications from your phone.")
+                    .setPositiveButton("Grant") { _, _ ->
+                        notificationPermissionLauncher.launch(notifPerm)
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            } else {
+                notificationPermissionLauncher.launch(notifPerm)
+            }
+        } else {
+            Toast.makeText(this, "Already granted", Toast.LENGTH_SHORT).show()
         }
     }
 }
