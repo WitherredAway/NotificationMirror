@@ -5,8 +5,12 @@
 Made with help from [Devin AI](https://devin.ai).
 
 ---
-### ❤️ Support Me At https://ko-fi.com/wthrr ❤️
----
+
+<p align="center">
+  <a href="https://ko-fi.com/wthrr"><img src="https://img.shields.io/badge/Support%20Me-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
+  <a href="https://discord.gg/gK6wQywwzb"><img src="https://img.shields.io/badge/Join-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
+</p>
+
 <p align="center">
   <img src="screenshots/phone_main.jpg" width="260" alt="Phone app main screen" />
   <img src="screenshots/watch_notifications.png" width="180" alt="Watch notifications" />
@@ -105,6 +109,7 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Auto permission requests** — phone app asks for notification access and unrestricted battery on launch
 - **GitHub link** — quick link to the project repo with version and update status
 - **Discord link** — quick link to the [Discord server](https://discord.gg/gK6wQywwzb)
+- **Ko-fi link** — quick link to support the developer on [Ko-fi](https://ko-fi.com/wthrr)
 
 ### Security
 - **End-to-end encryption** — all notification data between phone and watch is encrypted with AES-256-GCM
