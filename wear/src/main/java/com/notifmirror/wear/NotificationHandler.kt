@@ -36,6 +36,7 @@ object NotificationHandler {
     const val EXTRA_NOTIF_KEY = "extra_notif_key"
     const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
     const val EXTRA_ACTION_INDEX = "extra_action_index"
+    const val EXTRA_IS_MESSAGING = "extra_is_messaging"
 
     // Track notification ID per conversation key (reuse for stacking)
     private val notifIdMap = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -250,7 +251,8 @@ object NotificationHandler {
                 conversationHistory = messages,
                 vibrateOnly = vibrateOnly, alertMode = alertMode,
                 conversationTitle = conversationTitle,
-                pictureBitmap = pictureBitmap
+                pictureBitmap = pictureBitmap,
+                isMessagingStyle = isMessagingStyle
             )
 
             if (!isUpdate) {
@@ -413,7 +415,8 @@ object NotificationHandler {
         vibrateOnly: Boolean = false,
         alertMode: Int = 0, // 0=sound, 1=vibrate, 2=mute
         conversationTitle: String = "",
-        pictureBitmap: Bitmap? = null
+        pictureBitmap: Bitmap? = null,
+        isMessagingStyle: Boolean = false
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -562,6 +565,7 @@ object NotificationHandler {
                         putExtra(EXTRA_NOTIF_KEY, notifKey)
                         putExtra(EXTRA_NOTIFICATION_ID, notifId)
                         putExtra(EXTRA_ACTION_INDEX, actionIndex)
+                        putExtra(EXTRA_IS_MESSAGING, isMessagingStyle)
                     }
                     val replyRequestCode = (notifKey + actionIndex).hashCode() and 0x7FFFFFFF
                     val replyPendingIntent = PendingIntent.getBroadcast(

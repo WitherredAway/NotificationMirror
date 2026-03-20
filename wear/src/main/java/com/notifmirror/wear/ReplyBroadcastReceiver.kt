@@ -36,6 +36,7 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
         val notifKey = intent.getStringExtra(NotificationHandler.EXTRA_NOTIF_KEY) ?: return
         val notifId = intent.getIntExtra(NotificationHandler.EXTRA_NOTIFICATION_ID, -1)
         val actionIndex = intent.getIntExtra(NotificationHandler.EXTRA_ACTION_INDEX, 0)
+        val isMessaging = intent.getBooleanExtra(NotificationHandler.EXTRA_IS_MESSAGING, false)
 
         // Extract the reply text from RemoteInput
         val remoteInputResults = RemoteInput.getResultsFromIntent(intent)
@@ -95,13 +96,19 @@ class ReplyBroadcastReceiver : BroadcastReceiver() {
                 }
 
                 if (sent) {
-                    // Re-post the notification to clear the RemoteInput spinner
-                    // without dismissing it, so the user can continue the conversation
                     if (notifId >= 0) {
                         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                        val existing = nm.activeNotifications.find { it.id == notifId }
-                        if (existing != null) {
-                            nm.notify(notifId, existing.notification)
+                        if (isMessaging) {
+                            // Messaging/conversation notification: re-post to clear the
+                            // RemoteInput spinner but keep it open so the user's reply
+                            // can appear in the conversation
+                            val existing = nm.activeNotifications.find { it.id == notifId }
+                            if (existing != null) {
+                                nm.notify(notifId, existing.notification)
+                            }
+                        } else {
+                            // Non-conversation notification: dismiss after reply
+                            nm.cancel(notifId)
                         }
                     }
                 }
