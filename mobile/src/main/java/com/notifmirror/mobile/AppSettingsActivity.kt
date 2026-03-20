@@ -45,7 +45,7 @@ class AppSettingsActivity : AppCompatActivity() {
         settings = SettingsManager(this)
 
         // Behavior section
-        val dndSwitch = findViewById<SwitchMaterial>(R.id.dndSyncSwitch)
+        val dndModeGroup = findViewById<RadioGroup>(R.id.dndModeGroup)
         val ongoingModeGroup = findViewById<RadioGroup>(R.id.ongoingModeGroup)
         val autoDismissSwitch = findViewById<SwitchMaterial>(R.id.autoDismissSwitch)
         val screenModeGroup = findViewById<RadioGroup>(R.id.screenModeGroup)
@@ -82,7 +82,11 @@ class AppSettingsActivity : AppCompatActivity() {
         var currentVibrationPattern = settings.getDefaultVibrationPattern()
 
         // Load current values - Behavior
-        dndSwitch.isChecked = settings.isDndSyncEnabled()
+        when (settings.getDndMode()) {
+            SettingsManager.DND_OFF -> dndModeGroup.check(R.id.radioDndOff)
+            SettingsManager.DND_BLOCK -> dndModeGroup.check(R.id.radioDndBlock)
+            SettingsManager.DND_SILENT -> dndModeGroup.check(R.id.radioDndSilent)
+        }
         when (settings.getOngoingMode()) {
             SettingsManager.ONGOING_NONE -> ongoingModeGroup.check(R.id.radioOngoingNone)
             SettingsManager.ONGOING_ONLY -> ongoingModeGroup.check(R.id.radioOngoingOnly)
@@ -199,7 +203,7 @@ class AppSettingsActivity : AppCompatActivity() {
         // Show save button when any setting changes
         val showSave = { saveButton.visibility = View.VISIBLE }
 
-        val switches = listOf(dndSwitch,
+        val switches = listOf(
             autoDismissSwitch, autoCancelSwitch, showOpenButtonSwitch, showMuteButtonSwitch,
             hideWhenLockedSwitch, muteContinuationSwitch, keepHistorySwitch,
             showSnoozeButtonSwitch, batterySaverSwitch)
@@ -211,6 +215,7 @@ class AppSettingsActivity : AppCompatActivity() {
         ongoingModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         priorityGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         alertModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
+        dndModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         complicationSourceGroup.setOnCheckedChangeListener { _, checkedId ->
             complicationAppButton.visibility = if (checkedId == R.id.radioComplicationSpecificApp) View.VISIBLE else View.GONE
             showSave()
@@ -272,7 +277,12 @@ class AppSettingsActivity : AppCompatActivity() {
             }
 
             // All validation passed — save all settings
-            settings.setDndSyncEnabled(dndSwitch.isChecked)
+            val dndMode = when (dndModeGroup.checkedRadioButtonId) {
+                R.id.radioDndOff -> SettingsManager.DND_OFF
+                R.id.radioDndSilent -> SettingsManager.DND_SILENT
+                else -> SettingsManager.DND_BLOCK
+            }
+            settings.setDndMode(dndMode)
             val ongoingMode = when (ongoingModeGroup.checkedRadioButtonId) {
                 R.id.radioOngoingOnly -> SettingsManager.ONGOING_ONLY
                 R.id.radioOngoingAll -> SettingsManager.ONGOING_ALL_PERSISTENT

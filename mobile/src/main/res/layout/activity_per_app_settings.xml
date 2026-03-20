@@ -94,15 +94,23 @@
 
     <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
 
-    <!-- DND Sync (matches global order: 2nd) -->
+    <!-- DND Mode (matches global order: 2nd) -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-        <CheckBox android:id="@+id/overrideDndSync" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <CheckBox android:id="@+id/overrideDndMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DND Sync" android:textSize="15sp" android:textColor="?colorOnSurface" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Skip mirroring when phone is in Do Not Disturb mode" android:textSize="12sp" android:textColor="?colorOutline" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DND Mode" android:textSize="15sp" android:textColor="?colorOnSurface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="How to handle notifications when phone is in DND" android:textSize="12sp" android:textColor="?colorOutline" />
         </LinearLayout>
-        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/perAppDndSync" android:layout_width="wrap_content" android:layout_height="wrap_content" />
     </LinearLayout>
+    <RadioGroup android:id="@+id/perAppDndModeGroup" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:layout_marginStart="40dp" android:orientation="vertical">
+        <RadioButton android:id="@+id/perAppDndOff" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Off — ignore DND" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/perAppDndBlock" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Block — skip mirroring" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+        <RadioButton android:id="@+id/perAppDndSilent" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Silent — mirror silently" android:textSize="14sp" android:textColor="?colorOnSurface" android:paddingStart="8dp" />
+    </RadioGroup>
 
     <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="14dp" android:background="?colorOutlineVariant" android:alpha="0.3" />
 

@@ -33,6 +33,10 @@ class NotificationListener : NotificationListenerService() {
         private const val PATH_RECONCILE = "/notification_reconcile"
 
         val pendingActions = java.util.concurrent.ConcurrentHashMap<String, Notification.Action>()
+        // Store contentIntent PendingIntents so watch can ask phone to open the specific
+        // conversation/context (e.g. open WhatsApp chat)
+        val pendingContentIntents = java.util.concurrent.ConcurrentHashMap<String, android.app.PendingIntent>()
+        private const val MAX_PENDING_CONTENT_INTENTS = 200
         // Track notification keys that were actually sent/queued to the watch
         // so we only send dismiss events for notifications the watch knows about
         private val sentNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
@@ -140,12 +144,17 @@ class NotificationListener : NotificationListenerService() {
         }
 
         // Check DND mode (per-app with global fallback)
-        // Block on any DND mode: PRIORITY, NONE, or ALARMS — only FILTER_ALL allows forwarding
-        if (settings.getEffectiveDndSync(sbn.packageName)) {
+        val dndMode = settings.getEffectiveDndMode(sbn.packageName)
+        var dndForceSilent = false
+        if (dndMode != SettingsManager.DND_OFF) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val interruptionFilter = nm.currentInterruptionFilter
             if (interruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
-                return
+                if (dndMode == SettingsManager.DND_BLOCK) {
+                    return
+                }
+                // DND_SILENT: continue but force silent delivery
+                dndForceSilent = true
             }
         }
 
@@ -237,6 +246,17 @@ class NotificationListener : NotificationListenerService() {
         // e.g. WhatsApp photo messages, Instagram posts, etc.
         val pictureBase64 = extractPictureBase64(extras)
 
+        // Store contentIntent so watch can ask phone to open the specific conversation
+        val contentIntent = notification.contentIntent
+        if (contentIntent != null) {
+            pendingContentIntents[notifKey] = contentIntent
+            if (pendingContentIntents.size > MAX_PENDING_CONTENT_INTENTS) {
+                val iter = pendingContentIntents.keys.iterator()
+                val excess = pendingContentIntents.size - MAX_PENDING_CONTENT_INTENTS
+                repeat(excess) { if (iter.hasNext()) { iter.next(); iter.remove() } }
+            }
+        }
+
         // Process ALL actions and store them
         val actionsJson = JSONArray()
         val actions = notification.actions
@@ -306,6 +326,7 @@ class NotificationListener : NotificationListenerService() {
             put("autoCancel", settings.getEffectiveAutoCancel(appPackageName))
             put("autoDismissSync", settings.getEffectiveAutoDismissSync(appPackageName))
             put("showOpenButton", settings.getEffectiveShowOpenButton(appPackageName))
+            put("hasContentIntent", contentIntent != null)
             put("showMuteButton", settings.getEffectiveShowMuteButton(appPackageName))
             put("showSnoozeButton", settings.getEffectiveShowSnoozeButton(appPackageName))
             put("snoozeDuration", settings.getEffectiveSnoozeDuration(appPackageName))
@@ -313,7 +334,7 @@ class NotificationListener : NotificationListenerService() {
             put("keepHistory", settings.isKeepNotificationHistoryEnabled())
             // Send screen mode so watch knows whether to be silent
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
+            if (dndForceSilent || (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive)) {
                 put("silent", true)
             }
             // Vibrate only (no sound) when screen is on
@@ -503,11 +524,16 @@ class NotificationListener : NotificationListenerService() {
                     }
 
                     // DND filter — per-app with global fallback
-                    if (settings.getEffectiveDndSync(sbn.packageName)) {
+                    val syncDndMode = settings.getEffectiveDndMode(sbn.packageName)
+                    var syncDndForceSilent = false
+                    if (syncDndMode != SettingsManager.DND_OFF) {
                         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         val interruptionFilter = nm.currentInterruptionFilter
                         if (interruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
-                            continue
+                            if (syncDndMode == SettingsManager.DND_BLOCK) {
+                                continue
+                            }
+                            syncDndForceSilent = true
                         }
                     }
 
@@ -566,6 +592,12 @@ class NotificationListener : NotificationListenerService() {
 
                     // Extract notification picture (BigPictureStyle) if available
                     val pictureBase64 = extractPictureBase64(extras)
+
+                    // Store contentIntent for "Open on Phone" feature
+                    val syncContentIntent = notification.contentIntent
+                    if (syncContentIntent != null) {
+                        pendingContentIntents[notifKey] = syncContentIntent
+                    }
 
                     val actionsJson = JSONArray()
                     val actions = notification.actions
@@ -627,13 +659,14 @@ class NotificationListener : NotificationListenerService() {
                         put("autoCancel", settings.getEffectiveAutoCancel(appPackageName))
                         put("autoDismissSync", settings.getEffectiveAutoDismissSync(appPackageName))
                         put("showOpenButton", settings.getEffectiveShowOpenButton(appPackageName))
+                        put("hasContentIntent", syncContentIntent != null)
                         put("showMuteButton", settings.getEffectiveShowMuteButton(appPackageName))
                         put("showSnoozeButton", settings.getEffectiveShowSnoozeButton(appPackageName))
                         put("snoozeDuration", settings.getEffectiveSnoozeDuration(appPackageName))
                         put("defaultVibration", settings.getDefaultVibrationPattern())
                         put("keepHistory", settings.isKeepNotificationHistoryEnabled())
                         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-                        if (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive) {
+                        if (syncDndForceSilent || (screenMode == SettingsManager.SCREEN_MODE_SILENT_WHEN_ON && pm.isInteractive)) {
                             put("silent", true)
                         }
                         if (screenMode == SettingsManager.SCREEN_MODE_VIBRATE_ONLY_WHEN_ON && pm.isInteractive) {

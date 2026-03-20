@@ -44,6 +44,14 @@
         </receiver>
 
         <receiver
+            android:name=".OpenOnPhoneBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.notifmirror.wear.OPEN_ON_PHONE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".ActionBroadcastReceiver"
             android:exported="false">
             <intent-filter>

@@ -24,6 +24,7 @@ class ReplyReceiverService : WearableListenerService() {
         when (messageEvent.path) {
             "/reply" -> handleReply(messageEvent)
             "/action" -> handleAction(messageEvent)
+            "/open_app" -> handleOpenApp(messageEvent)
             "/open_settings" -> handleOpenSettings()
             "/open_url" -> handleOpenUrl(messageEvent)
             "/snooze" -> handleSnooze(messageEvent)
@@ -40,6 +41,57 @@ class ReplyReceiverService : WearableListenerService() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         startActivity(intent)
+    }
+
+    private fun handleOpenApp(messageEvent: MessageEvent) {
+        try {
+            val json = JSONObject(String(messageEvent.data))
+            val notifKey = json.getString("key")
+
+            Log.d(TAG, "Received open app request for $notifKey")
+
+            // First try the stored contentIntent (opens specific conversation)
+            val contentIntent = NotificationListener.pendingContentIntents[notifKey]
+            if (contentIntent != null) {
+                try {
+                    contentIntent.send()
+                    Log.d(TAG, "Opened app via contentIntent for $notifKey")
+                    return
+                } catch (e: android.app.PendingIntent.CanceledException) {
+                    Log.w(TAG, "ContentIntent cancelled for $notifKey, trying fallback", e)
+                    NotificationListener.pendingContentIntents.remove(notifKey)
+                }
+            }
+
+            // Fallback: try to recover contentIntent from active notification
+            val listener = NotificationListener.instance
+            if (listener != null) {
+                val activeNotifs = listener.getActiveNotifications()
+                val sbn = activeNotifs?.find { it.key == notifKey }
+                val freshIntent = sbn?.notification?.contentIntent
+                if (freshIntent != null) {
+                    freshIntent.send()
+                    Log.d(TAG, "Opened app via recovered contentIntent for $notifKey")
+                    return
+                }
+            }
+
+            // Last fallback: try to launch the app by package name
+            val packageName = json.optString("package", "")
+            if (packageName.isNotEmpty()) {
+                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(launchIntent)
+                    Log.d(TAG, "Opened app via launch intent for $packageName")
+                    return
+                }
+            }
+
+            Log.w(TAG, "Could not open app for $notifKey — no intent available")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle open app", e)
+        }
     }
 
     private fun handleOpenUrl(messageEvent: MessageEvent) {

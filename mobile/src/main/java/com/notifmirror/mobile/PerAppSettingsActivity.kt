@@ -60,7 +60,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val overrideBigText = findViewById<CheckBox>(R.id.overrideBigText)
         val overrideMuteDuration = findViewById<CheckBox>(R.id.overrideMuteDuration)
         val overrideScreenOffMode = findViewById<CheckBox>(R.id.overrideScreenOffMode)
-        val overrideDndSync = findViewById<CheckBox>(R.id.overrideDndSync)
+        val overrideDndMode = findViewById<CheckBox>(R.id.overrideDndMode)
         val overrideHideWhenLocked = findViewById<CheckBox>(R.id.overrideHideWhenLocked)
         val overrideMuteContinuation = findViewById<CheckBox>(R.id.overrideMuteContinuation)
         val overrideAlertMode = findViewById<CheckBox>(R.id.overrideAlertMode)
@@ -85,7 +85,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         val keywordWhitelistInput = findViewById<EditText>(R.id.perAppKeywordWhitelist)
         val keywordBlacklistInput = findViewById<EditText>(R.id.perAppKeywordBlacklist)
         val perAppScreenModeGroup = findViewById<RadioGroup>(R.id.perAppScreenModeGroup)
-        val dndSyncSwitch = findViewById<SwitchMaterial>(R.id.perAppDndSync)
+        val perAppDndModeGroup = findViewById<RadioGroup>(R.id.perAppDndModeGroup)
         val hideWhenLockedSwitch = findViewById<SwitchMaterial>(R.id.perAppHideWhenLocked)
         val perAppAlertModeGroup = findViewById<RadioGroup>(R.id.perAppAlertModeGroup)
         // Floating save button — hidden until changes are made (matches global settings pattern)
@@ -145,9 +145,13 @@ class PerAppSettingsActivity : AppCompatActivity() {
         snoozeDurationInput.setText(settings.getEffectiveSnoozeDuration(packageName).toString())
         snoozeDurationInput.isEnabled = overrideSnoozeDuration.isChecked
 
-        overrideDndSync.isChecked = settings.isPerAppBooleanCustomized("dnd_sync", packageName)
-        dndSyncSwitch.isChecked = settings.getEffectiveDndSync(packageName)
-        dndSyncSwitch.isEnabled = overrideDndSync.isChecked
+        overrideDndMode.isChecked = settings.isPerAppIntCustomized("dnd_mode", packageName)
+        when (settings.getEffectiveDndMode(packageName)) {
+            SettingsManager.DND_OFF -> perAppDndModeGroup.check(R.id.perAppDndOff)
+            SettingsManager.DND_BLOCK -> perAppDndModeGroup.check(R.id.perAppDndBlock)
+            SettingsManager.DND_SILENT -> perAppDndModeGroup.check(R.id.perAppDndSilent)
+        }
+        SettingsUIHelper.setRadioGroupEnabled(perAppDndModeGroup, overrideDndMode.isChecked)
 
         overrideHideWhenLocked.isChecked = settings.isPerAppBooleanCustomized("hide_when_locked", packageName)
         hideWhenLockedSwitch.isChecked = settings.getEffectiveHideWhenLocked(packageName)
@@ -205,7 +209,7 @@ class PerAppSettingsActivity : AppCompatActivity() {
         SettingsUIHelper.wireOverrideCheckbox(overrideShowMute, showMuteSwitch, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideBigText, bigTextInput, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideMuteDuration, muteDurationInput, showSave)
-        SettingsUIHelper.wireOverrideCheckbox(overrideDndSync, dndSyncSwitch, showSave)
+        SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideDndMode, perAppDndModeGroup, showSave)
         SettingsUIHelper.wireOverrideCheckbox(overrideHideWhenLocked, hideWhenLockedSwitch, showSave)
         SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideAlertMode, perAppAlertModeGroup, showSave)
         SettingsUIHelper.wireOverrideCheckboxForRadioGroup(overrideScreenOffMode, perAppScreenModeGroup, showSave)
@@ -215,11 +219,11 @@ class PerAppSettingsActivity : AppCompatActivity() {
         SettingsUIHelper.wireSwitchesToShowSave(
             listOf(muteContinuationSwitch, autoDismissSwitch, autoCancelSwitch,
                 showOpenSwitch, showMuteSwitch, showSnoozeSwitch,
-                dndSyncSwitch, hideWhenLockedSwitch),
+                hideWhenLockedSwitch),
             showSave
         )
         SettingsUIHelper.wireRadioGroupsToShowSave(
-            listOf(perAppOngoingModeGroup, priorityGroup, perAppScreenModeGroup, perAppAlertModeGroup),
+            listOf(perAppOngoingModeGroup, priorityGroup, perAppScreenModeGroup, perAppAlertModeGroup, perAppDndModeGroup),
             showSave
         )
         SettingsUIHelper.wireEditTextsToShowSave(
@@ -321,10 +325,15 @@ class PerAppSettingsActivity : AppCompatActivity() {
                 settings.clearPerAppInt("snooze_duration", packageName)
             }
 
-            if (overrideDndSync.isChecked) {
-                settings.setPerAppBoolean("dnd_sync", packageName, dndSyncSwitch.isChecked)
+            if (overrideDndMode.isChecked) {
+                val dndMode = when (perAppDndModeGroup.checkedRadioButtonId) {
+                    R.id.perAppDndOff -> SettingsManager.DND_OFF
+                    R.id.perAppDndSilent -> SettingsManager.DND_SILENT
+                    else -> SettingsManager.DND_BLOCK
+                }
+                settings.setPerAppInt("dnd_mode", packageName, dndMode)
             } else {
-                settings.clearPerAppBoolean("dnd_sync", packageName)
+                settings.clearPerAppInt("dnd_mode", packageName)
             }
 
             if (overrideHideWhenLocked.isChecked) {
