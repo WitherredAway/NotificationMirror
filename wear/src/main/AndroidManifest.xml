@@ -36,6 +36,14 @@
             android:exported="false" />
 
         <receiver
+            android:name=".ReplyBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.notifmirror.wear.REPLY" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".ActionBroadcastReceiver"
             android:exported="false">
             <intent-filter>

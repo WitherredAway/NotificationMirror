@@ -31,10 +31,22 @@ class MainActivity : AppCompatActivity() {
     private var connectedNodeName: String? = null
     private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
+    private var permissionCard: LinearLayout? = null
+    private var permissionIcon: ImageView? = null
+    private var permissionStatusView: TextView? = null
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        // Permission result received, continue
+    ) { granted ->
+        val card = permissionCard
+        val icon = permissionIcon
+        val status = permissionStatusView
+        if (card != null && icon != null && status != null) {
+            updatePermissionCard(card, icon, status)
+        }
+        if (granted) {
+            Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -150,17 +162,19 @@ class MainActivity : AppCompatActivity() {
             syncFromPhone()
         }
 
-        val versionText = findViewById<TextView>(R.id.versionText)
-        try {
-            val pInfo = packageManager.getPackageInfo(packageName, 0)
-            versionText.text = "v${pInfo.versionName}"
-        } catch (_: Exception) {}
-
         // Check for updates and show indicator
         checkForUpdates()
 
-        findViewById<TextView>(R.id.githubLink).setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
+        findViewById<LinearLayout>(R.id.githubButton).setOnClickListener {
+            openUrlOnPhone("https://github.com/WitherredAway/NotificationMirror")
+        }
+
+        findViewById<LinearLayout>(R.id.discordButton).setOnClickListener {
+            openUrlOnPhone("https://discord.gg/gK6wQywwzb")
+        }
+
+        findViewById<LinearLayout>(R.id.kofiButton).setOnClickListener {
+            openUrlOnPhone("https://ko-fi.com/wthrr")
         }
 
         // Keep History toggle
@@ -199,7 +213,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        checkAndRequestPermissions()
+        // Notification permission card (status-card style, like phone's notification access banner)
+        val notifPermissionCard = findViewById<LinearLayout>(R.id.notifPermissionCard)
+        val notifPermissionIcon = findViewById<ImageView>(R.id.notifPermissionIcon)
+        val notifPermissionStatus = findViewById<TextView>(R.id.notifPermissionStatus)
+        updatePermissionCard(notifPermissionCard, notifPermissionIcon, notifPermissionStatus)
+        notifPermissionCard.setOnClickListener {
+            requestNotificationPermission(notifPermissionCard, notifPermissionIcon, notifPermissionStatus)
+        }
 
         // Proactively pull encryption key from DataClient on app launch
         pullEncryptionKeyFromDataClient()
@@ -215,6 +236,17 @@ class MainActivity : AppCompatActivity() {
         }
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
 
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh permission card when returning from system settings
+        val card = findViewById<LinearLayout>(R.id.notifPermissionCard)
+        val icon = findViewById<ImageView>(R.id.notifPermissionIcon)
+        val status = findViewById<TextView>(R.id.notifPermissionStatus)
+        if (card != null && icon != null && status != null) {
+            updatePermissionCard(card, icon, status)
+        }
     }
 
     override fun onDestroy() {
@@ -376,6 +408,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun openUrlOnPhone(url: String) {
+        scope.launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
+                if (nodes.isEmpty()) {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "No phone connected", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@MainActivity)
+                        .sendMessage(node.id, "/open_url", url.toByteArray())
+                        .await()
+                }
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Opening on phone", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("NotifMirrorWear", "Failed to open URL on phone", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Failed to reach phone", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     private fun dpToPx(dp: Int): Int {
         return TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
@@ -384,23 +443,44 @@ class MainActivity : AppCompatActivity() {
         ).toInt()
     }
 
-    private fun checkAndRequestPermissions() {
+    private fun updatePermissionCard(card: LinearLayout, icon: ImageView, statusView: TextView) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            card.setBackgroundResource(if (granted) R.drawable.bg_status_active else R.drawable.bg_status_inactive)
+            icon.setImageResource(if (granted) R.drawable.ic_check_circle else R.drawable.ic_error_circle)
+            statusView.text = if (granted) "Notifications allowed" else "Notifications not allowed"
+        } else {
+            card.setBackgroundResource(R.drawable.bg_status_active)
+            icon.setImageResource(R.drawable.ic_check_circle)
+            statusView.text = "Notifications allowed"
+        }
+    }
+
+    private fun requestNotificationPermission(card: LinearLayout, icon: ImageView, statusView: TextView) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val notifPerm = android.Manifest.permission.POST_NOTIFICATIONS
-            if (checkSelfPermission(notifPerm) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                if (shouldShowRequestPermissionRationale(notifPerm)) {
-                    AlertDialog.Builder(this)
-                        .setTitle("Notification Permission Required")
-                        .setMessage("This app needs notification permission to display mirrored notifications from your phone.")
-                        .setPositiveButton("Grant") { _, _ ->
-                            notificationPermissionLauncher.launch(notifPerm)
-                        }
-                        .setNegativeButton("Later", null)
-                        .show()
-                } else {
-                    notificationPermissionLauncher.launch(notifPerm)
-                }
+            if (checkSelfPermission(notifPerm) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Already granted", Toast.LENGTH_SHORT).show()
+                return
             }
+            permissionCard = card
+            permissionIcon = icon
+            permissionStatusView = statusView
+            if (shouldShowRequestPermissionRationale(notifPerm)) {
+                AlertDialog.Builder(this)
+                    .setTitle("Notification Permission")
+                    .setMessage("This app needs notification permission to display mirrored notifications from your phone.")
+                    .setPositiveButton("Grant") { _, _ ->
+                        notificationPermissionLauncher.launch(notifPerm)
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            } else {
+                notificationPermissionLauncher.launch(notifPerm)
+            }
+        } else {
+            Toast.makeText(this, "Already granted", Toast.LENGTH_SHORT).show()
         }
     }
 }

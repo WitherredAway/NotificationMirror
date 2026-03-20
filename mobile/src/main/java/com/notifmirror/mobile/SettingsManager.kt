@@ -38,6 +38,12 @@ class SettingsManager(context: Context) {
         private const val KEY_COMPLICATION_SOURCE = "complication_source"
         private const val KEY_COMPLICATION_APP = "complication_app"
         private const val KEY_MIRRORING_ENABLED = "mirroring_enabled"
+        private const val KEY_ALERT_MODE = "alert_mode"
+
+        // Alert modes
+        const val ALERT_SOUND = 0
+        const val ALERT_VIBRATE = 1
+        const val ALERT_MUTE = 2
 
         // Screen off modes
         const val SCREEN_MODE_ALWAYS = 0
@@ -282,6 +288,14 @@ class SettingsManager(context: Context) {
         prefs.edit().putString(KEY_COMPLICATION_APP, packageName).apply()
     }
 
+    // --- Alert Mode (Sound / Vibrate / Mute) ---
+
+    fun getAlertMode(): Int = prefs.getInt(KEY_ALERT_MODE, ALERT_SOUND)
+
+    fun setAlertMode(mode: Int) {
+        prefs.edit().putInt(KEY_ALERT_MODE, mode).apply()
+    }
+
     // --- Default Vibration Pattern ---
 
     fun getDefaultVibrationPattern(): String {
@@ -434,6 +448,18 @@ class SettingsManager(context: Context) {
         return getPerAppInt("big_text_threshold", packageName, getBigTextThreshold())
     }
 
+    fun getEffectiveAlertMode(packageName: String): Int {
+        return getPerAppInt("alert_mode", packageName, getAlertMode())
+    }
+
+    fun getEffectiveHideWhenLocked(packageName: String): Boolean {
+        return getPerAppBoolean("hide_when_locked", packageName, isHideWhenLockedEnabled())
+    }
+
+    fun getEffectiveDndSync(packageName: String): Boolean {
+        return getPerAppBoolean("dnd_sync", packageName, isDndSyncEnabled())
+    }
+
     fun getEffectiveVibrationPattern(packageName: String): String {
         val custom = getVibrationPattern(packageName)
         return if (custom.isNotEmpty()) custom else getDefaultVibrationPattern()
@@ -495,7 +521,8 @@ class SettingsManager(context: Context) {
     fun hasAnyPerAppCustomization(packageName: String): Boolean {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
-            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
+            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration",
+            "alert_mode", "hide_when_locked", "dnd_sync")
         for (s in settings) {
             if (prefs.getBoolean(perAppEnabledKey(s, packageName), false)) return true
         }
@@ -509,7 +536,8 @@ class SettingsManager(context: Context) {
     fun clearAllPerAppSettings(packageName: String) {
         val settings = listOf("priority", "mirror_ongoing", "mirror_persistent", "ongoing_mode", "auto_cancel",
             "auto_dismiss", "show_open", "show_mute", "mute_duration", "big_text_threshold",
-            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration")
+            "screen_off_mode", "mute_continuation", "show_snooze", "snooze_duration",
+            "alert_mode", "hide_when_locked", "dnd_sync")
         val editor = prefs.edit()
         for (s in settings) {
             editor.remove(perAppEnabledKey(s, packageName))

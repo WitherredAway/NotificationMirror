@@ -36,6 +36,7 @@ object NotificationHandler {
     const val EXTRA_NOTIF_KEY = "extra_notif_key"
     const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
     const val EXTRA_ACTION_INDEX = "extra_action_index"
+    const val EXTRA_IS_MESSAGING = "extra_is_messaging"
 
     // Track notification ID per conversation key (reuse for stacking)
     private val notifIdMap = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -94,6 +95,7 @@ object NotificationHandler {
             val hideContent = json.optBoolean("hideContent", false)
             val muteContinuation = json.optBoolean("muteContinuation", false)
             val vibrateOnly = json.optBoolean("vibrateOnly", false)
+            val alertMode = json.optInt("alertMode", 0) // 0=sound, 1=vibrate, 2=mute
             // Single SharedPreferences lookup for all watch-side settings
             val watchSettings = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
 
@@ -247,9 +249,10 @@ object NotificationHandler {
                 isSilent = isSilent, isOngoing = isOngoing,
                 hideContent = hideContent, silentUpdate = (isUpdate && muteContinuation) || isReplyUpdate,
                 conversationHistory = messages,
-                vibrateOnly = vibrateOnly,
+                vibrateOnly = vibrateOnly, alertMode = alertMode,
                 conversationTitle = conversationTitle,
-                pictureBitmap = pictureBitmap
+                pictureBitmap = pictureBitmap,
+                isMessagingStyle = isMessagingStyle
             )
 
             if (!isUpdate) {
@@ -410,8 +413,10 @@ object NotificationHandler {
         silentUpdate: Boolean = false,
         conversationHistory: List<Pair<String, String>> = emptyList(),
         vibrateOnly: Boolean = false,
+        alertMode: Int = 0, // 0=sound, 1=vibrate, 2=mute
         conversationTitle: String = "",
-        pictureBitmap: Bitmap? = null
+        pictureBitmap: Bitmap? = null,
+        isMessagingStyle: Boolean = false
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -476,13 +481,13 @@ object NotificationHandler {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(displayTitle)
             .setContentText(displayText)
-            .setPriority(if (isSilent || vibrateOnly || silentUpdate) NotificationCompat.PRIORITY_LOW else compatPriority)
+            .setPriority(if (isSilent || vibrateOnly || silentUpdate || alertMode == 1 || alertMode == 2) NotificationCompat.PRIORITY_LOW else compatPriority)
             .setAutoCancel(if (isOngoing) false else autoCancel)
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(groupId)
             .setOnlyAlertOnce(silentUpdate)
-            .setSilent(isSilent || vibrateOnly || silentUpdate)
+            .setSilent(isSilent || vibrateOnly || silentUpdate || alertMode == 1 || alertMode == 2)
 
         // For ongoing notifications: set a DeleteIntent so we know when the user
         // dismisses it from the watch. This triggers a resend from the phone if
@@ -553,14 +558,17 @@ object NotificationHandler {
                 val hasRemoteInput = actionJson.getBoolean("hasRemoteInput")
 
                 if (hasRemoteInput) {
-                    val replyIntent = Intent(context, ReplyActivity::class.java).apply {
+                    // Use BroadcastReceiver instead of Activity so the app doesn't
+                    // visually open when the user replies via inline RemoteInput
+                    val replyIntent = Intent(context, ReplyBroadcastReceiver::class.java).apply {
+                        action = "com.notifmirror.wear.REPLY"
                         putExtra(EXTRA_NOTIF_KEY, notifKey)
                         putExtra(EXTRA_NOTIFICATION_ID, notifId)
                         putExtra(EXTRA_ACTION_INDEX, actionIndex)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        putExtra(EXTRA_IS_MESSAGING, isMessagingStyle)
                     }
                     val replyRequestCode = (notifKey + actionIndex).hashCode() and 0x7FFFFFFF
-                    val replyPendingIntent = PendingIntent.getActivity(
+                    val replyPendingIntent = PendingIntent.getBroadcast(
                         context,
                         replyRequestCode,
                         replyIntent,
@@ -664,8 +672,10 @@ object NotificationHandler {
         // vibrateOnly mode: suppress sound (via low-priority notification) but still vibrate
         // Post with a short delay so the system finishes processing the notification
         // before we trigger our own vibration (avoids the OS canceling it).
-        val shouldVibrate = (!silentUpdate && !isSilent && notifPriority != -1) ||
-            (vibrateOnly && !silentUpdate)
+        // alertMode: 0=sound (vibrate+sound), 1=vibrate only, 2=mute (no vibrate, no sound)
+        val shouldVibrate = ((!silentUpdate && !isSilent && notifPriority != -1 && alertMode != 2) ||
+            (vibrateOnly && !silentUpdate && alertMode != 2) ||
+            (alertMode == 1 && !silentUpdate && !isSilent && notifPriority != -1))
         if (shouldVibrate) {
             Handler(Looper.getMainLooper()).postDelayed({
                 vibrateManually(context, vibrationPattern)

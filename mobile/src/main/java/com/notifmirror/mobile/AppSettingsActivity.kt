@@ -52,6 +52,7 @@ class AppSettingsActivity : AppCompatActivity() {
 
         // Watch notifications section
         val priorityGroup = findViewById<RadioGroup>(R.id.priorityGroup)
+        val alertModeGroup = findViewById<RadioGroup>(R.id.alertModeGroup)
         val autoCancelSwitch = findViewById<SwitchMaterial>(R.id.autoCancelSwitch)
         val showOpenButtonSwitch = findViewById<SwitchMaterial>(R.id.showOpenButtonSwitch)
         val showMuteButtonSwitch = findViewById<SwitchMaterial>(R.id.showMuteButtonSwitch)
@@ -101,6 +102,13 @@ class AppSettingsActivity : AppCompatActivity() {
             SettingsManager.PRIORITY_HIGH -> priorityGroup.check(R.id.radioPriorityHigh)
             SettingsManager.PRIORITY_DEFAULT -> priorityGroup.check(R.id.radioPriorityDefault)
             SettingsManager.PRIORITY_LOW -> priorityGroup.check(R.id.radioPriorityLow)
+        }
+
+        // Load current values - Alert mode
+        when (settings.getAlertMode()) {
+            SettingsManager.ALERT_SOUND -> alertModeGroup.check(R.id.radioAlertSound)
+            SettingsManager.ALERT_VIBRATE -> alertModeGroup.check(R.id.radioAlertVibrate)
+            SettingsManager.ALERT_MUTE -> alertModeGroup.check(R.id.radioAlertMute)
         }
 
         autoCancelSwitch.isChecked = settings.isAutoCancelEnabled()
@@ -202,6 +210,7 @@ class AppSettingsActivity : AppCompatActivity() {
         screenModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         ongoingModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         priorityGroup.setOnCheckedChangeListener { _, _ -> showSave() }
+        alertModeGroup.setOnCheckedChangeListener { _, _ -> showSave() }
         complicationSourceGroup.setOnCheckedChangeListener { _, checkedId ->
             complicationAppButton.visibility = if (checkedId == R.id.radioComplicationSpecificApp) View.VISIBLE else View.GONE
             showSave()
@@ -286,6 +295,13 @@ class AppSettingsActivity : AppCompatActivity() {
                 else -> SettingsManager.PRIORITY_HIGH
             }
             settings.setNotificationPriority(priority)
+
+            val alertMode = when (alertModeGroup.checkedRadioButtonId) {
+                R.id.radioAlertVibrate -> SettingsManager.ALERT_VIBRATE
+                R.id.radioAlertMute -> SettingsManager.ALERT_MUTE
+                else -> SettingsManager.ALERT_SOUND
+            }
+            settings.setAlertMode(alertMode)
 
             settings.setAutoCancelEnabled(autoCancelSwitch.isChecked)
             settings.setShowOpenButtonEnabled(showOpenButtonSwitch.isChecked)

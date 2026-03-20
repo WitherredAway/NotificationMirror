@@ -154,8 +154,16 @@ class MainActivity : AppCompatActivity() {
             exportDebugLogs()
         }
 
-        findViewById<TextView>(R.id.githubLink).setOnClickListener {
+        findViewById<LinearLayout>(R.id.githubButton).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/WitherredAway/NotificationMirror")))
+        }
+
+        findViewById<LinearLayout>(R.id.discordButton).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/gK6wQywwzb")))
+        }
+
+        findViewById<LinearLayout>(R.id.kofiButton).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/wthrr")))
         }
 
         // Update banner
@@ -745,6 +753,12 @@ class MainActivity : AppCompatActivity() {
             val effectiveVib = settingsManager.getEffectiveVibrationPattern(packageName)
             if (effectiveVib.isNotEmpty()) {
                 put("vibrationPattern", effectiveVib)
+            }
+            put("alertMode", settingsManager.getEffectiveAlertMode(packageName))
+            put("complicationSource", settingsManager.getComplicationSource())
+            val complicationApp = settingsManager.getComplicationApp()
+            if (complicationApp.isNotEmpty()) {
+                put("complicationApp", complicationApp)
             }
             val appLabel = try {
                 val ai = this@MainActivity.packageManager.getApplicationInfo(packageName, 0)

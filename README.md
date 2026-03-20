@@ -5,8 +5,12 @@
 Made with help from [Devin AI](https://devin.ai).
 
 ---
-### ❤️ Support Me At https://ko-fi.com/wthrr ❤️
----
+
+<p align="center">
+  <a href="https://ko-fi.com/wthrr"><img src="https://img.shields.io/badge/Support%20Me-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
+  <a href="https://discord.gg/gK6wQywwzb"><img src="https://img.shields.io/badge/Join-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
+</p>
+
 <p align="center">
   <img src="screenshots/phone_main.jpg" width="260" alt="Phone app main screen" />
   <img src="screenshots/watch_notifications.png" width="180" alt="Watch notifications" />
@@ -57,6 +61,7 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Snooze button** — snooze individual notifications for a configurable duration (per-app)
 - **Per-app custom sounds** — set a custom notification sound for any app via the watch notification channel
 - **Vibration patterns** — 12 built-in presets (Default, Short Buzz, Long Buzz, Double Tap, Triple Tap, Gentle, Strong, Heartbeat, Pulse, Ramp Up, SOS, Silent) + custom pattern support, configurable globally and per-app
+- **Alert mode** — sound, vibrate, or mute per notification, configurable globally and per-app
 - **Notification priority** — configurable (High / Default / Low), per-app
 - **Auto-cancel on tap** — configurable, per-app
 - **BigText threshold** — configurable character count before expanded text kicks in, per-app
@@ -90,8 +95,9 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Wear Tile** — quick-glance tile showing notification counts per app, with action buttons for Pause/Resume mirroring, Mute/Unmute all, and connection info
 - **Notification settings shortcut** — button to open WearOS granular notification settings
 - **Mirroring toggle** — pause/resume mirroring directly from the watch (synced to phone)
+- **Support section** — GitHub (with version/update status) and Discord buttons that open links on your phone
 - **Bezel/rotary scrolling** — native rotary input support for scrolling through the watch UI
-- **Auto permission requests** — watch app asks for required permissions on first launch
+- **Auto permission requests** — watch app asks for required permissions on first launch, with a status card showing permission state
 
 ### Phone App
 - **Dashboard** — at-a-glance status showing mirroring state, watch connection, app/filter/log counts
@@ -101,7 +107,9 @@ So that's why this app exists! It basically lets you have the watch app installe
 - **Auto-update** — automatically check for and install updates from GitHub releases
 - **Battery optimization prompt** — reminds you to allow unrestricted battery for reliable background operation
 - **Auto permission requests** — phone app asks for notification access and unrestricted battery on launch
-- **GitHub link** — quick link to the project repo
+- **GitHub link** — quick link to the project repo with version and update status
+- **Discord link** — quick link to the [Discord server](https://discord.gg/gK6wQywwzb)
+- **Ko-fi link** — quick link to support the developer on [Ko-fi](https://ko-fi.com/wthrr)
 
 ### Security
 - **End-to-end encryption** — all notification data between phone and watch is encrypted with AES-256-GCM
@@ -116,7 +124,11 @@ So that's why this app exists! It basically lets you have the watch app installe
 1. Download the phone and watch APKs from the [releases page](https://github.com/WitherredAway/NotificationMirror/releases) (or build the APKs yourself, scroll down for that)
 
 ### Install
-You'll have to sideload the watch APK, e.g. using [Wear Installer 2](https://play.google.com/store/apps/details?id=org.freepoc.wearinstaller2&hl=en_IN) or [Geminiman WearOS Manager](https://play.google.com/store/apps/details?id=com.geminiman.wearosmanager&hl=en_IN) or adb, etc.
+You'll have to sideload the watch APK using one of these tools:
+- [Wear Installer 2](https://play.google.com/store/apps/details?id=org.freepoc.wearinstaller2) ([Website](https://freepoc.org/wear-installer-2-help-page/)) — simple ADB-based installer over Wi-Fi
+- [WearLoad](https://play.google.com/store/apps/details?id=com.camope.wearload) ([Website](https://wearload.github.io/index_en.html) · [XDA](https://xdaforums.com/t/app-wear-os-wearload-install-apk-apks-zip-without-debug-mode-and-adb.4766128/)) — install APKs without debug mode or ADB
+- [GeminiMan WearOS Manager](https://play.google.com/store/apps/details?id=com.geminiman.wearosmanager) — full-featured watch manager with app installer
+- Or use `adb` directly from a computer
 
 If Google Play prevents you from installing the phone APK, please use [Install With Options](https://github.com/zacharee/InstallWithOptions) to install it.
 
