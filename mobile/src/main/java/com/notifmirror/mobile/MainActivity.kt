@@ -159,7 +159,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<LinearLayout>(R.id.discordButton).setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/qUYayXyQX")))
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/gK6wQywwzb")))
         }
 
         // Update banner

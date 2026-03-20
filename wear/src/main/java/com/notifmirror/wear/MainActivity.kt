@@ -169,7 +169,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<LinearLayout>(R.id.discordButton).setOnClickListener {
-            openUrlOnPhone("https://discord.gg/qUYayXyQX")
+            openUrlOnPhone("https://discord.gg/gK6wQywwzb")
         }
 
         // Keep History toggle
