@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.PowerManager
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
@@ -358,6 +359,19 @@ class NotificationListener : NotificationListenerService() {
             if (effectiveVib.isNotEmpty()) {
                 put("vibrationPattern", effectiveVib)
             }
+            // Send notification tag for conversation-level deep linking on watch
+            // (e.g. WhatsApp sets tag to JID like "1234567890@s.whatsapp.net")
+            val tag = sbn.tag
+            if (!tag.isNullOrEmpty()) {
+                put("notifTag", tag)
+            }
+            // Send shortcutId for Android conversation shortcut support (API 30+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val sid = notification.shortcutId
+                if (!sid.isNullOrEmpty()) {
+                    put("shortcutId", sid)
+                }
+            }
             // Send complication settings so watch can filter by app
             put("complicationSource", settings.getComplicationSource())
             val complicationApp = settings.getComplicationApp()
@@ -660,6 +674,18 @@ class NotificationListener : NotificationListenerService() {
                         put("autoDismissSync", settings.getEffectiveAutoDismissSync(appPackageName))
                         put("showOpenButton", settings.getEffectiveShowOpenButton(appPackageName))
                         put("hasContentIntent", syncContentIntent != null)
+                        // Send notification tag for conversation-level deep linking on watch
+                        val syncTag = sbn.tag
+                        if (!syncTag.isNullOrEmpty()) {
+                            put("notifTag", syncTag)
+                        }
+                        // Send shortcutId for Android conversation shortcut support (API 30+)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val syncSid = notification.shortcutId
+                            if (!syncSid.isNullOrEmpty()) {
+                                put("shortcutId", syncSid)
+                            }
+                        }
                         put("showMuteButton", settings.getEffectiveShowMuteButton(appPackageName))
                         put("showSnoozeButton", settings.getEffectiveShowSnoozeButton(appPackageName))
                         put("snoozeDuration", settings.getEffectiveSnoozeDuration(appPackageName))

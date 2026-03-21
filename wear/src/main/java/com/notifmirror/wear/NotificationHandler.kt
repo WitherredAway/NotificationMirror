@@ -97,6 +97,9 @@ object NotificationHandler {
             val muteContinuation = json.optBoolean("muteContinuation", false)
             val vibrateOnly = json.optBoolean("vibrateOnly", false)
             val alertMode = json.optInt("alertMode", 0) // 0=sound, 1=vibrate, 2=mute
+            // Deep link data for "Open on Watch" with sideloaded apps
+            val notifTag = json.optString("notifTag", "")
+            val shortcutId = json.optString("shortcutId", "")
             // Single SharedPreferences lookup for all watch-side settings
             val watchSettings = context.getSharedPreferences("notif_mirror_settings", Context.MODE_PRIVATE)
 
@@ -254,7 +257,8 @@ object NotificationHandler {
                 vibrateOnly = vibrateOnly, alertMode = alertMode,
                 conversationTitle = conversationTitle,
                 pictureBitmap = pictureBitmap,
-                isMessagingStyle = isMessagingStyle
+                isMessagingStyle = isMessagingStyle,
+                notifTag = notifTag, shortcutId = shortcutId
             )
 
             if (!isUpdate) {
@@ -419,7 +423,9 @@ object NotificationHandler {
         alertMode: Int = 0, // 0=sound, 1=vibrate, 2=mute
         conversationTitle: String = "",
         pictureBitmap: Bitmap? = null,
-        isMessagingStyle: Boolean = false
+        isMessagingStyle: Boolean = false,
+        notifTag: String = "",
+        shortcutId: String = ""
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -620,7 +626,8 @@ object NotificationHandler {
 
         if (showOpenButton) {
             // "Open on Watch" — launches the app directly on watch if installed
-            val launchIntent = getCompanionLaunchIntent(context, packageName)
+            // For sideloaded apps, tries conversation-level deep linking first
+            val launchIntent = getCompanionLaunchIntent(context, packageName, notifTag, shortcutId)
             if (launchIntent != null) {
                 val openRequestCode = (notifKey + "open").hashCode() and 0x7FFFFFFF
                 val openPendingIntent = PendingIntent.getActivity(
@@ -770,8 +777,21 @@ object NotificationHandler {
         }
     }
 
-    private fun getCompanionLaunchIntent(context: Context, phonePackageName: String): Intent? {
+    private fun getCompanionLaunchIntent(
+        context: Context,
+        phonePackageName: String,
+        notifTag: String = "",
+        shortcutId: String = ""
+    ): Intent? {
         val pm = context.packageManager
+
+        // Try conversation-level deep link first (for sideloaded apps)
+        val deepLinkIntent = getDeepLinkIntent(context, phonePackageName, notifTag, shortcutId)
+        if (deepLinkIntent != null) {
+            Log.d(TAG, "Using deep link for $phonePackageName (tag=$notifTag, shortcutId=$shortcutId)")
+            return deepLinkIntent
+        }
+
         val directIntent = pm.getLaunchIntentForPackage(phonePackageName)
         if (directIntent != null) {
             directIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -785,6 +805,82 @@ object NotificationHandler {
                 return mappedIntent
             }
         }
+        return null
+    }
+
+    /**
+     * Try to construct a conversation-level deep link intent for sideloaded apps.
+     * Uses notification tag and shortcutId sent from the phone to build app-specific
+     * deep link URIs that open the specific conversation rather than just the app.
+     *
+     * Falls back to null if the app isn't installed or the deep link can't be resolved.
+     */
+    private fun getDeepLinkIntent(
+        context: Context,
+        packageName: String,
+        notifTag: String,
+        shortcutId: String
+    ): Intent? {
+        if (notifTag.isEmpty() && shortcutId.isEmpty()) return null
+
+        val pm = context.packageManager
+        // Only try deep linking if the app is actually installed on the watch
+        try {
+            pm.getPackageInfo(packageName, 0)
+        } catch (_: Exception) {
+            return null
+        }
+
+        val uri = when (packageName) {
+            "com.whatsapp", "com.whatsapp.w4b" -> {
+                // WhatsApp sets notification tag to JID (e.g. "1234567890@s.whatsapp.net")
+                if (notifTag.contains("@")) {
+                    Uri.parse("whatsapp://send?jid=$notifTag")
+                } else null
+            }
+            "com.facebook.orca" -> {
+                // Messenger: use shortcutId or tag as thread identifier
+                val threadId = shortcutId.ifEmpty { notifTag }
+                if (threadId.isNotEmpty()) {
+                    Uri.parse("fb-messenger://thread/$threadId")
+                } else null
+            }
+            "org.telegram.messenger", "org.telegram.messenger.web",
+            "org.thunderdog.challegram", "nekox.messenger" -> {
+                // Telegram and forks: try tg:// scheme with chat identifier
+                val chatId = notifTag.ifEmpty { shortcutId }
+                if (chatId.isNotEmpty()) {
+                    Uri.parse("tg://openmessage?chat_id=$chatId")
+                } else null
+            }
+            "com.discord" -> {
+                // Discord: try discord:// scheme with channel info from tag
+                val channelId = notifTag.ifEmpty { shortcutId }
+                if (channelId.isNotEmpty()) {
+                    Uri.parse("discord://discord.com/channels/$channelId")
+                } else null
+            }
+            "com.instagram.android" -> {
+                // Instagram: try opening thread via shortcutId
+                if (shortcutId.isNotEmpty()) {
+                    Uri.parse("instagram://direct_thread?threadId=$shortcutId")
+                } else null
+            }
+            else -> null
+        }
+
+        if (uri != null) {
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setPackage(packageName)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            // Verify the intent can be resolved before returning
+            if (intent.resolveActivity(pm) != null) {
+                return intent
+            }
+            Log.d(TAG, "Deep link $uri not resolvable for $packageName, falling back to launch")
+        }
+
         return null
     }
 
