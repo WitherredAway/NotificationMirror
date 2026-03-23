@@ -43,7 +43,6 @@ object NotificationHandler {
     // Track message history per conversation key for stacking
     // Use ArrayDeque for O(1) head removal when capping at 50 messages
     private val conversationMessages = java.util.concurrent.ConcurrentHashMap<String, ArrayDeque<Pair<String, String>>>()
-    private val nextId = java.util.concurrent.atomic.AtomicInteger(1000)
     private val idLock = Any()
     private const val SUMMARY_ID_OFFSET = 500000
     private const val MAX_TRACKED_CONVERSATIONS = 200
@@ -169,7 +168,13 @@ object NotificationHandler {
 
             val (isUpdate, notifId, messages) = synchronized(idLock) {
                 val existing = notifIdMap.containsKey(conversationKey)
-                val id = notifIdMap.getOrPut(conversationKey) { nextId.getAndIncrement() }
+                // Use deterministic hash-based ID so the same conversation always gets
+                // the same notification ID, even after WearOS kills and restarts our process.
+                // Without this, process restarts cause nextId to reset and assign different IDs
+                // to existing conversations, leaving stale notifications as duplicates.
+                val id = notifIdMap.getOrPut(conversationKey) {
+                    (conversationKey.hashCode() and 0x7FFFFFFF).coerceAtLeast(1000)
+                }
 
                 // Track conversation messages for stacking (cap at 50 to avoid unbounded memory growth)
                 val msgList = conversationMessages.getOrPut(conversationKey) { ArrayDeque() }

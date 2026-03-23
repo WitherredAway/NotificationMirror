@@ -22,11 +22,30 @@ object MessageHelper {
 
     private const val TAG = "NotifMirrorWear"
 
+    // Dedup cache: both NotificationReceiverService (WearableListenerService) and
+    // PersistentListenerService (foreground service) receive the same message.
+    // Track recent message hashes to skip duplicate processing.
+    private val recentMessageHashes = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+    private const val DEDUP_WINDOW_MS = 2000L
+
     /**
      * Route an incoming message to the appropriate handler based on its path.
      */
     fun handleMessage(context: Context, messageEvent: MessageEvent) {
         Log.d(TAG, "MessageHelper received message on path: ${messageEvent.path}")
+
+        // Deduplicate: both WearableListenerService and PersistentListenerService
+        // receive the same message. Skip if we already processed this exact message.
+        val msgHash = (messageEvent.path.hashCode() * 31 + messageEvent.data.contentHashCode())
+        val now = System.currentTimeMillis()
+        val previous = recentMessageHashes.put(msgHash, now)
+        if (previous != null && now - previous < DEDUP_WINDOW_MS) {
+            Log.d(TAG, "Skipping duplicate message on path: ${messageEvent.path}")
+            return
+        }
+        // Prune old entries
+        recentMessageHashes.entries.removeAll { now - it.value > DEDUP_WINDOW_MS * 2 }
+
         when (messageEvent.path) {
             "/notification" -> {
                 val decryptedData = decryptMessageData(context, messageEvent.data)
