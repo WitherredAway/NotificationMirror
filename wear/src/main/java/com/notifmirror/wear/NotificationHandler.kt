@@ -40,11 +40,13 @@ object NotificationHandler {
 
     // Track notification ID per conversation key (reuse for stacking)
     private val notifIdMap = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    // Reverse mapping: notification ID → conversation key (for collision detection)
+    private val notifIdReverse = java.util.concurrent.ConcurrentHashMap<Int, String>()
     // Track message history per conversation key for stacking
     // Use ArrayDeque for O(1) head removal when capping at 50 messages
     private val conversationMessages = java.util.concurrent.ConcurrentHashMap<String, ArrayDeque<Pair<String, String>>>()
     private val idLock = Any()
-    private const val SUMMARY_ID_OFFSET = 500000
+    private const val SUMMARY_TAG = "summary"
     private const val MAX_TRACKED_CONVERSATIONS = 200
 
     private val DEFAULT_VIBRATION = longArrayOf(0, 200, 100, 200)
@@ -177,7 +179,14 @@ object NotificationHandler {
                 // Without this, process restarts cause nextId to reset and assign different IDs
                 // to existing conversations, leaving stale notifications as duplicates.
                 val id = notifIdMap.getOrPut(conversationKey) {
-                    (conversationKey.hashCode() and 0x7FFFFFFF).coerceAtLeast(1000)
+                    var candidate = (conversationKey.hashCode() and 0x7FFFFFFF).coerceAtLeast(1000)
+                    // Resolve hash collisions: if another conversation already uses this ID, increment
+                    while (true) {
+                        val existing = notifIdReverse.putIfAbsent(candidate, conversationKey)
+                        if (existing == null || existing == conversationKey) break
+                        candidate = ((candidate + 1) and 0x7FFFFFFF).coerceAtLeast(1000)
+                    }
+                    candidate
                 }
 
                 // Track conversation messages for stacking (cap at 50 to avoid unbounded memory growth)
@@ -323,8 +332,9 @@ object NotificationHandler {
                 }
                 val stale = staleMap.values.toList()
                 // Clean up the stale entries
-                for ((convKey, _, _) in stale) {
+                for ((convKey, notifId, _) in stale) {
                     notifIdMap.remove(convKey)
+                    notifIdReverse.remove(notifId)
                     conversationMessages.remove(convKey)
                     convKeyToPackage.remove(convKey)
                 }
@@ -350,7 +360,7 @@ object NotificationHandler {
                         convKeyToPackage.values.any { it == pkg }
                     }
                     if (!hasOtherNotifs) {
-                        nm.cancel(pkg.hashCode() + SUMMARY_ID_OFFSET)
+                        nm.cancel(SUMMARY_TAG, (pkg.hashCode() and 0x7FFFFFFF))
                     }
                 }
             }
@@ -371,6 +381,7 @@ object NotificationHandler {
             val (notifId, _, packageName) = synchronized(idLock) {
                 val convKey = notifKeyToConversationKey.remove(key) ?: key
                 val id = notifIdMap.remove(convKey) ?: return
+                notifIdReverse.remove(id)
                 conversationMessages.remove(convKey)
                 val pkg = convKeyToPackage.remove(convKey) ?: json.optString("package", "")
                 Triple(id, convKey, pkg)
@@ -384,7 +395,7 @@ object NotificationHandler {
                     convKeyToPackage.values.any { it == packageName }
                 }
                 if (!hasOtherNotifs) {
-                    nm.cancel(packageName.hashCode() + SUMMARY_ID_OFFSET)
+                    nm.cancel(SUMMARY_TAG, (packageName.hashCode() and 0x7FFFFFFF))
                 }
             }
             if (packageName.isNotEmpty()) {
@@ -717,8 +728,9 @@ object NotificationHandler {
             }, 150)
         }
 
-        // Create/update summary notification for the per-app group
-        val summaryId = packageName.hashCode() + SUMMARY_ID_OFFSET
+        // Create/update summary notification for the per-app group.
+        // Uses a tag ("summary") to prevent ID collision with regular notification IDs.
+        val summaryId = (packageName.hashCode() and 0x7FFFFFFF)
         val summaryBuilder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(appLabel)
@@ -730,7 +742,7 @@ object NotificationHandler {
             .setSilent(true)
             .setStyle(NotificationCompat.InboxStyle()
                 .setSummaryText(appLabel))
-        nm.notify(summaryId, summaryBuilder.build())
+        nm.notify(SUMMARY_TAG, summaryId, summaryBuilder.build())
     }
 
     /**
@@ -959,6 +971,29 @@ object NotificationHandler {
             val activeConvKeys = synchronized(idLock) { notifIdMap.keys.toSet() }
             notifKeyToConversationKey.entries.removeAll { it.value !in activeConvKeys }
             convKeyToPackage.entries.removeAll { it.key !in activeConvKeys }
+            conversationMessages.entries.removeAll { it.key !in activeConvKeys }
+        }
+        // Also prune notifIdMap/notifIdReverse if they grow too large
+        if (notifIdMap.size > MAX_TRACKED_CONVERSATIONS) {
+            synchronized(idLock) {
+                // Keep the most recent entries by removing excess from the maps
+                val excess = notifIdMap.size - MAX_TRACKED_CONVERSATIONS
+                if (excess > 0) {
+                    val iter = notifIdMap.entries.iterator()
+                    var removed = 0
+                    val removedConvKeys = mutableSetOf<String>()
+                    while (iter.hasNext() && removed < excess) {
+                        val entry = iter.next()
+                        iter.remove()
+                        notifIdReverse.remove(entry.value)
+                        conversationMessages.remove(entry.key)
+                        convKeyToPackage.remove(entry.key)
+                        removedConvKeys.add(entry.key)
+                        removed++
+                    }
+                    notifKeyToConversationKey.entries.removeAll { it.value in removedConvKeys }
+                }
+            }
         }
     }
 
