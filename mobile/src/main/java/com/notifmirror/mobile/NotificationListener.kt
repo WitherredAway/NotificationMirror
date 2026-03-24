@@ -381,16 +381,8 @@ class NotificationListener : NotificationListenerService() {
         }
 
         // Derive conversation key for log grouping (mirrors watch-side logic)
-        val isMessagingStyle = conversationMessages.isNotEmpty()
-        val logConversationKey = if (isMessagingStyle) {
-            when {
-                conversationTitle.isNotEmpty() -> "$appPackageName:$conversationTitle"
-                title.isNotEmpty() -> "$appPackageName:$title"
-                else -> notifKey
-            }
-        } else {
-            notifKey
-        }
+        // Uses notifKey (sbn.key) which is the stable, canonical notification identifier
+        val logConversationKey = notifKey
 
         Log.d(TAG, "Forwarding notification: $title from $appPackageName (${actionsJson.length()} actions)")
 

@@ -150,8 +150,9 @@ object NotificationHandler {
             val isMessagingStyle = json.optBoolean("isMessagingStyle", false)
             val conversationTitle = json.optString("conversationTitle", "")
             val conversationKey = deriveConversationKey(packageName, key, title, isMessagingStyle, conversationTitle)
-            // Track reverse mapping for dismissals
+            // Track reverse mapping for dismissals and package name for tile/summary cleanup
             notifKeyToConversationKey[key] = conversationKey
+            convKeyToPackage[conversationKey] = packageName
             pruneTrackingMapsIfNeeded()
 
             // Reuse notification ID for same conversation key to stack messages
@@ -315,7 +316,7 @@ object NotificationHandler {
                     if (notifKey !in activeKeys && convKey !in staleMap) {
                         val notifId = notifIdMap[convKey]
                         if (notifId != null) {
-                            val pkg = convKey.substringBefore(":")
+                            val pkg = convKeyToPackage[convKey] ?: ""
                             staleMap[convKey] = Triple(convKey, notifId, pkg)
                         }
                     }
@@ -325,6 +326,7 @@ object NotificationHandler {
                 for ((convKey, _, _) in stale) {
                     notifIdMap.remove(convKey)
                     conversationMessages.remove(convKey)
+                    convKeyToPackage.remove(convKey)
                 }
                 // Remove stale notifKey → convKey mappings
                 notifKeyToConversationKey.entries.removeAll { it.key !in activeKeys }
@@ -342,10 +344,10 @@ object NotificationHandler {
 
             // Clean up orphaned summaries
             if (staleEntries.isNotEmpty()) {
-                val packagesToCheck = staleEntries.map { it.third }.distinct()
+                val packagesToCheck = staleEntries.map { it.third }.filter { it.isNotEmpty() }.distinct()
                 for (pkg in packagesToCheck) {
                     val hasOtherNotifs = synchronized(idLock) {
-                        notifIdMap.keys.any { k -> k == pkg || k.startsWith("$pkg:") }
+                        convKeyToPackage.values.any { it == pkg }
                     }
                     if (!hasOtherNotifs) {
                         nm.cancel(pkg.hashCode() + SUMMARY_ID_OFFSET)
@@ -370,7 +372,8 @@ object NotificationHandler {
                 val convKey = notifKeyToConversationKey.remove(key) ?: key
                 val id = notifIdMap.remove(convKey) ?: return
                 conversationMessages.remove(convKey)
-                Triple(id, convKey, json.optString("package", ""))
+                val pkg = convKeyToPackage.remove(convKey) ?: json.optString("package", "")
+                Triple(id, convKey, pkg)
             }
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(notifId)
@@ -378,9 +381,7 @@ object NotificationHandler {
             // Cancel the per-app summary if no more notifications for this package
             if (packageName.isNotEmpty()) {
                 val hasOtherNotifs = synchronized(idLock) {
-                    notifIdMap.keys.any { k ->
-                        k == packageName || k.startsWith("$packageName:")
-                    }
+                    convKeyToPackage.values.any { it == packageName }
                 }
                 if (!hasOtherNotifs) {
                     nm.cancel(packageName.hashCode() + SUMMARY_ID_OFFSET)
@@ -923,11 +924,16 @@ object NotificationHandler {
 
     /**
      * Derive a conversation-level grouping key from notification metadata.
-     * For messaging apps (detected via MessagingStyle on the phone side),
-     * uses conversationTitle (from EXTRA_CONVERSATION_TITLE) when available
-     * for stable grouping — this is the group/chat name that stays constant
-     * even when different people send messages (e.g. WhatsApp group name).
-     * Falls back to notification title, then notification key.
+     *
+     * Always uses the notification key (sbn.key from the phone) which is the
+     * canonical, stable identifier for a notification. Each conversation in
+     * messaging apps (WhatsApp, Telegram, etc.) has exactly one notification
+     * with a stable key that persists across content updates.
+     *
+     * Previous approach used conversationTitle/title, but these are unstable:
+     * WhatsApp includes dynamic content like "(14 messages)", "person replied
+     * to you", sender name, etc. — causing a different key per update and
+     * leaving stale notifications as duplicates.
      */
     private fun deriveConversationKey(
         packageName: String,
@@ -936,23 +942,15 @@ object NotificationHandler {
         isMessagingStyle: Boolean,
         conversationTitle: String = ""
     ): String {
-        return if (isMessagingStyle) {
-            when {
-                // Prefer conversationTitle — stable across sender changes
-                // e.g. "HHH GNG" stays the same regardless of who sent the message
-                conversationTitle.isNotEmpty() -> "$packageName:$conversationTitle"
-                // Fallback to title if no conversationTitle (1:1 chats)
-                title.isNotEmpty() -> "$packageName:$title"
-                else -> notifKey
-            }
-        } else {
-            // Non-messaging apps: use the original notification key
-            notifKey
-        }
+        // The notification key (sbn.key) is always stable for the same conversation.
+        // It only changes if the notification is dismissed and recreated.
+        return notifKey
     }
 
     // Reverse lookup: find conversation key from notification key
     private val notifKeyToConversationKey = java.util.concurrent.ConcurrentHashMap<String, String>()
+    // Track package name per conversation key (needed for tile counts and summary cleanup)
+    private val convKeyToPackage = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /** Prune tracking maps if they grow too large to keep memory bounded */
     private fun pruneTrackingMapsIfNeeded() {
@@ -960,6 +958,7 @@ object NotificationHandler {
             // Only keep entries that have a corresponding notifIdMap entry
             val activeConvKeys = synchronized(idLock) { notifIdMap.keys.toSet() }
             notifKeyToConversationKey.entries.removeAll { it.value !in activeConvKeys }
+            convKeyToPackage.entries.removeAll { it.key !in activeConvKeys }
         }
     }
 
