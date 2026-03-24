@@ -38,6 +38,13 @@ KEYSTORE_PASSWORD=<password> KEY_ALIAS=<alias> KEY_PASSWORD=<password> ./gradlew
 - Phone: `mobile/build/outputs/apk/release/mobile-release.apk`
 - Watch: `wear/build/outputs/apk/release/wear-release.apk`
 
+### APK Naming Convention
+When copying/renaming APKs for the user, **always** use this format:
+- `NotificationMirror-Phone-vX.x.x.apk` (e.g., `NotificationMirror-Phone-v1.7.0.apk`)
+- `NotificationMirror-Watch-vX.x.x.apk` (e.g., `NotificationMirror-Watch-v1.7.0.apk`)
+
+The version number must match the `versionName` in the build.gradle files. Never use suffixes like `-fix18`, `-v2`, etc.
+
 ### Version Management
 - Version is defined in BOTH `mobile/build.gradle` and `wear/build.gradle`
 - Both files must be updated together: `versionCode` (integer) and `versionName` (string)
@@ -199,7 +206,7 @@ complicationSource, complicationApp
 ```
 
 ## Watch Notification Features
-- **Conversation stacking** — Messages grouped by conversation key (packageName:conversationTitle or packageName:title)
+- **Conversation stacking** — Messages grouped by conversation key (uses sbn.key from Android, which is stable across content updates)
 - **MessagingStyle rendering** — Multi-message conversations shown with sender names
 - **Content hash dedup** — Prevents re-alerting on unchanged notifications (important for WhatsApp which re-posts all unread)
 - **Reply suppression** — 5-second silence window after replying to prevent echo
