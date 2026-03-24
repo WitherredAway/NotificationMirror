@@ -981,14 +981,17 @@ object NotificationHandler {
                 if (excess > 0) {
                     val iter = notifIdMap.entries.iterator()
                     var removed = 0
+                    val removedConvKeys = mutableSetOf<String>()
                     while (iter.hasNext() && removed < excess) {
                         val entry = iter.next()
                         iter.remove()
                         notifIdReverse.remove(entry.value)
                         conversationMessages.remove(entry.key)
                         convKeyToPackage.remove(entry.key)
+                        removedConvKeys.add(entry.key)
                         removed++
                     }
+                    notifKeyToConversationKey.entries.removeAll { it.value in removedConvKeys }
                 }
             }
         }
