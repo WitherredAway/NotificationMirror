@@ -923,11 +923,16 @@ object NotificationHandler {
 
     /**
      * Derive a conversation-level grouping key from notification metadata.
-     * For messaging apps (detected via MessagingStyle on the phone side),
-     * uses conversationTitle (from EXTRA_CONVERSATION_TITLE) when available
-     * for stable grouping — this is the group/chat name that stays constant
-     * even when different people send messages (e.g. WhatsApp group name).
-     * Falls back to notification title, then notification key.
+     *
+     * Always uses the notification key (sbn.key from the phone) which is the
+     * canonical, stable identifier for a notification. Each conversation in
+     * messaging apps (WhatsApp, Telegram, etc.) has exactly one notification
+     * with a stable key that persists across content updates.
+     *
+     * Previous approach used conversationTitle/title, but these are unstable:
+     * WhatsApp includes dynamic content like "(14 messages)", "person replied
+     * to you", sender name, etc. — causing a different key per update and
+     * leaving stale notifications as duplicates.
      */
     private fun deriveConversationKey(
         packageName: String,
@@ -936,19 +941,9 @@ object NotificationHandler {
         isMessagingStyle: Boolean,
         conversationTitle: String = ""
     ): String {
-        return if (isMessagingStyle) {
-            when {
-                // Prefer conversationTitle — stable across sender changes
-                // e.g. "HHH GNG" stays the same regardless of who sent the message
-                conversationTitle.isNotEmpty() -> "$packageName:$conversationTitle"
-                // Fallback to title if no conversationTitle (1:1 chats)
-                title.isNotEmpty() -> "$packageName:$title"
-                else -> notifKey
-            }
-        } else {
-            // Non-messaging apps: use the original notification key
-            notifKey
-        }
+        // The notification key (sbn.key) is always stable for the same conversation.
+        // It only changes if the notification is dismissed and recreated.
+        return notifKey
     }
 
     // Reverse lookup: find conversation key from notification key
