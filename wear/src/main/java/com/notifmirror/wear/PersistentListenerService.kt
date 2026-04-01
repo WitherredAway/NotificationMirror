@@ -53,7 +53,7 @@ class PersistentListenerService : Service(),
 
     private lateinit var messageClient: MessageClient
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var phoneConnected = false
+    @Volatile private var phoneConnected = false
 
     override fun onCreate() {
         super.onCreate()
