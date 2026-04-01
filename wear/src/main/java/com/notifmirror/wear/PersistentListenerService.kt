@@ -9,6 +9,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.google.android.gms.wearable.CapabilityClient
+import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -16,13 +18,24 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-class PersistentListenerService : Service(), MessageClient.OnMessageReceivedListener, DataClient.OnDataChangedListener {
+class PersistentListenerService : Service(),
+    MessageClient.OnMessageReceivedListener,
+    DataClient.OnDataChangedListener,
+    CapabilityClient.OnCapabilityChangedListener {
 
     companion object {
         private const val TAG = "NotifMirrorWear"
         private const val CHANNEL_ID = "persistent_listener"
         private const val NOTIFICATION_ID = 1
+        private const val PHONE_CAPABILITY = "notif_mirror_phone"
 
         fun start(context: Context) {
             val intent = Intent(context, PersistentListenerService::class.java)
@@ -39,6 +52,8 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
     }
 
     private lateinit var messageClient: MessageClient
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    @Volatile private var phoneConnected = false
 
     override fun onCreate() {
         super.onCreate()
@@ -49,13 +64,30 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
         messageClient = Wearable.getMessageClient(this)
         messageClient.addListener(this)
         Wearable.getDataClient(this).addListener(this)
-        Log.d(TAG, "MessageClient and DataClient listeners registered")
+        // Listen for phone capability changes to detect reconnection
+        Wearable.getCapabilityClient(this).addListener(this, PHONE_CAPABILITY)
+        Log.d(TAG, "MessageClient, DataClient, and CapabilityClient listeners registered")
+
+        // Check initial phone connection state
+        scope.launch {
+            try {
+                val capabilityInfo = Wearable.getCapabilityClient(this@PersistentListenerService)
+                    .getCapability(PHONE_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
+                    .await()
+                phoneConnected = capabilityInfo.nodes.isNotEmpty()
+                Log.d(TAG, "Initial phone capability nodes: ${capabilityInfo.nodes.size}")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to check initial phone capability", e)
+            }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        scope.cancel()
         messageClient.removeListener(this)
         Wearable.getDataClient(this).removeListener(this)
+        Wearable.getCapabilityClient(this).removeListener(this)
         Log.d(TAG, "PersistentListenerService destroyed, listeners removed")
     }
 
@@ -68,6 +100,33 @@ class PersistentListenerService : Service(), MessageClient.OnMessageReceivedList
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Log.d(TAG, "PersistentListener received message on path: ${messageEvent.path}")
         MessageHelper.handleMessage(this, messageEvent)
+    }
+
+    override fun onCapabilityChanged(capabilityInfo: CapabilityInfo) {
+        val hasPhone = capabilityInfo.nodes.isNotEmpty()
+        Log.d(TAG, "Phone capability changed: ${capabilityInfo.nodes.size} nodes (was connected=$phoneConnected)")
+
+        if (hasPhone && !phoneConnected) {
+            // Phone just reconnected — request a full sync so reconciliation
+            // cleans up any stale notifications from missed dismissals
+            // (e.g. watch was locked/off wrist when phone dismissed notifications)
+            Log.d(TAG, "Phone reconnected — requesting sync for reconciliation")
+            scope.launch {
+                try {
+                    // Small delay to let the connection stabilize
+                    delay(1500)
+                    for (node in capabilityInfo.nodes) {
+                        Wearable.getMessageClient(this@PersistentListenerService)
+                            .sendMessage(node.id, "/request_sync", ByteArray(0))
+                            .await()
+                    }
+                    Log.d(TAG, "Reconnection sync requested from phone")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to request reconnection sync", e)
+                }
+            }
+        }
+        phoneConnected = hasPhone
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
