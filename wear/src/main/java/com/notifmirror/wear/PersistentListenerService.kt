@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -36,6 +38,7 @@ class PersistentListenerService : Service(),
         private const val CHANNEL_ID = "persistent_listener"
         private const val NOTIFICATION_ID = 1
         private const val PHONE_CAPABILITY = "notif_mirror_phone"
+        private const val RECONCILE_MIN_INTERVAL_MS = 30_000L
 
         fun start(context: Context) {
             val intent = Intent(context, PersistentListenerService::class.java)
@@ -54,6 +57,20 @@ class PersistentListenerService : Service(),
     private lateinit var messageClient: MessageClient
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     @Volatile private var phoneConnected = false
+    @Volatile private var lastReconcileRequestMs = 0L
+
+    // Fires when the watch screen turns on (e.g. the user picks it up after it was
+    // charging/asleep). Triggers a lightweight reconcile so notifications dismissed on
+    // the phone while the watch was idle are cleared. Debounced to avoid spamming on
+    // every wrist raise. Screen on/off cannot be declared in the manifest, so this is
+    // registered at runtime while the foreground service is alive.
+    private val screenOnReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_ON) {
+                requestReconcileDebounced()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -66,7 +83,8 @@ class PersistentListenerService : Service(),
         Wearable.getDataClient(this).addListener(this)
         // Listen for phone capability changes to detect reconnection
         Wearable.getCapabilityClient(this).addListener(this, PHONE_CAPABILITY)
-        Log.d(TAG, "MessageClient, DataClient, and CapabilityClient listeners registered")
+        registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+        Log.d(TAG, "MessageClient, DataClient, CapabilityClient and screen-on listeners registered")
 
         // Check initial phone connection state
         scope.launch {
@@ -88,7 +106,36 @@ class PersistentListenerService : Service(),
         messageClient.removeListener(this)
         Wearable.getDataClient(this).removeListener(this)
         Wearable.getCapabilityClient(this).removeListener(this)
+        try {
+            unregisterReceiver(screenOnReceiver)
+        } catch (e: Exception) {
+            Log.w(TAG, "screenOnReceiver was not registered", e)
+        }
         Log.d(TAG, "PersistentListenerService destroyed, listeners removed")
+    }
+
+    /**
+     * Ask the phone for a reconcile so stale notifications get cleared, but at most
+     * once per [RECONCILE_MIN_INTERVAL_MS] so frequent wrist-raises don't spam the link.
+     */
+    private fun requestReconcileDebounced() {
+        val now = System.currentTimeMillis()
+        if (now - lastReconcileRequestMs < RECONCILE_MIN_INTERVAL_MS) return
+        lastReconcileRequestMs = now
+        scope.launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@PersistentListenerService)
+                    .connectedNodes.await()
+                for (node in nodes) {
+                    Wearable.getMessageClient(this@PersistentListenerService)
+                        .sendMessage(node.id, "/request_reconcile", ByteArray(0))
+                        .await()
+                }
+                Log.d(TAG, "Requested reconcile on screen-on (${nodes.size} nodes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to request reconcile on screen-on", e)
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
