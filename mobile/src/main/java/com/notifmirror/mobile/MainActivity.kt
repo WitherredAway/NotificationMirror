@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import android.text.Editable
 import android.text.TextUtils
 import android.text.TextWatcher
@@ -474,7 +475,33 @@ class MainActivity : AppCompatActivity() {
     private fun syncCurrentNotifications() {
         val listener = NotificationListener.instance
         if (listener == null) {
-            Toast.makeText(this, "Notification listener not active", Toast.LENGTH_SHORT).show()
+            if (isNotificationListenerEnabled()) {
+                // Permission is still granted but the OS has unbound the service
+                // (battery optimization / low memory). Ask it to rebind so the
+                // listener recovers, instead of dead-ending the user.
+                try {
+                    NotificationListenerService.requestRebind(
+                        ComponentName(this, NotificationListener::class.java)
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to request listener rebind", e)
+                }
+                Toast.makeText(
+                    this,
+                    "Reconnecting notification service\u2026 try Sync again in a moment",
+                    Toast.LENGTH_LONG
+                ).show()
+            } else {
+                // Permission was actually revoked: send the user to enable it.
+                AlertDialog.Builder(this)
+                    .setTitle("Notification Access Required")
+                    .setMessage("Notification access is off, so there's nothing to sync. Please re-enable it for Notification Mirror.")
+                    .setPositiveButton("Open Settings") { _, _ ->
+                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
             return
         }
         Toast.makeText(this, "Syncing notifications...", Toast.LENGTH_SHORT).show()

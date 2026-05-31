@@ -3,6 +3,7 @@ package com.notifmirror.mobile
 import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Build
@@ -93,6 +94,36 @@ class NotificationListener : NotificationListenerService() {
         notifLog = NotificationLog(this)
         offlineQueue = OfflineQueue(this)
         syncEncryptionKey()
+    }
+
+    /**
+     * Called when the system (re)binds this listener. This is the authoritative
+     * signal that the listener is active and [getActiveNotifications] is valid, so
+     * we (re)publish [instance] here. Relying on [onCreate] alone is unreliable
+     * because the OS can unbind and later rebind the same process without
+     * re-running onCreate.
+     */
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        instance = this
+        Log.d(TAG, "Listener connected")
+    }
+
+    /**
+     * Called when the system unbinds the listener (low memory, battery
+     * optimization, etc.). Without intervention the OS often does not rebind on
+     * its own, leaving "Sync notifications" with a null instance. Request an
+     * immediate rebind so mirroring recovers automatically.
+     */
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        instance = null
+        Log.w(TAG, "Listener disconnected; requesting rebind")
+        try {
+            requestRebind(ComponentName(this, NotificationListener::class.java))
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to request rebind", e)
+        }
     }
 
     private fun syncEncryptionKey(retryCount: Int = 0) {
@@ -743,31 +774,7 @@ class NotificationListener : NotificationListenerService() {
                 // Send reconciliation message: tells the watch which notification keys
                 // are currently active so it can remove any stale ones that were missed
                 // (e.g. dismissals lost during service restart)
-                try {
-                    val activeKeys = JSONArray()
-                    for (sbn2 in (getActiveNotifications() ?: emptyArray())) {
-                        activeKeys.put(sbn2.key)
-                    }
-                    val reconcileJson = JSONObject().apply {
-                        put("action", "reconcile")
-                        put("activeKeys", activeKeys)
-                    }
-                    val reconcileBytes = CryptoHelper.encrypt(
-                        reconcileJson.toString().toByteArray(Charsets.UTF_8), key
-                    )
-                    for (node in nodes) {
-                        try {
-                            Wearable.getMessageClient(this@NotificationListener)
-                                .sendMessage(node.id, PATH_RECONCILE, reconcileBytes)
-                                .await()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to send reconcile to node ${node.displayName}: ${e.message}")
-                        }
-                    }
-                    Log.d(TAG, "Sent reconciliation with ${activeKeys.length()} active keys")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to send reconciliation", e)
-                }
+                sendReconciliationMessage(key, nodes)
 
                 Log.d(TAG, "Sync complete: $syncCount notifications sent")
                 onComplete?.invoke(syncCount)
@@ -775,6 +782,59 @@ class NotificationListener : NotificationListenerService() {
                 Log.e(TAG, "Failed to sync notifications", e)
                 onComplete?.invoke(0)
             }
+        }
+    }
+
+    /**
+     * Lightweight reconcile: sends ONLY the set of currently-active notification keys
+     * to the watch so it can drop any stale notifications, without re-forwarding the
+     * notifications themselves. Cheap enough to run whenever the watch wakes up.
+     */
+    fun sendReconciliation() {
+        scope.launch {
+            try {
+                val nodes = Wearable.getNodeClient(this@NotificationListener)
+                    .connectedNodes.await()
+                if (nodes.isEmpty()) {
+                    Log.w(TAG, "No connected watch nodes for reconcile")
+                    return@launch
+                }
+                val key = CryptoHelper.getOrCreateKey(this@NotificationListener)
+                sendReconciliationMessage(key, nodes)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send standalone reconciliation", e)
+            }
+        }
+    }
+
+    private suspend fun sendReconciliationMessage(
+        key: javax.crypto.SecretKey,
+        nodes: List<com.google.android.gms.wearable.Node>
+    ) {
+        try {
+            val activeKeys = JSONArray()
+            for (sbn2 in (getActiveNotifications() ?: emptyArray())) {
+                activeKeys.put(sbn2.key)
+            }
+            val reconcileJson = JSONObject().apply {
+                put("action", "reconcile")
+                put("activeKeys", activeKeys)
+            }
+            val reconcileBytes = CryptoHelper.encrypt(
+                reconcileJson.toString().toByteArray(Charsets.UTF_8), key
+            )
+            for (node in nodes) {
+                try {
+                    Wearable.getMessageClient(this@NotificationListener)
+                        .sendMessage(node.id, PATH_RECONCILE, reconcileBytes)
+                        .await()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to send reconcile to node ${node.displayName}: ${e.message}")
+                }
+            }
+            Log.d(TAG, "Sent reconciliation with ${activeKeys.length()} active keys")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send reconciliation", e)
         }
     }
 

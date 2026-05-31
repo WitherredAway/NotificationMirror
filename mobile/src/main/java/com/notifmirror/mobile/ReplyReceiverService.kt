@@ -34,6 +34,7 @@ class ReplyReceiverService : WearableListenerService() {
             "/request_key" -> handleKeyRequest()
             "/mirroring_toggle" -> handleMirroringToggle(messageEvent)
             "/request_sync" -> handleRequestSync()
+            "/request_reconcile" -> handleRequestReconcile()
             "/resend_ongoing" -> handleResendOngoing(messageEvent)
         }
     }
@@ -262,6 +263,21 @@ class ReplyReceiverService : WearableListenerService() {
             }
         } else {
             Log.w(TAG, "NotificationListener not active — cannot sync")
+        }
+    }
+
+    /**
+     * Handle a lightweight reconcile request from the watch (e.g. when the watch wakes
+     * up). Sends only the set of active notification keys so the watch can drop stale
+     * ones, without re-forwarding every notification.
+     */
+    private fun handleRequestReconcile() {
+        Log.d(TAG, "Received reconcile request from watch")
+        val listener = NotificationListener.instance
+        if (listener != null) {
+            listener.sendReconciliation()
+        } else {
+            Log.w(TAG, "NotificationListener not active — cannot reconcile")
         }
     }
 
