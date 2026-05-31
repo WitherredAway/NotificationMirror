@@ -162,8 +162,14 @@ class MainActivity : AppCompatActivity() {
             syncFromPhone()
         }
 
-        // Show build timestamp
-        findViewById<TextView>(R.id.lastUpdatedText).text = "Last updated: ${BuildConfig.BUILD_TIMESTAMP}"
+        // Show build timestamp in device's local timezone with relative time
+        val buildDate = java.util.Date(BuildConfig.BUILD_TIMESTAMP_MILLIS)
+        val localFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm z", java.util.Locale.getDefault())
+        val relativeTime = android.text.format.DateUtils.getRelativeTimeSpanString(
+            BuildConfig.BUILD_TIMESTAMP_MILLIS, System.currentTimeMillis(),
+            android.text.format.DateUtils.MINUTE_IN_MILLIS
+        )
+        findViewById<TextView>(R.id.lastUpdatedText).text = "Last updated: ${localFormat.format(buildDate)} ($relativeTime)"
 
         // Check for updates and show indicator
         checkForUpdates()
